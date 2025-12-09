@@ -303,8 +303,14 @@
             border-bottom: 1px solid rgba(59, 130, 246, 0.3);
         }
         
+        .table-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
         .planning-table {
             width: 100%;
+            min-width: 420px;
             border-collapse: collapse;
         }
         
@@ -334,7 +340,7 @@
             text-align: left;
             padding-left: 6px;
             font-weight: 500;
-            font-size: 0.7rem;
+            font-size: 0.75rem;
         }
         
         .planning-table tr:last-child td {
@@ -351,8 +357,8 @@
         }
         
         .planning-table input {
-            width: 32px;
-            padding: 5px 1px;
+            width: 36px;
+            padding: 5px 2px;
             background: var(--bg-input);
             border: 1px solid var(--border-color);
             border-radius: 4px;
@@ -370,6 +376,16 @@
         .planning-table input.highlight {
             background: rgba(59, 130, 246, 0.2);
             border-color: var(--accent-blue);
+        }
+        
+        .planning-table input.error {
+            border-color: var(--accent-red);
+            background: rgba(239, 68, 68, 0.2);
+        }
+        
+        .planning-table input.totaal-field {
+            background: var(--bg-card);
+            font-weight: 600;
         }
         
         .planning-table .sug-value {
@@ -890,45 +906,49 @@
                 <!-- Group A -->
                 <div class="group-card">
                     <div class="group-header group-a">🔶 GROEP A — Pistolets</div>
-                    <table class="planning-table">
-                        <thead>
-                            <tr>
-                                <th>Product</th>
-                                <th>Sug</th>
-                                <th>Finaal</th>
-                                <th>L1</th>
-                                <th>L2</th>
-                                <th>L3</th>
-                                <th>L4</th>
-                                <th>L5</th>
-                            </tr>
-                        </thead>
-                        <tbody id="group-a-body">
-                            <!-- Filled by JS -->
-                        </tbody>
-                    </table>
+                    <div class="table-scroll">
+                        <table class="planning-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Sug</th>
+                                    <th>Totaal</th>
+                                    <th>L1</th>
+                                    <th>L2</th>
+                                    <th>L3</th>
+                                    <th>L4</th>
+                                    <th>L5</th>
+                                </tr>
+                            </thead>
+                            <tbody id="group-a-body">
+                                <!-- Filled by JS -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
                 
                 <!-- Group B -->
                 <div class="group-card">
                     <div class="group-header group-b">🔷 GROEP B — Stokbrood</div>
-                    <table class="planning-table">
-                        <thead>
-                            <tr>
-                                <th>Product</th>
-                                <th>Sug</th>
-                                <th>Finaal</th>
-                                <th>L1</th>
-                                <th>L2</th>
-                                <th>L3</th>
-                                <th>L4</th>
-                                <th>L5</th>
-                            </tr>
+                    <div class="table-scroll">
+                        <table class="planning-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Sug</th>
+                                    <th>Totaal</th>
+                                    <th>L1</th>
+                                    <th>L2</th>
+                                    <th>L3</th>
+                                    <th>L4</th>
+                                    <th>L5</th>
+                                </tr>
                         </thead>
                         <tbody id="group-b-body">
                             <!-- Filled by JS -->
                         </tbody>
-                    </table>
+                        </table>
+                    </div>
                 </div>
                 
                 <!-- Lading Totals - BELOW BOTH GROUPS -->
@@ -1318,79 +1338,101 @@
             const groupA = products.filter(p => p.group === 'A');
             const groupB = products.filter(p => p.group === 'B');
             
-            // Get totals for each group
+            // Get totals for each group - check for manual overrides
             let totalA = 0, totalB = 0;
             groupA.forEach(p => {
-                const finaal = planningData[p.id]?.finaal || calculateSuggestion(p, currentDate);
-                result[p.id] = { finaal, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
-                totalA += finaal;
+                const totaal = planningData[p.id]?.totaal || calculateSuggestion(p, currentDate);
+                // Check if there are manual batch overrides
+                const hasManualBatches = planningData[p.id]?.l1 !== undefined;
+                result[p.id] = { 
+                    totaal, 
+                    l1: hasManualBatches ? planningData[p.id].l1 : 0, 
+                    l2: hasManualBatches ? planningData[p.id].l2 : 0, 
+                    l3: hasManualBatches ? planningData[p.id].l3 : 0, 
+                    l4: hasManualBatches ? planningData[p.id].l4 : 0, 
+                    l5: hasManualBatches ? planningData[p.id].l5 : 0 
+                };
+                totalA += totaal;
             });
             groupB.forEach(p => {
-                const finaal = planningData[p.id]?.finaal || calculateSuggestion(p, currentDate);
-                result[p.id] = { finaal, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
-                totalB += finaal;
+                const totaal = planningData[p.id]?.totaal || calculateSuggestion(p, currentDate);
+                const hasManualBatches = planningData[p.id]?.l1 !== undefined;
+                result[p.id] = { 
+                    totaal, 
+                    l1: hasManualBatches ? planningData[p.id].l1 : 0, 
+                    l2: hasManualBatches ? planningData[p.id].l2 : 0, 
+                    l3: hasManualBatches ? planningData[p.id].l3 : 0, 
+                    l4: hasManualBatches ? planningData[p.id].l4 : 0, 
+                    l5: hasManualBatches ? planningData[p.id].l5 : 0 
+                };
+                totalB += totaal;
             });
             
-            // Calculate batch totals for groups
-            let batchesA = [0, 0, 0, 0, 0];
-            let batchesB = [0, 0, 0, 0, 0];
+            // Only auto-distribute if no manual batches set
+            const needsAutoDistribute = !Object.keys(planningData).some(k => planningData[k]?.l1 !== undefined);
             
-            if (isWeekendDay) {
-                // Weekend logic
-                let remainingA = totalA;
-                let remainingB = totalB;
+            if (needsAutoDistribute) {
+                // Calculate batch totals for groups
+                let batchesA = [0, 0, 0, 0, 0];
+                let batchesB = [0, 0, 0, 0, 0];
                 
-                // L1: A up to 16, B fills remaining (up to 15)
-                batchesA[0] = Math.min(remainingA, SETTINGS.oven1Max);
-                remainingA -= batchesA[0];
-                batchesB[0] = Math.min(remainingB, SETTINGS.batchMax - batchesA[0]);
-                remainingB -= batchesB[0];
-                
-                // L2: If skipB, all A (up to 31), else normal
-                if (skipBInL2) {
-                    batchesA[1] = Math.min(remainingA, SETTINGS.batchMax);
-                    remainingA -= batchesA[1];
-                    batchesB[1] = 0;
+                if (isWeekendDay) {
+                    // Weekend logic
+                    let remainingA = totalA;
+                    let remainingB = totalB;
+                    
+                    // L1: A up to 16, B fills remaining (up to 15)
+                    batchesA[0] = Math.min(remainingA, SETTINGS.oven1Max);
+                    remainingA -= batchesA[0];
+                    batchesB[0] = Math.min(remainingB, SETTINGS.batchMax - batchesA[0]);
+                    remainingB -= batchesB[0];
+                    
+                    // L2: If skipB, all A (up to 31), else normal
+                    if (skipBInL2) {
+                        batchesA[1] = Math.min(remainingA, SETTINGS.batchMax);
+                        remainingA -= batchesA[1];
+                        batchesB[1] = 0;
+                    } else {
+                        batchesA[1] = Math.min(remainingA, SETTINGS.oven1Max);
+                        remainingA -= batchesA[1];
+                        batchesB[1] = Math.min(remainingB, SETTINGS.batchMax - batchesA[1]);
+                        remainingB -= batchesB[1];
+                    }
+                    
+                    // L3-L5: Continue filling
+                    for (let i = 2; i < 5; i++) {
+                        batchesA[i] = Math.min(remainingA, SETTINGS.oven1Max);
+                        remainingA -= batchesA[i];
+                        batchesB[i] = Math.min(remainingB, SETTINGS.batchMax - batchesA[i]);
+                        remainingB -= batchesB[i];
+                    }
                 } else {
-                    batchesA[1] = Math.min(remainingA, SETTINGS.oven1Max);
-                    remainingA -= batchesA[1];
-                    batchesB[1] = Math.min(remainingB, SETTINGS.batchMax - batchesA[1]);
-                    remainingB -= batchesB[1];
+                    // Weekday logic: 50/50 split
+                    batchesA[0] = Math.ceil(totalA / 2);
+                    batchesA[1] = totalA - batchesA[0];
+                    batchesB[0] = Math.ceil(totalB / 2);
+                    batchesB[1] = totalB - batchesB[0];
                 }
                 
-                // L3-L5: Continue filling
-                for (let i = 2; i < 5; i++) {
-                    batchesA[i] = Math.min(remainingA, SETTINGS.oven1Max);
-                    remainingA -= batchesA[i];
-                    batchesB[i] = Math.min(remainingB, SETTINGS.batchMax - batchesA[i]);
-                    remainingB -= batchesB[i];
-                }
-            } else {
-                // Weekday logic: 50/50 split
-                batchesA[0] = Math.ceil(totalA / 2);
-                batchesA[1] = totalA - batchesA[0];
-                batchesB[0] = Math.ceil(totalB / 2);
-                batchesB[1] = totalB - batchesB[0];
+                // Distribute to individual products proportionally
+                groupA.forEach(p => {
+                    const totaal = result[p.id].totaal;
+                    const ratio = totalA > 0 ? totaal / totalA : 0;
+                    for (let i = 0; i < 5; i++) {
+                        result[p.id][`l${i+1}`] = Math.round(batchesA[i] * ratio);
+                    }
+                });
+                
+                groupB.forEach(p => {
+                    const totaal = result[p.id].totaal;
+                    const ratio = totalB > 0 ? totaal / totalB : 0;
+                    for (let i = 0; i < 5; i++) {
+                        result[p.id][`l${i+1}`] = Math.round(batchesB[i] * ratio);
+                    }
+                });
             }
             
-            // Distribute to individual products proportionally
-            groupA.forEach(p => {
-                const finaal = result[p.id].finaal;
-                const ratio = totalA > 0 ? finaal / totalA : 0;
-                for (let i = 0; i < 5; i++) {
-                    result[p.id][`l${i+1}`] = Math.round(batchesA[i] * ratio);
-                }
-            });
-            
-            groupB.forEach(p => {
-                const finaal = result[p.id].finaal;
-                const ratio = totalB > 0 ? finaal / totalB : 0;
-                for (let i = 0; i < 5; i++) {
-                    result[p.id][`l${i+1}`] = Math.round(batchesB[i] * ratio);
-                }
-            });
-            
-            return { products: result, batchesA, batchesB };
+            return { products: result };
         }
         
         // ===== UI RENDERING =====
@@ -1415,25 +1457,30 @@
             const groupABody = document.getElementById('group-a-body');
             const groupAProducts = PRODUCTS.filter(p => p.group === 'A');
             let htmlA = '';
-            let totalA = { sug: 0, finaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
+            let totalA = { sug: 0, totaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
             
             groupAProducts.forEach(p => {
                 const sug = calculateSuggestion(p, currentDate);
                 const data = distribution.products[p.id];
+                // Calculate totaal from batches
+                const batchSum = data.l1 + data.l2 + data.l3 + data.l4 + data.l5;
+                const totaal = planningData[p.id]?.totaal ?? batchSum;
+                const hasError = totaal !== batchSum;
+                
                 totalA.sug += sug;
-                totalA.finaal += data.finaal;
+                totalA.totaal += totaal;
                 for (let i = 1; i <= 5; i++) totalA[`l${i}`] += data[`l${i}`];
                 
                 htmlA += `
                     <tr>
                         <td>${p.short}</td>
                         <td class="sug-value">${sug}</td>
-                        <td><input type="number" value="${data.finaal}" data-product="${p.id}" data-field="finaal" onchange="updatePlanning(this)"></td>
-                        <td><input type="number" value="${data.l1}" data-product="${p.id}" data-field="l1" onchange="updatePlanning(this)"></td>
-                        <td><input type="number" value="${data.l2}" data-product="${p.id}" data-field="l2" onchange="updatePlanning(this)"></td>
-                        <td><input type="number" value="${data.l3}" data-product="${p.id}" data-field="l3" onchange="updatePlanning(this)"></td>
-                        <td><input type="number" value="${data.l4}" data-product="${p.id}" data-field="l4" onchange="updatePlanning(this)"></td>
-                        <td><input type="number" value="${data.l5}" data-product="${p.id}" data-field="l5" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" class="totaal-field ${hasError ? 'error' : ''}" value="${totaal}" data-product="${p.id}" data-field="totaal" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l1}" data-product="${p.id}" data-field="l1" onchange="updateBatch(this)"></td>
+                        <td><input type="number" value="${data.l2}" data-product="${p.id}" data-field="l2" onchange="updateBatch(this)"></td>
+                        <td><input type="number" value="${data.l3}" data-product="${p.id}" data-field="l3" onchange="updateBatch(this)"></td>
+                        <td><input type="number" value="${data.l4}" data-product="${p.id}" data-field="l4" onchange="updateBatch(this)"></td>
+                        <td><input type="number" value="${data.l5}" data-product="${p.id}" data-field="l5" onchange="updateBatch(this)"></td>
                     </tr>
                 `;
             });
@@ -1442,7 +1489,7 @@
                 <tr class="total-row">
                     <td>TOTAAL A</td>
                     <td>${totalA.sug}</td>
-                    <td>${totalA.finaal}</td>
+                    <td>${totalA.totaal}</td>
                     <td>${totalA.l1}</td>
                     <td>${totalA.l2}</td>
                     <td>${totalA.l3}</td>
@@ -1456,25 +1503,30 @@
             const groupBBody = document.getElementById('group-b-body');
             const groupBProducts = PRODUCTS.filter(p => p.group === 'B');
             let htmlB = '';
-            let totalB = { sug: 0, finaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
+            let totalB = { sug: 0, totaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
             
             groupBProducts.forEach(p => {
                 const sug = calculateSuggestion(p, currentDate);
                 const data = distribution.products[p.id];
+                // Calculate totaal from batches
+                const batchSum = data.l1 + data.l2 + data.l3 + data.l4 + data.l5;
+                const totaal = planningData[p.id]?.totaal ?? batchSum;
+                const hasError = totaal !== batchSum;
+                
                 totalB.sug += sug;
-                totalB.finaal += data.finaal;
+                totalB.totaal += totaal;
                 for (let i = 1; i <= 5; i++) totalB[`l${i}`] += data[`l${i}`];
                 
                 htmlB += `
                     <tr>
                         <td>${p.short}</td>
                         <td class="sug-value">${sug}</td>
-                        <td><input type="number" value="${data.finaal}" data-product="${p.id}" data-field="finaal" onchange="updatePlanning(this)"></td>
-                        <td><input type="number" value="${data.l1}" data-product="${p.id}" data-field="l1" onchange="updatePlanning(this)"></td>
-                        <td><input type="number" value="${data.l2}" data-product="${p.id}" data-field="l2" onchange="updatePlanning(this)"></td>
-                        <td><input type="number" value="${data.l3}" data-product="${p.id}" data-field="l3" onchange="updatePlanning(this)"></td>
-                        <td><input type="number" value="${data.l4}" data-product="${p.id}" data-field="l4" onchange="updatePlanning(this)"></td>
-                        <td><input type="number" value="${data.l5}" data-product="${p.id}" data-field="l5" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" class="totaal-field ${hasError ? 'error' : ''}" value="${totaal}" data-product="${p.id}" data-field="totaal" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l1}" data-product="${p.id}" data-field="l1" onchange="updateBatch(this)"></td>
+                        <td><input type="number" value="${data.l2}" data-product="${p.id}" data-field="l2" onchange="updateBatch(this)"></td>
+                        <td><input type="number" value="${data.l3}" data-product="${p.id}" data-field="l3" onchange="updateBatch(this)"></td>
+                        <td><input type="number" value="${data.l4}" data-product="${p.id}" data-field="l4" onchange="updateBatch(this)"></td>
+                        <td><input type="number" value="${data.l5}" data-product="${p.id}" data-field="l5" onchange="updateBatch(this)"></td>
                     </tr>
                 `;
             });
@@ -1483,7 +1535,7 @@
                 <tr class="total-row">
                     <td>TOTAAL B</td>
                     <td>${totalB.sug}</td>
-                    <td>${totalB.finaal}</td>
+                    <td>${totalB.totaal}</td>
                     <td>${totalB.l1}</td>
                     <td>${totalB.l2}</td>
                     <td>${totalB.l3}</td>
@@ -1955,6 +2007,47 @@
             }
             planningData[productId][field] = value;
             
+            // If totaal changed, auto-distribute to batches
+            if (field === 'totaal') {
+                // Clear manual batch overrides to trigger auto-distribution
+                delete planningData[productId].l1;
+                delete planningData[productId].l2;
+                delete planningData[productId].l3;
+                delete planningData[productId].l4;
+                delete planningData[productId].l5;
+            }
+            
+            // Recalculate totals display
+            renderPlanning();
+        }
+        
+        function updateBatch(input) {
+            const productId = input.dataset.product;
+            const field = input.dataset.field;
+            const value = parseInt(input.value) || 0;
+            
+            if (!planningData[productId]) {
+                planningData[productId] = {};
+            }
+            planningData[productId][field] = value;
+            
+            // Recalculate the totaal from all batches
+            const l1 = planningData[productId].l1 ?? parseInt(document.querySelector(`input[data-product="${productId}"][data-field="l1"]`)?.value) || 0;
+            const l2 = planningData[productId].l2 ?? parseInt(document.querySelector(`input[data-product="${productId}"][data-field="l2"]`)?.value) || 0;
+            const l3 = planningData[productId].l3 ?? parseInt(document.querySelector(`input[data-product="${productId}"][data-field="l3"]`)?.value) || 0;
+            const l4 = planningData[productId].l4 ?? parseInt(document.querySelector(`input[data-product="${productId}"][data-field="l4"]`)?.value) || 0;
+            const l5 = planningData[productId].l5 ?? parseInt(document.querySelector(`input[data-product="${productId}"][data-field="l5"]`)?.value) || 0;
+            
+            // Store all batch values
+            planningData[productId].l1 = l1;
+            planningData[productId].l2 = l2;
+            planningData[productId].l3 = l3;
+            planningData[productId].l4 = l4;
+            planningData[productId].l5 = l5;
+            
+            // Auto-update totaal to match batch sum
+            planningData[productId].totaal = l1 + l2 + l3 + l4 + l5;
+            
             // Recalculate totals display
             renderPlanning();
         }
@@ -1983,7 +2076,10 @@
                     const field = input.dataset.field;
                     data[field] = parseInt(input.value) || 0;
                 });
-                data.totaal = data.finaal || data.l1 + data.l2 + data.l3 + data.l4 + data.l5;
+                // Use totaal field directly, or calculate from batches
+                if (!data.totaal) {
+                    data.totaal = data.l1 + data.l2 + data.l3 + data.l4 + data.l5;
+                }
                 
                 historicalData.push(data);
                 newRecords.push(data);
