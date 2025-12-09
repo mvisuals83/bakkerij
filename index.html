@@ -254,7 +254,7 @@
         
         /* ===== MAIN CONTENT ===== */
         .main {
-            padding: 16px;
+            padding: 10px;
             padding-bottom: 100px;
         }
         
@@ -276,19 +276,19 @@
         .group-card {
             background: var(--bg-dark);
             border-radius: var(--radius);
-            margin-bottom: 16px;
+            margin-bottom: 10px;
             overflow: hidden;
             box-shadow: var(--shadow);
             border: 1px solid var(--border-light);
         }
         
         .group-header {
-            padding: 12px 16px;
+            padding: 8px 10px;
             font-weight: 600;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
         
         .group-header.group-a {
@@ -309,11 +309,10 @@
         }
         
         .planning-table th {
-            padding: 8px 4px;
-            font-size: 0.7rem;
+            padding: 6px 2px;
+            font-size: 0.65rem;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
             color: var(--text-muted);
             text-align: center;
             background: var(--bg-card);
@@ -322,25 +321,20 @@
         
         .planning-table th:first-child {
             text-align: left;
-            padding-left: 8px;
-            max-width: 70px;
+            padding-left: 6px;
         }
         
         .planning-table td {
-            padding: 6px 3px;
+            padding: 4px 2px;
             text-align: center;
             border-bottom: 1px solid var(--border-light);
         }
         
         .planning-table td:first-child {
             text-align: left;
-            padding-left: 8px;
+            padding-left: 6px;
             font-weight: 500;
             font-size: 0.7rem;
-            max-width: 70px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
         
         .planning-table tr:last-child td {
@@ -357,22 +351,20 @@
         }
         
         .planning-table input {
-            width: 38px;
-            padding: 6px 2px;
+            width: 32px;
+            padding: 5px 1px;
             background: var(--bg-input);
             border: 1px solid var(--border-color);
-            border-radius: 6px;
+            border-radius: 4px;
             color: var(--text-primary);
             font-family: var(--font-mono);
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             text-align: center;
-            transition: all 0.2s;
         }
         
         .planning-table input:focus {
             outline: none;
             border-color: var(--accent-blue);
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
         }
         
         .planning-table input.highlight {
@@ -1123,12 +1115,12 @@
     <script>
         // ===== DATA & STATE =====
         const PRODUCTS = [
-            { id: 'pistolet_wit', name: 'pistolet wit', group: 'A', ppp: 15, bij0: 1, d1: 30, d2: 60, d3: 90 },
-            { id: 'pistolet_bruin', name: 'pistolet bruin', group: 'A', ppp: 15, bij0: 1, d1: 20, d2: 40, d3: 60 },
-            { id: 'tijger_pistolet', name: 'tijger pistolet', group: 'A', ppp: 15, bij0: 1, d1: 20, d2: 40, d3: 60 },
-            { id: 'piccolo', name: 'piccolo', group: 'A', ppp: 12, bij0: 1, d1: 20, d2: 40, d3: 60 },
-            { id: 'stokbrood_wit', name: 'stokbrood wit', group: 'B', ppp: 5, bij0: 1, d1: 15, d2: 30, d3: 45 },
-            { id: 'stokbrood_bruin', name: 'stokbrood bruin', group: 'B', ppp: 4, bij0: 1, d1: 12, d2: 24, d3: 36 }
+            { id: 'pistolet_wit', name: 'pistolet wit', short: 'Pist. wit', group: 'A', ppp: 15, bij0: 1, d1: 30, d2: 60, d3: 90 },
+            { id: 'pistolet_bruin', name: 'pistolet bruin', short: 'Pist. bruin', group: 'A', ppp: 15, bij0: 1, d1: 20, d2: 40, d3: 60 },
+            { id: 'tijger_pistolet', name: 'tijger pistolet', short: 'Tijger', group: 'A', ppp: 15, bij0: 1, d1: 20, d2: 40, d3: 60 },
+            { id: 'piccolo', name: 'piccolo', short: 'Piccolo', group: 'A', ppp: 12, bij0: 1, d1: 20, d2: 40, d3: 60 },
+            { id: 'stokbrood_wit', name: 'stokbrood wit', short: 'Stok. wit', group: 'B', ppp: 5, bij0: 1, d1: 15, d2: 30, d3: 45 },
+            { id: 'stokbrood_bruin', name: 'stokbrood bruin', short: 'Stok. bruin', group: 'B', ppp: 4, bij0: 1, d1: 12, d2: 24, d3: 36 }
         ];
         
         const SETTINGS = {
@@ -1434,7 +1426,7 @@
                 
                 htmlA += `
                     <tr>
-                        <td>${p.name}</td>
+                        <td>${p.short}</td>
                         <td class="sug-value">${sug}</td>
                         <td><input type="number" value="${data.finaal}" data-product="${p.id}" data-field="finaal" onchange="updatePlanning(this)"></td>
                         <td><input type="number" value="${data.l1}" data-product="${p.id}" data-field="l1" onchange="updatePlanning(this)"></td>
@@ -1475,7 +1467,7 @@
                 
                 htmlB += `
                     <tr>
-                        <td>${p.name}</td>
+                        <td>${p.short}</td>
                         <td class="sug-value">${sug}</td>
                         <td><input type="number" value="${data.finaal}" data-product="${p.id}" data-field="finaal" onchange="updatePlanning(this)"></td>
                         <td><input type="number" value="${data.l1}" data-product="${p.id}" data-field="l1" onchange="updatePlanning(this)"></td>
