@@ -1,0 +1,2128 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🥖 Bakkerij Planning</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥖</text></svg>">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            /* Dark Slate & Blue Theme */
+            --bg-darkest: #0f172a;
+            --bg-dark: #1e293b;
+            --bg-card: #334155;
+            --bg-input: #475569;
+            --bg-hover: #3b4d63;
+            
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            
+            --accent-blue: #3b82f6;
+            --accent-blue-hover: #2563eb;
+            --accent-cyan: #06b6d4;
+            --accent-green: #10b981;
+            --accent-orange: #f97316;
+            --accent-red: #ef4444;
+            --accent-yellow: #eab308;
+            
+            --border-color: #475569;
+            --border-light: #334155;
+            
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+            
+            --radius: 12px;
+            --radius-sm: 8px;
+            
+            --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        /* Remove number input spinners/arrows */
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        
+        html, body {
+            font-family: var(--font-sans);
+            background: var(--bg-darkest);
+            color: var(--text-primary);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        /* ===== HEADER ===== */
+        .header {
+            background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-darkest) 100%);
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-light);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+        
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .logo-icon {
+            font-size: 1.8rem;
+        }
+        
+        .date-nav {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .date-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .date-btn:hover {
+            background: var(--accent-blue);
+            transform: scale(1.05);
+        }
+        
+        .date-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .current-date {
+            text-align: center;
+            min-width: 140px;
+        }
+        
+        .current-date .day {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        .current-date .date {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        
+        .weekend-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-red));
+            color: white;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-left: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .header-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .event-select {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            font-family: var(--font-sans);
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+        
+        .save-btn {
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+            box-shadow: var(--shadow);
+        }
+        
+        .save-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .save-btn:active {
+            transform: translateY(0);
+        }
+        
+        /* ===== NAVIGATION TABS ===== */
+        .tabs {
+            display: flex;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border-light);
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .tab {
+            flex: 1;
+            min-width: 80px;
+            padding: 14px 16px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-family: var(--font-sans);
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            white-space: nowrap;
+        }
+        
+        .tab.active {
+            color: var(--accent-blue);
+        }
+        
+        .tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--accent-blue);
+            border-radius: 3px 3px 0 0;
+        }
+        
+        .tab:hover:not(.active) {
+            color: var(--text-primary);
+            background: var(--bg-card);
+        }
+        
+        /* ===== MAIN CONTENT ===== */
+        .main {
+            padding: 16px;
+            padding-bottom: 100px;
+        }
+        
+        .page {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .page.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* ===== PLANNING TABLE ===== */
+        .group-card {
+            background: var(--bg-dark);
+            border-radius: var(--radius);
+            margin-bottom: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-light);
+        }
+        
+        .group-header {
+            padding: 12px 16px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .group-header.group-a {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(239, 68, 68, 0.1));
+            color: var(--accent-orange);
+            border-bottom: 1px solid rgba(249, 115, 22, 0.3);
+        }
+        
+        .group-header.group-b {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(6, 182, 212, 0.1));
+            color: var(--accent-cyan);
+            border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+        }
+        
+        .planning-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .planning-table th {
+            padding: 10px 8px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            text-align: center;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-light);
+        }
+        
+        .planning-table th:first-child {
+            text-align: left;
+            padding-left: 16px;
+        }
+        
+        .planning-table td {
+            padding: 8px;
+            text-align: center;
+            border-bottom: 1px solid var(--border-light);
+        }
+        
+        .planning-table td:first-child {
+            text-align: left;
+            padding-left: 16px;
+            font-weight: 500;
+        }
+        
+        .planning-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .planning-table .total-row {
+            background: var(--bg-card);
+            font-weight: 600;
+        }
+        
+        .planning-table .total-row td {
+            color: var(--text-primary);
+        }
+        
+        .planning-table input {
+            width: 100%;
+            max-width: 50px;
+            padding: 6px 4px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 0.95rem;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        
+        .planning-table input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        
+        .planning-table input.highlight {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: var(--accent-blue);
+        }
+        
+        .planning-table .sug-value {
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+        }
+        
+        /* Lading totals card */
+        .lading-card {
+            background: linear-gradient(135deg, var(--bg-card), var(--bg-dark));
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-color);
+        }
+        
+        .lading-header {
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .lading-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+        }
+        
+        .lading-item {
+            text-align: center;
+            padding: 10px 8px;
+            background: var(--bg-dark);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-light);
+        }
+        
+        .lading-item .label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+        
+        .lading-item .value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            color: var(--accent-blue);
+        }
+        
+        .lading-item.warning .value {
+            color: var(--accent-orange);
+        }
+        
+        .lading-item.danger .value {
+            color: var(--accent-red);
+        }
+        
+        /* ===== VORIGE WEKEN (Reference) ===== */
+        .reference-card {
+            background: var(--bg-dark);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-top: 24px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-light);
+        }
+        
+        .reference-header {
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+        }
+        
+        .reference-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        
+        .reference-table th {
+            padding: 8px 6px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            text-align: center;
+            border-bottom: 1px solid var(--border-light);
+        }
+        
+        .reference-table th:first-child {
+            text-align: left;
+        }
+        
+        .reference-table td {
+            padding: 6px;
+            text-align: center;
+            border-bottom: 1px solid var(--border-light);
+            font-family: var(--font-mono);
+        }
+        
+        .reference-table td:first-child {
+            text-align: left;
+            font-family: var(--font-sans);
+            font-weight: 500;
+        }
+        
+        .reference-table .breuk {
+            color: var(--accent-red);
+            font-weight: 600;
+        }
+        
+        .reference-table .event-row td {
+            color: var(--text-muted);
+            font-style: italic;
+            font-family: var(--font-sans);
+            font-size: 0.8rem;
+        }
+        
+        /* ===== BREUK INVOER PAGE ===== */
+        .breuk-date-selector {
+            background: var(--bg-dark);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+        }
+        
+        .breuk-date-selector label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        
+        .breuk-date-selector select {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            font-size: 1rem;
+        }
+        
+        .breuk-grid {
+            display: grid;
+            gap: 12px;
+        }
+        
+        .breuk-item {
+            background: var(--bg-dark);
+            border-radius: var(--radius);
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-light);
+        }
+        
+        .breuk-item .product-info {
+            flex: 1;
+        }
+        
+        .breuk-item .product-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .breuk-item .product-baked {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        
+        .breuk-item input {
+            width: 80px;
+            padding: 12px;
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--accent-red);
+            font-family: var(--font-mono);
+            font-size: 1.2rem;
+            font-weight: 600;
+            text-align: center;
+        }
+        
+        .breuk-item input:focus {
+            outline: none;
+            border-color: var(--accent-red);
+        }
+        
+        .breuk-save-btn {
+            width: 100%;
+            padding: 16px;
+            margin-top: 16px;
+            background: linear-gradient(135deg, var(--accent-green), #059669);
+            border: none;
+            border-radius: var(--radius);
+            color: white;
+            font-family: var(--font-sans);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: var(--shadow);
+        }
+        
+        /* ===== HISTORIEK PAGE ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: var(--bg-dark);
+            border-radius: var(--radius);
+            padding: 16px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-light);
+        }
+        
+        .stat-card .label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+        
+        .stat-card .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+        
+        .stat-card.green .value { color: var(--accent-green); }
+        .stat-card.red .value { color: var(--accent-red); }
+        .stat-card.blue .value { color: var(--accent-blue); }
+        .stat-card.orange .value { color: var(--accent-orange); }
+        
+        .history-table {
+            width: 100%;
+            background: var(--bg-dark);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        
+        .history-table th {
+            padding: 12px;
+            background: var(--bg-card);
+            font-size: 0.8rem;
+            text-align: left;
+            color: var(--text-secondary);
+        }
+        
+        .history-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-light);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+        }
+        
+        .history-table td:first-child {
+            font-family: var(--font-sans);
+        }
+        
+        /* ===== INSTELLINGEN PAGE ===== */
+        .settings-section {
+            background: var(--bg-dark);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-light);
+        }
+        
+        .settings-section h3 {
+            font-size: 1rem;
+            margin-bottom: 16px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+        
+        .setting-row:last-child {
+            border-bottom: none;
+        }
+        
+        .setting-row label {
+            font-size: 0.95rem;
+        }
+        
+        .setting-row input[type="number"] {
+            width: 80px;
+            padding: 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            text-align: center;
+        }
+        
+        .setting-row select {
+            padding: 8px 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+        }
+        
+        .toggle {
+            position: relative;
+            width: 50px;
+            height: 28px;
+        }
+        
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-input);
+            border-radius: 28px;
+            transition: 0.3s;
+        }
+        
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        
+        .toggle input:checked + .toggle-slider {
+            background: var(--accent-green);
+        }
+        
+        .toggle input:checked + .toggle-slider::before {
+            transform: translateX(22px);
+        }
+        
+        /* ===== TOAST NOTIFICATIONS ===== */
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            padding: 14px 24px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 1000;
+            opacity: 0;
+            transition: all 0.3s ease;
+            border: 1px solid var(--border-color);
+        }
+        
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        
+        .toast.success {
+            border-left: 4px solid var(--accent-green);
+        }
+        
+        .toast.error {
+            border-left: 4px solid var(--accent-red);
+        }
+        
+        /* ===== LOADING STATE ===== */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 480px) {
+            .header {
+                padding: 12px 16px;
+            }
+            
+            .logo {
+                font-size: 1.2rem;
+            }
+            
+            .save-btn span {
+                display: none;
+            }
+            
+            .planning-table th,
+            .planning-table td {
+                padding: 6px 4px;
+                font-size: 0.8rem;
+            }
+            
+            .planning-table input {
+                max-width: 40px;
+                padding: 4px 2px;
+                font-size: 0.85rem;
+            }
+            
+            .lading-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            
+            .lading-item:nth-child(4),
+            .lading-item:nth-child(5) {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-top">
+                <div class="logo">
+                    <span class="logo-icon">🥖</span>
+                    <span>Bakkerij</span>
+                </div>
+                <div class="date-nav">
+                    <button class="date-btn" onclick="changeDate(-1)">‹</button>
+                    <div class="current-date">
+                        <div class="day" id="current-day">zaterdag</div>
+                        <div class="date" id="current-date">06/12/2025</div>
+                    </div>
+                    <button class="date-btn" onclick="changeDate(1)">›</button>
+                    <span class="weekend-badge" id="weekend-badge" style="display: none;">WEEKEND</span>
+                </div>
+            </div>
+            <div class="header-controls">
+                <select class="event-select" id="event-select">
+                    <option value="Normal">Normal</option>
+                    <option value="Snow">❄️ Snow</option>
+                    <option value="BBQ">🔥 BBQ Weer</option>
+                    <option value="Holiday">🎉 Feestdag</option>
+                    <option value="Promo">📢 Promotie</option>
+                </select>
+                <button class="save-btn" onclick="savePlanning()">
+                    💾 <span>Opslaan</span>
+                </button>
+            </div>
+        </header>
+        
+        <!-- Navigation Tabs -->
+        <nav class="tabs">
+            <button class="tab active" data-page="planning">📋 Planning</button>
+            <button class="tab" data-page="breuk">📊 Breuk</button>
+            <button class="tab" data-page="historiek">📈 Historiek</button>
+            <button class="tab" data-page="instellingen">⚙️ Instellingen</button>
+        </nav>
+        
+        <!-- Main Content -->
+        <main class="main">
+            <!-- PLANNING PAGE -->
+            <div class="page active" id="page-planning">
+                <!-- Group A -->
+                <div class="group-card">
+                    <div class="group-header group-a">🔶 GROEP A — Pistolets</div>
+                    <table class="planning-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Sug</th>
+                                <th>Finaal</th>
+                                <th>L1</th>
+                                <th>L2</th>
+                                <th>L3</th>
+                                <th>L4</th>
+                                <th>L5</th>
+                            </tr>
+                        </thead>
+                        <tbody id="group-a-body">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Group B -->
+                <div class="group-card">
+                    <div class="group-header group-b">🔷 GROEP B — Stokbrood</div>
+                    <table class="planning-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Sug</th>
+                                <th>Finaal</th>
+                                <th>L1</th>
+                                <th>L2</th>
+                                <th>L3</th>
+                                <th>L4</th>
+                                <th>L5</th>
+                            </tr>
+                        </thead>
+                        <tbody id="group-b-body">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Lading Totals - BELOW BOTH GROUPS -->
+                <div class="lading-card">
+                    <div class="lading-header">📦 Totaal Lading</div>
+                    <div class="lading-grid" id="lading-totals">
+                        <div class="lading-item"><div class="label">L1</div><div class="value" id="lading-l1">0</div></div>
+                        <div class="lading-item"><div class="label">L2</div><div class="value" id="lading-l2">0</div></div>
+                        <div class="lading-item"><div class="label">L3</div><div class="value" id="lading-l3">0</div></div>
+                        <div class="lading-item"><div class="label">L4</div><div class="value" id="lading-l4">0</div></div>
+                        <div class="lading-item"><div class="label">L5</div><div class="value" id="lading-l5">0</div></div>
+                    </div>
+                </div>
+                
+                <!-- Reference Section -->
+                <div class="reference-card">
+                    <div class="reference-header">📊 Vorige Weken (zelfde dag)</div>
+                    <table class="reference-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>W-1</th>
+                                <th>Brk</th>
+                                <th>W-2</th>
+                                <th>Brk</th>
+                                <th>W-3</th>
+                                <th>Brk</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reference-body">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- BREUK PAGE -->
+            <div class="page" id="page-breuk">
+                <div class="breuk-date-selector">
+                    <label>Selecteer datum voor breuk invoer:</label>
+                    <select id="breuk-date-select" onchange="loadBreukData()">
+                        <!-- Filled by JS -->
+                    </select>
+                </div>
+                <div class="breuk-grid" id="breuk-grid">
+                    <!-- Filled by JS -->
+                </div>
+                <button class="breuk-save-btn" onclick="saveBreuk()">
+                    ✅ Breuk Opslaan
+                </button>
+            </div>
+            
+            <!-- HISTORIEK PAGE -->
+            <div class="page" id="page-historiek">
+                <div class="stats-grid">
+                    <div class="stat-card green">
+                        <div class="label">Totaal Gebakken</div>
+                        <div class="value" id="stat-gebakken">0</div>
+                    </div>
+                    <div class="stat-card red">
+                        <div class="label">Totaal Breuk</div>
+                        <div class="value" id="stat-breuk">0</div>
+                    </div>
+                    <div class="stat-card blue">
+                        <div class="label">Verkocht</div>
+                        <div class="value" id="stat-verkocht">0</div>
+                    </div>
+                    <div class="stat-card orange">
+                        <div class="label">Breuk %</div>
+                        <div class="value" id="stat-percentage">0%</div>
+                    </div>
+                </div>
+                
+                <!-- Trend Chart -->
+                <div class="settings-section" style="margin-bottom: 16px;">
+                    <h3 style="margin-bottom: 12px;">📈 Productie Trend (laatste 14 dagen)</h3>
+                    <div id="trend-chart" style="height: 200px; position: relative; overflow: hidden;">
+                        <canvas id="chart-canvas" style="width: 100%; height: 100%;"></canvas>
+                    </div>
+                    <div style="display: flex; justify-content: center; gap: 16px; margin-top: 8px; font-size: 0.75rem;">
+                        <span style="color: var(--accent-green);">● Gebakken</span>
+                        <span style="color: var(--accent-red);">● Breuk</span>
+                    </div>
+                </div>
+                
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Gebakken</th>
+                            <th>Breuk</th>
+                            <th>%</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-body">
+                        <!-- Filled by JS -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- INSTELLINGEN PAGE -->
+            <div class="page" id="page-instellingen">
+                <div class="settings-section">
+                    <h3>⚙️ Capaciteit</h3>
+                    <div class="setting-row">
+                        <label>Oven 1 max</label>
+                        <input type="number" id="setting-oven1" value="16" onchange="saveSettings()">
+                    </div>
+                    <div class="setting-row">
+                        <label>Oven 2 max</label>
+                        <input type="number" id="setting-oven2" value="15" onchange="saveSettings()">
+                    </div>
+                    <div class="setting-row">
+                        <label>Batch max (O1+O2)</label>
+                        <input type="number" id="setting-batch-max" value="31" onchange="saveSettings()">
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>🔥 Weekend Strategie</h3>
+                    <div class="setting-row">
+                        <label>Skip Groep B in L2</label>
+                        <label class="toggle">
+                            <input type="checkbox" id="setting-skip-b" checked onchange="saveSettings()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>🥖 Stuks per Plaat</h3>
+                    <div id="ppp-settings-body"></div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>📊 Product Drempels</h3>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;">
+                        Bij 0 = verhogen als breuk=0 | D1/D2/D3 = verlagen als breuk > drempel
+                    </p>
+                    <div style="overflow-x: auto;">
+                        <table class="planning-table" style="min-width: 320px;">
+                            <thead>
+                                <tr><th>Product</th><th>+Bij0</th><th>-1 &gt;</th><th>-2 &gt;</th><th>-3 &gt;</th></tr>
+                            </thead>
+                            <tbody id="product-settings-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Database Connection - At Bottom, Collapsible -->
+                <div class="settings-section" style="margin-top: 30px; border: 1px dashed var(--border-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleDatabaseSettings()">
+                        <h3 style="display: flex; align-items: center; gap: 8px;">
+                            <span id="db-status-indicator" style="width: 10px; height: 10px; border-radius: 50%; background: var(--accent-red);"></span>
+                            ☁️ Database Sync
+                        </h3>
+                        <span id="db-toggle-arrow" style="color: var(--text-muted);">▼</span>
+                    </div>
+                    <div id="database-settings" style="display: none; margin-top: 12px;">
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px;">
+                            Verbind met Supabase om data te delen tussen apparaten.
+                        </p>
+                        <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                            <label style="font-size: 0.8rem;">Project URL</label>
+                            <input type="text" id="setting-supabase-url" placeholder="https://xxxxx.supabase.co" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem;">
+                        </div>
+                        <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                            <label style="font-size: 0.8rem;">Anon Key</label>
+                            <input type="text" id="setting-supabase-key" placeholder="eyJhbGc..." style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem;">
+                        </div>
+                        <div class="setting-row">
+                            <span id="supabase-status" style="font-size: 0.85rem; color: var(--text-muted);">⚪ Niet verbonden</span>
+                            <button onclick="testSupabaseConnection()" style="background: var(--accent-blue); color: white; border: none; padding: 8px 16px; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.85rem;">Test & Opslaan</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Toast -->
+        <div class="toast" id="toast"></div>
+    </div>
+    
+    <script>
+        // ===== DATA & STATE =====
+        const PRODUCTS = [
+            { id: 'pistolet_wit', name: 'pistolet wit', group: 'A', ppp: 15, bij0: 1, d1: 30, d2: 60, d3: 90 },
+            { id: 'pistolet_bruin', name: 'pistolet bruin', group: 'A', ppp: 15, bij0: 1, d1: 20, d2: 40, d3: 60 },
+            { id: 'tijger_pistolet', name: 'tijger pistolet', group: 'A', ppp: 15, bij0: 1, d1: 20, d2: 40, d3: 60 },
+            { id: 'piccolo', name: 'piccolo', group: 'A', ppp: 12, bij0: 1, d1: 20, d2: 40, d3: 60 },
+            { id: 'stokbrood_wit', name: 'stokbrood wit', group: 'B', ppp: 5, bij0: 1, d1: 15, d2: 30, d3: 45 },
+            { id: 'stokbrood_bruin', name: 'stokbrood bruin', group: 'B', ppp: 4, bij0: 1, d1: 12, d2: 24, d3: 36 }
+        ];
+        
+        const SETTINGS = {
+            oven1Max: 16,
+            oven2Max: 15,
+            batchMax: 31,
+            skipBInL2: true,
+            saturdayMaxBatches: 6,
+            sundayMaxBatches: 4
+        };
+        
+        let currentDate = new Date(2025, 11, 6); // December 6, 2025
+        let planningData = {};
+        let historicalData = [];
+        
+        // ===== HISTORICAL DATA (from your spreadsheet) =====
+        const INITIAL_DATA = [
+            // Week 1: 17-23 Nov 2025
+            { datum: '2025-11-17', product: 'pistolet wit', totaal: 8, l1: 4, l2: 4, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-17', product: 'pistolet bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 8, event: 'Normal' },
+            { datum: '2025-11-17', product: 'piccolo', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 1, event: 'Normal' },
+            { datum: '2025-11-17', product: 'tijger pistolet', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 6, event: 'Normal' },
+            { datum: '2025-11-17', product: 'stokbrood wit', totaal: 12, l1: 6, l2: 6, l3: 0, l4: 0, l5: 0, breuk: 16, event: 'Normal' },
+            { datum: '2025-11-17', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 7, event: 'Normal' },
+            
+            { datum: '2025-11-18', product: 'pistolet wit', totaal: 8, l1: 4, l2: 4, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-18', product: 'pistolet bruin', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-18', product: 'piccolo', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-18', product: 'tijger pistolet', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-18', product: 'stokbrood wit', totaal: 8, l1: 4, l2: 4, l3: 0, l4: 0, l5: 0, breuk: 8, event: 'Normal' },
+            { datum: '2025-11-18', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 4, event: 'Normal' },
+            
+            { datum: '2025-11-19', product: 'pistolet wit', totaal: 10, l1: 5, l2: 5, l3: 0, l4: 0, l5: 0, breuk: 8, event: 'Normal' },
+            { datum: '2025-11-19', product: 'pistolet bruin', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 2, event: 'Normal' },
+            { datum: '2025-11-19', product: 'piccolo', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 18, event: 'Normal' },
+            { datum: '2025-11-19', product: 'tijger pistolet', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-19', product: 'stokbrood wit', totaal: 8, l1: 4, l2: 4, l3: 0, l4: 0, l5: 0, breuk: 4, event: 'Normal' },
+            { datum: '2025-11-19', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            
+            { datum: '2025-11-20', product: 'pistolet wit', totaal: 7, l1: 4, l2: 3, l3: 0, l4: 0, l5: 0, breuk: 21, event: 'Normal' },
+            { datum: '2025-11-20', product: 'pistolet bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 14, event: 'Normal' },
+            { datum: '2025-11-20', product: 'piccolo', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 2, event: 'Normal' },
+            { datum: '2025-11-20', product: 'tijger pistolet', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 12, event: 'Normal' },
+            { datum: '2025-11-20', product: 'stokbrood wit', totaal: 10, l1: 5, l2: 5, l3: 0, l4: 0, l5: 0, breuk: 11, event: 'Normal' },
+            { datum: '2025-11-20', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 6, event: 'Normal' },
+            
+            { datum: '2025-11-21', product: 'pistolet wit', totaal: 12, l1: 6, l2: 6, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-21', product: 'pistolet bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-21', product: 'piccolo', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 1, event: 'Normal' },
+            { datum: '2025-11-21', product: 'tijger pistolet', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 8, event: 'Normal' },
+            { datum: '2025-11-21', product: 'stokbrood wit', totaal: 12, l1: 6, l2: 6, l3: 0, l4: 0, l5: 0, breuk: 6, event: 'Normal' },
+            { datum: '2025-11-21', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 2, event: 'Normal' },
+            
+            { datum: '2025-11-22', product: 'pistolet wit', totaal: 44, l1: 10, l2: 20, l3: 14, l4: 0, l5: 0, breuk: 39, event: 'Normal' },
+            { datum: '2025-11-22', product: 'pistolet bruin', totaal: 4, l1: 1, l2: 2, l3: 1, l4: 0, l5: 0, breuk: 12, event: 'Normal' },
+            { datum: '2025-11-22', product: 'piccolo', totaal: 4, l1: 1, l2: 1, l3: 2, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-22', product: 'tijger pistolet', totaal: 6, l1: 2, l2: 3, l3: 1, l4: 0, l5: 0, breuk: 1, event: 'Normal' },
+            { datum: '2025-11-22', product: 'stokbrood wit', totaal: 26, l1: 10, l2: 0, l3: 10, l4: 6, l5: 0, breuk: 2, event: 'Normal' },
+            { datum: '2025-11-22', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 0, l3: 1, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            
+            { datum: '2025-11-23', product: 'pistolet wit', totaal: 37, l1: 11, l2: 11, l3: 11, l4: 4, l5: 0, breuk: 29, event: 'Normal' },
+            { datum: '2025-11-23', product: 'pistolet bruin', totaal: 3, l1: 1, l2: 1, l3: 1, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-23', product: 'piccolo', totaal: 4, l1: 1, l2: 1, l3: 1, l4: 1, l5: 0, breuk: 20, event: 'Normal' },
+            { datum: '2025-11-23', product: 'tijger pistolet', totaal: 4, l1: 1, l2: 1, l3: 1, l4: 1, l5: 0, breuk: 7, event: 'Normal' },
+            { datum: '2025-11-23', product: 'stokbrood wit', totaal: 14, l1: 7, l2: 0, l3: 7, l4: 0, l5: 0, breuk: 25, event: 'Normal' },
+            { datum: '2025-11-23', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 0, l3: 1, l4: 0, l5: 0, breuk: 1, event: 'Normal' },
+            
+            // Week 2: 24-30 Nov 2025
+            { datum: '2025-11-24', product: 'pistolet wit', totaal: 10, l1: 5, l2: 5, l3: 0, l4: 0, l5: 0, breuk: 77, event: 'Normal' },
+            { datum: '2025-11-24', product: 'pistolet bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 17, event: 'Normal' },
+            { datum: '2025-11-24', product: 'piccolo', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-24', product: 'tijger pistolet', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 7, event: 'Normal' },
+            { datum: '2025-11-24', product: 'stokbrood wit', totaal: 9, l1: 5, l2: 4, l3: 0, l4: 0, l5: 0, breuk: 33, event: 'Normal' },
+            { datum: '2025-11-24', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 2, event: 'Normal' },
+            
+            { datum: '2025-11-25', product: 'pistolet wit', totaal: 7, l1: 4, l2: 3, l3: 0, l4: 0, l5: 0, breuk: 2, event: 'Normal' },
+            { datum: '2025-11-25', product: 'pistolet bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 13, event: 'Normal' },
+            { datum: '2025-11-25', product: 'piccolo', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 10, event: 'Normal' },
+            { datum: '2025-11-25', product: 'tijger pistolet', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 2, event: 'Normal' },
+            { datum: '2025-11-25', product: 'stokbrood wit', totaal: 9, l1: 5, l2: 4, l3: 0, l4: 0, l5: 0, breuk: 8, event: 'Normal' },
+            { datum: '2025-11-25', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 5, event: 'Normal' },
+            
+            { datum: '2025-11-26', product: 'pistolet wit', totaal: 10, l1: 5, l2: 5, l3: 0, l4: 0, l5: 0, breuk: 12, event: 'Normal' },
+            { datum: '2025-11-26', product: 'pistolet bruin', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-26', product: 'piccolo', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-26', product: 'tijger pistolet', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 7, event: 'Normal' },
+            { datum: '2025-11-26', product: 'stokbrood wit', totaal: 9, l1: 5, l2: 4, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-26', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            
+            { datum: '2025-11-27', product: 'pistolet wit', totaal: 6, l1: 3, l2: 3, l3: 0, l4: 0, l5: 0, breuk: 15, event: 'Normal' },
+            { datum: '2025-11-27', product: 'pistolet bruin', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-27', product: 'piccolo', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 5, event: 'Normal' },
+            { datum: '2025-11-27', product: 'tijger pistolet', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 3, event: 'Normal' },
+            { datum: '2025-11-27', product: 'stokbrood wit', totaal: 8, l1: 4, l2: 4, l3: 0, l4: 0, l5: 0, breuk: 5, event: 'Normal' },
+            { datum: '2025-11-27', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 3, event: 'Normal' },
+            
+            { datum: '2025-11-28', product: 'pistolet wit', totaal: 14, l1: 7, l2: 7, l3: 0, l4: 0, l5: 0, breuk: 2, event: 'Normal' },
+            { datum: '2025-11-28', product: 'pistolet bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 5, event: 'Normal' },
+            { datum: '2025-11-28', product: 'piccolo', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-28', product: 'tijger pistolet', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 16, event: 'Normal' },
+            { datum: '2025-11-28', product: 'stokbrood wit', totaal: 12, l1: 6, l2: 6, l3: 0, l4: 0, l5: 0, breuk: 8, event: 'Normal' },
+            { datum: '2025-11-28', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 10, event: 'Normal' },
+            
+            { datum: '2025-11-29', product: 'pistolet wit', totaal: 45, l1: 10, l2: 20, l3: 10, l4: 5, l5: 0, breuk: 1, event: 'Normal' },
+            { datum: '2025-11-29', product: 'pistolet bruin', totaal: 4, l1: 1, l2: 1, l3: 1, l4: 1, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-29', product: 'piccolo', totaal: 6, l1: 1, l2: 3, l3: 2, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-29', product: 'tijger pistolet', totaal: 6, l1: 2, l2: 2, l3: 1, l4: 1, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-29', product: 'stokbrood wit', totaal: 28, l1: 10, l2: 0, l3: 10, l4: 8, l5: 0, breuk: 1, event: 'Normal' },
+            { datum: '2025-11-29', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 0, l3: 1, l4: 0, l5: 0, breuk: 5, event: 'Normal' },
+            
+            { datum: '2025-11-30', product: 'pistolet wit', totaal: 36, l1: 10, l2: 20, l3: 6, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-30', product: 'pistolet bruin', totaal: 4, l1: 1, l2: 2, l3: 1, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-30', product: 'piccolo', totaal: 6, l1: 2, l2: 2, l3: 2, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-30', product: 'tijger pistolet', totaal: 4, l1: 1, l2: 2, l3: 1, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-30', product: 'stokbrood wit', totaal: 14, l1: 7, l2: 0, l3: 7, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-30', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 0, l3: 1, l4: 0, l5: 0, breuk: 0, event: 'Normal' }
+        ];
+        
+        // Initialize historical data
+        historicalData = [...INITIAL_DATA];
+        
+        // ===== UTILITY FUNCTIONS =====
+        function formatDate(date) {
+            const d = String(date.getDate()).padStart(2, '0');
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const y = date.getFullYear();
+            return `${d}/${m}/${y}`;
+        }
+        
+        function formatDateISO(date) {
+            const d = String(date.getDate()).padStart(2, '0');
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const y = date.getFullYear();
+            return `${y}-${m}-${d}`;
+        }
+        
+        function getDayName(date) {
+            const days = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'];
+            return days[date.getDay()];
+        }
+        
+        function isWeekend(date) {
+            const day = date.getDay();
+            return day === 0 || day === 6;
+        }
+        
+        function isSaturday(date) {
+            return date.getDay() === 6;
+        }
+        
+        function isSunday(date) {
+            return date.getDay() === 0;
+        }
+        
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+        
+        // ===== CALCULATIONS =====
+        function getSameWeekdayData(date, weeksAgo) {
+            const targetDate = new Date(date);
+            targetDate.setDate(targetDate.getDate() - (weeksAgo * 7));
+            const dateStr = formatDateISO(targetDate);
+            return historicalData.filter(d => d.datum === dateStr);
+        }
+        
+        function calculateSuggestion(product, date) {
+            const lastWeekData = getSameWeekdayData(date, 1);
+            const productData = lastWeekData.find(d => d.product === product.name);
+            
+            if (!productData) return 1;
+            
+            let suggestion = productData.totaal;
+            const breuk = productData.breuk || 0;
+            
+            // Apply adjustment based on breuk
+            if (breuk === 0) {
+                suggestion += product.bij0;
+            } else if (breuk > product.d3) {
+                suggestion -= 3;
+            } else if (breuk > product.d2) {
+                suggestion -= 2;
+            } else if (breuk > product.d1) {
+                suggestion -= 1;
+            }
+            
+            return Math.max(1, suggestion);
+        }
+        
+        function calculateBatchDistribution(products, isWeekendDay, skipBInL2) {
+            const result = {};
+            const groupA = products.filter(p => p.group === 'A');
+            const groupB = products.filter(p => p.group === 'B');
+            
+            // Get totals for each group
+            let totalA = 0, totalB = 0;
+            groupA.forEach(p => {
+                const finaal = planningData[p.id]?.finaal || calculateSuggestion(p, currentDate);
+                result[p.id] = { finaal, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
+                totalA += finaal;
+            });
+            groupB.forEach(p => {
+                const finaal = planningData[p.id]?.finaal || calculateSuggestion(p, currentDate);
+                result[p.id] = { finaal, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
+                totalB += finaal;
+            });
+            
+            // Calculate batch totals for groups
+            let batchesA = [0, 0, 0, 0, 0];
+            let batchesB = [0, 0, 0, 0, 0];
+            
+            if (isWeekendDay) {
+                // Weekend logic
+                let remainingA = totalA;
+                let remainingB = totalB;
+                
+                // L1: A up to 16, B fills remaining (up to 15)
+                batchesA[0] = Math.min(remainingA, SETTINGS.oven1Max);
+                remainingA -= batchesA[0];
+                batchesB[0] = Math.min(remainingB, SETTINGS.batchMax - batchesA[0]);
+                remainingB -= batchesB[0];
+                
+                // L2: If skipB, all A (up to 31), else normal
+                if (skipBInL2) {
+                    batchesA[1] = Math.min(remainingA, SETTINGS.batchMax);
+                    remainingA -= batchesA[1];
+                    batchesB[1] = 0;
+                } else {
+                    batchesA[1] = Math.min(remainingA, SETTINGS.oven1Max);
+                    remainingA -= batchesA[1];
+                    batchesB[1] = Math.min(remainingB, SETTINGS.batchMax - batchesA[1]);
+                    remainingB -= batchesB[1];
+                }
+                
+                // L3-L5: Continue filling
+                for (let i = 2; i < 5; i++) {
+                    batchesA[i] = Math.min(remainingA, SETTINGS.oven1Max);
+                    remainingA -= batchesA[i];
+                    batchesB[i] = Math.min(remainingB, SETTINGS.batchMax - batchesA[i]);
+                    remainingB -= batchesB[i];
+                }
+            } else {
+                // Weekday logic: 50/50 split
+                batchesA[0] = Math.ceil(totalA / 2);
+                batchesA[1] = totalA - batchesA[0];
+                batchesB[0] = Math.ceil(totalB / 2);
+                batchesB[1] = totalB - batchesB[0];
+            }
+            
+            // Distribute to individual products proportionally
+            groupA.forEach(p => {
+                const finaal = result[p.id].finaal;
+                const ratio = totalA > 0 ? finaal / totalA : 0;
+                for (let i = 0; i < 5; i++) {
+                    result[p.id][`l${i+1}`] = Math.round(batchesA[i] * ratio);
+                }
+            });
+            
+            groupB.forEach(p => {
+                const finaal = result[p.id].finaal;
+                const ratio = totalB > 0 ? finaal / totalB : 0;
+                for (let i = 0; i < 5; i++) {
+                    result[p.id][`l${i+1}`] = Math.round(batchesB[i] * ratio);
+                }
+            });
+            
+            return { products: result, batchesA, batchesB };
+        }
+        
+        // ===== UI RENDERING =====
+        function updateHeader() {
+            document.getElementById('current-day').textContent = getDayName(currentDate);
+            document.getElementById('current-date').textContent = formatDate(currentDate);
+            
+            const badge = document.getElementById('weekend-badge');
+            if (isWeekend(currentDate)) {
+                badge.style.display = 'inline-block';
+                badge.textContent = isSaturday(currentDate) ? 'ZATERDAG' : 'ZONDAG';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+        
+        function renderPlanning() {
+            const weekend = isWeekend(currentDate);
+            const distribution = calculateBatchDistribution(PRODUCTS, weekend, SETTINGS.skipBInL2);
+            
+            // Group A
+            const groupABody = document.getElementById('group-a-body');
+            const groupAProducts = PRODUCTS.filter(p => p.group === 'A');
+            let htmlA = '';
+            let totalA = { sug: 0, finaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
+            
+            groupAProducts.forEach(p => {
+                const sug = calculateSuggestion(p, currentDate);
+                const data = distribution.products[p.id];
+                totalA.sug += sug;
+                totalA.finaal += data.finaal;
+                for (let i = 1; i <= 5; i++) totalA[`l${i}`] += data[`l${i}`];
+                
+                htmlA += `
+                    <tr>
+                        <td>${p.name}</td>
+                        <td class="sug-value">${sug}</td>
+                        <td><input type="number" value="${data.finaal}" data-product="${p.id}" data-field="finaal" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l1}" data-product="${p.id}" data-field="l1" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l2}" data-product="${p.id}" data-field="l2" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l3}" data-product="${p.id}" data-field="l3" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l4}" data-product="${p.id}" data-field="l4" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l5}" data-product="${p.id}" data-field="l5" onchange="updatePlanning(this)"></td>
+                    </tr>
+                `;
+            });
+            
+            htmlA += `
+                <tr class="total-row">
+                    <td>TOTAAL A</td>
+                    <td>${totalA.sug}</td>
+                    <td>${totalA.finaal}</td>
+                    <td>${totalA.l1}</td>
+                    <td>${totalA.l2}</td>
+                    <td>${totalA.l3}</td>
+                    <td>${totalA.l4}</td>
+                    <td>${totalA.l5}</td>
+                </tr>
+            `;
+            groupABody.innerHTML = htmlA;
+            
+            // Group B
+            const groupBBody = document.getElementById('group-b-body');
+            const groupBProducts = PRODUCTS.filter(p => p.group === 'B');
+            let htmlB = '';
+            let totalB = { sug: 0, finaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
+            
+            groupBProducts.forEach(p => {
+                const sug = calculateSuggestion(p, currentDate);
+                const data = distribution.products[p.id];
+                totalB.sug += sug;
+                totalB.finaal += data.finaal;
+                for (let i = 1; i <= 5; i++) totalB[`l${i}`] += data[`l${i}`];
+                
+                htmlB += `
+                    <tr>
+                        <td>${p.name}</td>
+                        <td class="sug-value">${sug}</td>
+                        <td><input type="number" value="${data.finaal}" data-product="${p.id}" data-field="finaal" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l1}" data-product="${p.id}" data-field="l1" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l2}" data-product="${p.id}" data-field="l2" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l3}" data-product="${p.id}" data-field="l3" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l4}" data-product="${p.id}" data-field="l4" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l5}" data-product="${p.id}" data-field="l5" onchange="updatePlanning(this)"></td>
+                    </tr>
+                `;
+            });
+            
+            htmlB += `
+                <tr class="total-row">
+                    <td>TOTAAL B</td>
+                    <td>${totalB.sug}</td>
+                    <td>${totalB.finaal}</td>
+                    <td>${totalB.l1}</td>
+                    <td>${totalB.l2}</td>
+                    <td>${totalB.l3}</td>
+                    <td>${totalB.l4}</td>
+                    <td>${totalB.l5}</td>
+                </tr>
+            `;
+            groupBBody.innerHTML = htmlB;
+            
+            // Lading totals
+            for (let i = 1; i <= 5; i++) {
+                const total = totalA[`l${i}`] + totalB[`l${i}`];
+                const el = document.getElementById(`lading-l${i}`);
+                el.textContent = total;
+                el.parentElement.className = 'lading-item' + (total > SETTINGS.batchMax ? ' danger' : (total > 25 ? ' warning' : ''));
+            }
+            
+            // Reference section
+            renderReference();
+        }
+        
+        function renderReference() {
+            const refBody = document.getElementById('reference-body');
+            let html = '';
+            
+            PRODUCTS.forEach(p => {
+                html += `<tr><td>${p.name}</td>`;
+                for (let w = 1; w <= 3; w++) {
+                    const data = getSameWeekdayData(currentDate, w);
+                    const productData = data.find(d => d.product === p.name);
+                    html += `<td>${productData?.totaal || 0}</td>`;
+                    html += `<td class="breuk">${productData?.breuk || 0}</td>`;
+                }
+                html += '</tr>';
+            });
+            
+            // Event row
+            html += '<tr class="event-row"><td>Event:</td>';
+            for (let w = 1; w <= 3; w++) {
+                const data = getSameWeekdayData(currentDate, w);
+                const event = data[0]?.event || '-';
+                html += `<td colspan="2">${event}</td>`;
+            }
+            html += '</tr>';
+            
+            refBody.innerHTML = html;
+        }
+        
+        function renderBreukPage() {
+            // Populate date selector with dates that have planning data
+            const dateSelect = document.getElementById('breuk-date-select');
+            const uniqueDates = [...new Set(historicalData.map(d => d.datum))].sort().reverse();
+            
+            dateSelect.innerHTML = uniqueDates.slice(0, 14).map(d => {
+                const date = new Date(d);
+                return `<option value="${d}">${formatDate(date)} (${getDayName(date)})</option>`;
+            }).join('');
+            
+            loadBreukData();
+        }
+        
+        function loadBreukData() {
+            const dateStr = document.getElementById('breuk-date-select').value;
+            const dayData = historicalData.filter(d => d.datum === dateStr);
+            
+            const grid = document.getElementById('breuk-grid');
+            grid.innerHTML = PRODUCTS.map(p => {
+                const data = dayData.find(d => d.product === p.name);
+                const totaal = data?.totaal || 0;
+                const breuk = data?.breuk ?? '';
+                
+                return `
+                    <div class="breuk-item">
+                        <div class="product-info">
+                            <div class="product-name">${p.name}</div>
+                            <div class="product-baked">Gebakken: ${totaal} platen (${totaal * p.ppp} stuks)</div>
+                        </div>
+                        <input type="number" value="${breuk}" data-product="${p.name}" placeholder="0">
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function renderHistoriek() {
+            // Calculate totals
+            let totalGebakken = 0;
+            let totalBreuk = 0;
+            
+            const productStats = {};
+            PRODUCTS.forEach(p => {
+                productStats[p.name] = { gebakken: 0, breuk: 0 };
+            });
+            
+            historicalData.forEach(d => {
+                const product = PRODUCTS.find(p => p.name === d.product);
+                if (product) {
+                    const stuks = d.totaal * product.ppp;
+                    productStats[d.product].gebakken += stuks;
+                    productStats[d.product].breuk += d.breuk || 0;
+                    totalGebakken += stuks;
+                    totalBreuk += d.breuk || 0;
+                }
+            });
+            
+            document.getElementById('stat-gebakken').textContent = totalGebakken.toLocaleString();
+            document.getElementById('stat-breuk').textContent = totalBreuk.toLocaleString();
+            document.getElementById('stat-verkocht').textContent = (totalGebakken - totalBreuk).toLocaleString();
+            document.getElementById('stat-percentage').textContent = totalGebakken > 0 
+                ? (totalBreuk / totalGebakken * 100).toFixed(1) + '%' 
+                : '0%';
+            
+            // Table
+            const tbody = document.getElementById('history-body');
+            tbody.innerHTML = PRODUCTS.map(p => {
+                const stats = productStats[p.name];
+                const pct = stats.gebakken > 0 ? (stats.breuk / stats.gebakken * 100).toFixed(1) : 0;
+                return `
+                    <tr>
+                        <td>${p.name}</td>
+                        <td>${stats.gebakken}</td>
+                        <td style="color: var(--accent-red)">${stats.breuk}</td>
+                        <td>${pct}%</td>
+                    </tr>
+                `;
+            }).join('');
+            
+            // Draw trend chart
+            drawTrendChart();
+        }
+        
+        function drawTrendChart() {
+            const canvas = document.getElementById('chart-canvas');
+            if (!canvas) return;
+            
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width * 2;
+            canvas.height = rect.height * 2;
+            ctx.scale(2, 2);
+            
+            const width = rect.width;
+            const height = rect.height;
+            const padding = { top: 20, right: 10, bottom: 30, left: 40 };
+            
+            // Get last 14 days of data grouped by date
+            const dates = [...new Set(historicalData.map(d => d.datum))].sort().slice(-14);
+            
+            const dailyData = dates.map(date => {
+                const dayRecords = historicalData.filter(d => d.datum === date);
+                let gebakken = 0, breuk = 0;
+                dayRecords.forEach(r => {
+                    const product = PRODUCTS.find(p => p.name === r.product);
+                    if (product) {
+                        gebakken += r.totaal * product.ppp;
+                        breuk += r.breuk || 0;
+                    }
+                });
+                return { date, gebakken, breuk };
+            });
+            
+            if (dailyData.length === 0) {
+                ctx.fillStyle = '#64748b';
+                ctx.font = '14px Plus Jakarta Sans';
+                ctx.textAlign = 'center';
+                ctx.fillText('Geen data beschikbaar', width/2, height/2);
+                return;
+            }
+            
+            const maxVal = Math.max(...dailyData.map(d => d.gebakken), 100);
+            
+            // Clear
+            ctx.clearRect(0, 0, width, height);
+            
+            // Draw grid lines
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 4; i++) {
+                const y = padding.top + (height - padding.top - padding.bottom) * (i / 4);
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(width - padding.right, y);
+                ctx.stroke();
+                
+                // Y labels
+                ctx.fillStyle = '#64748b';
+                ctx.font = '10px JetBrains Mono';
+                ctx.textAlign = 'right';
+                ctx.fillText(Math.round(maxVal * (1 - i/4)), padding.left - 5, y + 3);
+            }
+            
+            // Draw lines
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+            const pointSpacing = chartWidth / Math.max(dailyData.length - 1, 1);
+            
+            // Gebakken line (green)
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            dailyData.forEach((d, i) => {
+                const x = padding.left + i * pointSpacing;
+                const y = padding.top + chartHeight * (1 - d.gebakken / maxVal);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            
+            // Gebakken dots
+            ctx.fillStyle = '#10b981';
+            dailyData.forEach((d, i) => {
+                const x = padding.left + i * pointSpacing;
+                const y = padding.top + chartHeight * (1 - d.gebakken / maxVal);
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            // Breuk line (red)
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            dailyData.forEach((d, i) => {
+                const x = padding.left + i * pointSpacing;
+                const y = padding.top + chartHeight * (1 - d.breuk / maxVal);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            
+            // Breuk dots
+            ctx.fillStyle = '#ef4444';
+            dailyData.forEach((d, i) => {
+                const x = padding.left + i * pointSpacing;
+                const y = padding.top + chartHeight * (1 - d.breuk / maxVal);
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            // X labels (dates)
+            ctx.fillStyle = '#64748b';
+            ctx.font = '9px JetBrains Mono';
+            ctx.textAlign = 'center';
+            dailyData.forEach((d, i) => {
+                if (i % 2 === 0 || dailyData.length <= 7) {
+                    const x = padding.left + i * pointSpacing;
+                    const dateObj = new Date(d.date);
+                    const label = `${dateObj.getDate()}/${dateObj.getMonth()+1}`;
+                    ctx.fillText(label, x, height - 8);
+                }
+            });
+        }
+        
+        function renderSettings() {
+            // Product drempels
+            const container = document.getElementById('product-settings-body');
+            container.innerHTML = PRODUCTS.map(p => `
+                <tr>
+                    <td style="font-size: 0.7rem;">${p.name}</td>
+                    <td><input type="number" style="max-width:40px" value="${p.bij0}" data-product="${p.id}" data-field="bij0" onchange="updateProductSetting(this)"></td>
+                    <td><input type="number" style="max-width:40px" value="${p.d1}" data-product="${p.id}" data-field="d1" onchange="updateProductSetting(this)"></td>
+                    <td><input type="number" style="max-width:40px" value="${p.d2}" data-product="${p.id}" data-field="d2" onchange="updateProductSetting(this)"></td>
+                    <td><input type="number" style="max-width:40px" value="${p.d3}" data-product="${p.id}" data-field="d3" onchange="updateProductSetting(this)"></td>
+                </tr>
+            `).join('');
+            
+            // Stuks per plaat (ppp)
+            const pppContainer = document.getElementById('ppp-settings-body');
+            pppContainer.innerHTML = PRODUCTS.map(p => `
+                <div class="setting-row">
+                    <label style="font-size: 0.85rem;">${p.name}</label>
+                    <input type="number" style="width: 60px;" value="${p.ppp}" data-product="${p.id}" data-field="ppp" onchange="updateProductSetting(this)">
+                </div>
+            `).join('');
+            
+            // Load Supabase settings
+            const supabaseUrl = localStorage.getItem('supabase_url') || '';
+            const supabaseKey = localStorage.getItem('supabase_key') || '';
+            document.getElementById('setting-supabase-url').value = supabaseUrl;
+            document.getElementById('setting-supabase-key').value = supabaseKey;
+            
+            updateDbStatusIndicator(supabaseUrl && supabaseKey && supabase);
+        }
+        
+        function toggleDatabaseSettings() {
+            const settings = document.getElementById('database-settings');
+            const arrow = document.getElementById('db-toggle-arrow');
+            if (settings.style.display === 'none') {
+                settings.style.display = 'block';
+                arrow.textContent = '▲';
+            } else {
+                settings.style.display = 'none';
+                arrow.textContent = '▼';
+            }
+        }
+        
+        function updateDbStatusIndicator(connected) {
+            const indicator = document.getElementById('db-status-indicator');
+            if (indicator) {
+                indicator.style.background = connected ? 'var(--accent-green)' : 'var(--accent-red)';
+            }
+        }
+        
+        function updateProductSetting(input) {
+            const productId = input.dataset.product;
+            const field = input.dataset.field;
+            const value = parseInt(input.value) || 0;
+            const product = PRODUCTS.find(p => p.id === productId);
+            if (product) {
+                product[field] = value;
+                localStorage.setItem('bakkerij_products', JSON.stringify(PRODUCTS));
+                showToast('⚙️ Instelling opgeslagen');
+            }
+        }
+        
+        // ===== SUPABASE FUNCTIONS =====
+        let supabase = null;
+        
+        async function testSupabaseConnection() {
+            const url = document.getElementById('setting-supabase-url').value.trim();
+            const key = document.getElementById('setting-supabase-key').value.trim();
+            const statusEl = document.getElementById('supabase-status');
+            
+            if (!url || !key) {
+                statusEl.innerHTML = '🔴 Vul URL en Key in';
+                statusEl.style.color = 'var(--accent-red)';
+                return;
+            }
+            
+            statusEl.innerHTML = '🔄 Testen...';
+            statusEl.style.color = 'var(--accent-blue)';
+            
+            try {
+                // Initialize Supabase client
+                supabase = window.supabase.createClient(url, key);
+                
+                // Test connection by trying to select from planning_data
+                const { data, error } = await supabase.from('planning_data').select('id').limit(1);
+                
+                if (error) {
+                    // Table might not exist, try to give helpful error
+                    if (error.message.includes('does not exist')) {
+                        statusEl.innerHTML = '🔴 Tabel niet gevonden - maak eerst de tabellen';
+                        statusEl.style.color = 'var(--accent-red)';
+                    } else {
+                        statusEl.innerHTML = '🔴 Fout: ' + error.message.substring(0, 30);
+                        statusEl.style.color = 'var(--accent-red)';
+                    }
+                    return;
+                }
+                
+                // Success!
+                localStorage.setItem('supabase_url', url);
+                localStorage.setItem('supabase_key', key);
+                statusEl.innerHTML = '🟢 Verbonden!';
+                statusEl.style.color = 'var(--accent-green)';
+                updateDbStatusIndicator(true);
+                showToast('✅ Supabase verbonden!');
+                
+                // Sync data
+                await syncToSupabase();
+                
+            } catch (err) {
+                statusEl.innerHTML = '🔴 Connectie mislukt';
+                statusEl.style.color = 'var(--accent-red)';
+                console.error(err);
+            }
+        }
+        
+        async function syncToSupabase() {
+            if (!supabase) return;
+            
+            try {
+                // Upload local data to Supabase
+                for (const record of historicalData) {
+                    const { error } = await supabase.from('planning_data').upsert({
+                        datum: record.datum,
+                        product: record.product,
+                        totaal: record.totaal,
+                        l1: record.l1,
+                        l2: record.l2,
+                        l3: record.l3,
+                        l4: record.l4,
+                        l5: record.l5,
+                        breuk: record.breuk,
+                        event: record.event
+                    }, { onConflict: 'datum,product' });
+                    
+                    if (error) console.error('Sync error:', error);
+                }
+                
+                showToast('☁️ Data gesynchroniseerd');
+            } catch (err) {
+                console.error('Sync failed:', err);
+            }
+        }
+        
+        async function loadFromSupabase() {
+            if (!supabase) return false;
+            
+            try {
+                const { data, error } = await supabase
+                    .from('planning_data')
+                    .select('*')
+                    .order('datum', { ascending: false });
+                
+                if (error) throw error;
+                
+                if (data && data.length > 0) {
+                    historicalData = data;
+                    localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
+                    return true;
+                }
+            } catch (err) {
+                console.error('Load from Supabase failed:', err);
+            }
+            return false;
+        }
+        
+        async function initSupabase() {
+            const url = localStorage.getItem('supabase_url');
+            const key = localStorage.getItem('supabase_key');
+            
+            if (url && key) {
+                try {
+                    supabase = window.supabase.createClient(url, key);
+                    await loadFromSupabase();
+                } catch (err) {
+                    console.error('Supabase init failed:', err);
+                }
+            }
+        }
+        
+        function saveSettings() {
+            SETTINGS.oven1Max = parseInt(document.getElementById('setting-oven1').value) || 16;
+            SETTINGS.oven2Max = parseInt(document.getElementById('setting-oven2').value) || 15;
+            SETTINGS.batchMax = parseInt(document.getElementById('setting-batch-max').value) || 31;
+            SETTINGS.skipBInL2 = document.getElementById('setting-skip-b').checked;
+            localStorage.setItem('bakkerij_settings', JSON.stringify(SETTINGS));
+            renderPlanning();
+            showToast('⚙️ Instellingen opgeslagen');
+        }
+        
+        // ===== EVENT HANDLERS =====
+        function changeDate(delta) {
+            currentDate.setDate(currentDate.getDate() + delta);
+            planningData = {}; // Reset manual changes
+            updateHeader();
+            renderPlanning();
+        }
+        
+        function updatePlanning(input) {
+            const productId = input.dataset.product;
+            const field = input.dataset.field;
+            const value = parseInt(input.value) || 0;
+            
+            if (!planningData[productId]) {
+                planningData[productId] = {};
+            }
+            planningData[productId][field] = value;
+            
+            // Recalculate totals display
+            renderPlanning();
+        }
+        
+        function savePlanning() {
+            const dateStr = formatDateISO(currentDate);
+            const event = document.getElementById('event-select').value;
+            
+            // Remove existing data for this date
+            historicalData = historicalData.filter(d => d.datum !== dateStr);
+            
+            // Add new data
+            const newRecords = [];
+            PRODUCTS.forEach(p => {
+                const inputs = document.querySelectorAll(`input[data-product="${p.id}"]`);
+                const data = {
+                    datum: dateStr,
+                    product: p.name,
+                    totaal: 0,
+                    l1: 0, l2: 0, l3: 0, l4: 0, l5: 0,
+                    breuk: null,
+                    event: event
+                };
+                
+                inputs.forEach(input => {
+                    const field = input.dataset.field;
+                    data[field] = parseInt(input.value) || 0;
+                });
+                data.totaal = data.finaal || data.l1 + data.l2 + data.l3 + data.l4 + data.l5;
+                
+                historicalData.push(data);
+                newRecords.push(data);
+            });
+            
+            // Sort by date
+            historicalData.sort((a, b) => b.datum.localeCompare(a.datum));
+            
+            // Save to localStorage
+            localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
+            
+            // Sync to Supabase if connected
+            if (supabase) {
+                newRecords.forEach(async (record) => {
+                    await supabase.from('planning_data').upsert({
+                        datum: record.datum,
+                        product: record.product,
+                        totaal: record.totaal,
+                        l1: record.l1,
+                        l2: record.l2,
+                        l3: record.l3,
+                        l4: record.l4,
+                        l5: record.l5,
+                        breuk: record.breuk,
+                        event: record.event
+                    }, { onConflict: 'datum,product' });
+                });
+            }
+            
+            showToast(`✅ Planning voor ${formatDate(currentDate)} opgeslagen!`);
+            
+            // Update breuk page
+            renderBreukPage();
+        }
+        
+        function saveBreuk() {
+            const dateStr = document.getElementById('breuk-date-select').value;
+            const inputs = document.querySelectorAll('#breuk-grid input');
+            
+            inputs.forEach(input => {
+                const productName = input.dataset.product;
+                const breuk = parseInt(input.value) || 0;
+                
+                const record = historicalData.find(d => d.datum === dateStr && d.product === productName);
+                if (record) {
+                    record.breuk = breuk;
+                    
+                    // Sync to Supabase if connected
+                    if (supabase) {
+                        supabase.from('planning_data').upsert({
+                            datum: record.datum,
+                            product: record.product,
+                            totaal: record.totaal,
+                            l1: record.l1,
+                            l2: record.l2,
+                            l3: record.l3,
+                            l4: record.l4,
+                            l5: record.l5,
+                            breuk: record.breuk,
+                            event: record.event
+                        }, { onConflict: 'datum,product' });
+                    }
+                }
+            });
+            
+            // Save to localStorage
+            localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
+            
+            showToast(`✅ Breuk opgeslagen!`);
+            
+            // Refresh historiek
+            renderHistoriek();
+        }
+        
+        // ===== TAB NAVIGATION =====
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(`page-${tab.dataset.page}`).classList.add('active');
+                
+                // Render page content
+                if (tab.dataset.page === 'breuk') renderBreukPage();
+                if (tab.dataset.page === 'historiek') renderHistoriek();
+                if (tab.dataset.page === 'instellingen') renderSettings();
+            });
+        });
+        
+        // ===== SETTINGS HANDLERS =====
+        document.getElementById('setting-skip-b').addEventListener('change', (e) => {
+            SETTINGS.skipBInL2 = e.target.checked;
+            renderPlanning();
+        });
+        
+        // ===== INITIALIZATION =====
+        async function init() {
+            // Load from localStorage if available
+            const saved = localStorage.getItem('bakkerij_data');
+            if (saved) {
+                try {
+                    historicalData = JSON.parse(saved);
+                } catch (e) {
+                    console.error('Failed to load saved data');
+                }
+            }
+            
+            // Load saved settings
+            const savedSettings = localStorage.getItem('bakkerij_settings');
+            if (savedSettings) {
+                try {
+                    const s = JSON.parse(savedSettings);
+                    SETTINGS = { ...SETTINGS, ...s };
+                } catch (e) {}
+            }
+            
+            // Load saved product drempels and ppp
+            const savedProducts = localStorage.getItem('bakkerij_products');
+            if (savedProducts) {
+                try {
+                    const p = JSON.parse(savedProducts);
+                    p.forEach(saved => {
+                        const prod = PRODUCTS.find(x => x.id === saved.id);
+                        if (prod) {
+                            prod.bij0 = saved.bij0 ?? prod.bij0;
+                            prod.d1 = saved.d1 ?? prod.d1;
+                            prod.d2 = saved.d2 ?? prod.d2;
+                            prod.d3 = saved.d3 ?? prod.d3;
+                            prod.ppp = saved.ppp ?? prod.ppp;
+                        }
+                    });
+                } catch (e) {}
+            }
+            
+            // Apply settings to UI
+            document.getElementById('setting-oven1').value = SETTINGS.oven1Max;
+            document.getElementById('setting-oven2').value = SETTINGS.oven2Max;
+            document.getElementById('setting-batch-max').value = SETTINGS.batchMax;
+            document.getElementById('setting-skip-b').checked = SETTINGS.skipBInL2;
+            
+            // Initialize Supabase if configured
+            await initSupabase();
+            
+            updateHeader();
+            renderPlanning();
+        }
+        
+        init();
+    </script>
+</body>
+</html>
