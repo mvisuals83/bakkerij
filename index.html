@@ -309,11 +309,11 @@
         }
         
         .planning-table th {
-            padding: 10px 8px;
-            font-size: 0.75rem;
+            padding: 8px 4px;
+            font-size: 0.7rem;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.3px;
             color: var(--text-muted);
             text-align: center;
             background: var(--bg-card);
@@ -322,19 +322,25 @@
         
         .planning-table th:first-child {
             text-align: left;
-            padding-left: 16px;
+            padding-left: 8px;
+            max-width: 70px;
         }
         
         .planning-table td {
-            padding: 8px;
+            padding: 6px 3px;
             text-align: center;
             border-bottom: 1px solid var(--border-light);
         }
         
         .planning-table td:first-child {
             text-align: left;
-            padding-left: 16px;
+            padding-left: 8px;
             font-weight: 500;
+            font-size: 0.7rem;
+            max-width: 70px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .planning-table tr:last-child td {
@@ -351,15 +357,14 @@
         }
         
         .planning-table input {
-            width: 100%;
-            max-width: 50px;
-            padding: 6px 4px;
+            width: 38px;
+            padding: 6px 2px;
             background: var(--bg-input);
             border: 1px solid var(--border-color);
             border-radius: 6px;
             color: var(--text-primary);
             font-family: var(--font-mono);
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             text-align: center;
             transition: all 0.2s;
         }
@@ -367,7 +372,7 @@
         .planning-table input:focus {
             outline: none;
             border-color: var(--accent-blue);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
         }
         
         .planning-table input.highlight {
@@ -1762,13 +1767,13 @@
                 </div>
             `).join('');
             
-            // Load Supabase settings
-            const supabaseUrl = localStorage.getItem('supabase_url') || '';
-            const supabaseKey = localStorage.getItem('supabase_key') || '';
+            // Load Supabase settings (show hardcoded or localStorage values)
+            const supabaseUrl = localStorage.getItem('supabase_url') || SUPABASE_URL;
+            const supabaseKey = localStorage.getItem('supabase_key') || SUPABASE_KEY;
             document.getElementById('setting-supabase-url').value = supabaseUrl;
             document.getElementById('setting-supabase-key').value = supabaseKey;
             
-            updateDbStatusIndicator(supabaseUrl && supabaseKey && supabase);
+            updateDbStatusIndicator(supabase !== null);
         }
         
         function toggleDatabaseSettings() {
@@ -1802,7 +1807,9 @@
             }
         }
         
-        // ===== SUPABASE FUNCTIONS =====
+        // ===== SUPABASE CONFIG (hardcoded for easy sharing) =====
+        const SUPABASE_URL = 'https://ukkvaewmnedznviqnotr.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVra3ZhZXdtbmVkem52aXFub3RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyODY5NjMsImV4cCI6MjA4MDg2Mjk2M30.J_2OPImNOrrBlwjztqRmUS7Qs9Y3RF1qT6D9x4-C5UE';
         let supabase = null;
         
         async function testSupabaseConnection() {
@@ -1907,13 +1914,21 @@
         }
         
         async function initSupabase() {
-            const url = localStorage.getItem('supabase_url');
-            const key = localStorage.getItem('supabase_key');
+            // Use hardcoded credentials (or override from localStorage if set)
+            const url = localStorage.getItem('supabase_url') || SUPABASE_URL;
+            const key = localStorage.getItem('supabase_key') || SUPABASE_KEY;
             
-            if (url && key) {
+            if (url && key && window.supabase) {
                 try {
                     supabase = window.supabase.createClient(url, key);
-                    await loadFromSupabase();
+                    
+                    // Test connection
+                    const { error } = await supabase.from('planning_data').select('id').limit(1);
+                    if (!error) {
+                        updateDbStatusIndicator(true);
+                        // Load fresh data from cloud
+                        await loadFromSupabase();
+                    }
                 } catch (err) {
                     console.error('Supabase init failed:', err);
                 }
