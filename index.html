@@ -399,12 +399,6 @@
                 </div>
             </div>
             <div class="settings-section">
-                <h3>☁️ Database Status</h3>
-                <div class="setting-row">
-                    <span id="db-status">⚪ Controleren...</span>
-                </div>
-            </div>
-            <div class="settings-section">
                 <h3>🥖 Stuks per Plaat</h3>
                 <div id="ppp-settings"></div>
             </div>
@@ -416,6 +410,12 @@
                         <thead><tr><th>Product</th><th>+Bij0</th><th>-1&gt;</th><th>-2&gt;</th><th>-3&gt;</th></tr></thead>
                         <tbody id="drempel-settings"></tbody>
                     </table>
+                </div>
+            </div>
+            <div class="settings-section" style="margin-top: 20px; opacity: 0.7;">
+                <h3>☁️ Database Status</h3>
+                <div class="setting-row">
+                    <span id="db-status">⚪ Controleren...</span>
                 </div>
             </div>
         </div>
@@ -499,33 +499,36 @@
         function distributeBatches(totaal, isGroupA, isWeekendDay) {
             const batches = [0, 0, 0, 0, 0];
             let remaining = totaal;
-            const maxPerBatch = SETTINGS.batchMax; // 31 typically
-            const oven1Max = SETTINGS.oven1Max;    // 16 typically
+            const oven1Max = SETTINGS.oven1Max;    // 16
+            const oven2Max = SETTINGS.oven2Max;    // 15
+            const batchMax = SETTINGS.batchMax;   // 31
             
             if (isWeekendDay) {
-                // Weekend logic with capacity limits per batch
-                // Group A: can use up to oven1Max (16) per batch for optimal results
-                // Group B: fills remaining capacity, but SKIP L2 if setting enabled
+                const skipL2 = SETTINGS.skipBInL2;
                 
                 if (isGroupA) {
-                    // Group A: spread across batches, max 16 per batch (oven 1 priority)
+                    // Group A: normally max 16 per batch (oven 1)
+                    // BUT in L2, if skipB is on, A can use full 31 (both ovens)
                     for (let i = 0; i < 5 && remaining > 0; i++) {
-                        batches[i] = Math.min(remaining, oven1Max);
+                        let maxForThisBatch = oven1Max; // default 16
+                        if (i === 1 && skipL2) {
+                            // L2: Group A gets full capacity since B is skipping
+                            maxForThisBatch = batchMax; // 31
+                        }
+                        batches[i] = Math.min(remaining, maxForThisBatch);
                         remaining -= batches[i];
                     }
                 } else {
-                    // Group B: fill L1, SKIP L2 if setting enabled, then L3, L4, L5
-                    const skipL2 = SETTINGS.skipBInL2;
-                    const batchOrder = skipL2 ? [0, 2, 3, 4, 1] : [0, 1, 2, 3, 4]; // Skip L2 = index 1
-                    
-                    for (let idx of batchOrder) {
-                        if (remaining <= 0) break;
-                        if (skipL2 && idx === 1) continue; // Skip L2 entirely for Group B
-                        
-                        // Group B gets remaining capacity (oven 2 = ~15 plates)
-                        const maxForB = SETTINGS.oven2Max;
-                        batches[idx] = Math.min(remaining, maxForB);
-                        remaining -= batches[idx];
+                    // Group B: max 15 per batch (oven 2)
+                    // Skip L2 entirely if setting is on
+                    for (let i = 0; i < 5 && remaining > 0; i++) {
+                        if (i === 1 && skipL2) {
+                            // Skip L2 for Group B
+                            batches[i] = 0;
+                            continue;
+                        }
+                        batches[i] = Math.min(remaining, oven2Max);
+                        remaining -= batches[i];
                     }
                 }
             } else {
