@@ -267,6 +267,10 @@
         .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
         .toast.success { border-left: 4px solid var(--accent-green); }
         
+        .range-btn { padding: 8px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
+        .range-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+        .range-btn.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+        
         @media (max-width: 400px) {
             .save-btn span { display: none; }
             .planning-table { min-width: 360px; }
@@ -362,6 +366,14 @@
         </div>
         
         <div class="page" id="page-historiek">
+            <div class="settings-section" style="margin-bottom: 12px;">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="range-btn active" data-range="7" onclick="setHistoryRange(7)">7 dagen</button>
+                    <button class="range-btn" data-range="14" onclick="setHistoryRange(14)">14 dagen</button>
+                    <button class="range-btn" data-range="30" onclick="setHistoryRange(30)">Deze maand</button>
+                    <button class="range-btn" data-range="all" onclick="setHistoryRange('all')">Alles</button>
+                </div>
+            </div>
             <div class="stats-grid">
                 <div class="stat-card green"><div class="label">Totaal Gebakken</div><div class="value" id="stat-gebakken">0</div></div>
                 <div class="stat-card red"><div class="label">Totaal Breuk</div><div class="value" id="stat-breuk">0</div></div>
@@ -369,7 +381,7 @@
                 <div class="stat-card orange"><div class="label">Breuk %</div><div class="value" id="stat-percentage">0%</div></div>
             </div>
             <div class="settings-section" style="margin-bottom: 12px;">
-                <h3>📈 Trend (14 dagen)</h3>
+                <h3>📈 Trend</h3>
                 <div style="height: 180px; position: relative;">
                     <canvas id="chart-canvas" style="width: 100%; height: 100%;"></canvas>
                 </div>
@@ -499,37 +511,66 @@
         function distributeBatches(totaal, isGroupA, isWeekendDay) {
             const batches = [0, 0, 0, 0, 0];
             let remaining = totaal;
-            const oven1Max = SETTINGS.oven1Max;    // 16
-            const oven2Max = SETTINGS.oven2Max;    // 15
-            const batchMax = SETTINGS.batchMax;   // 31
             
             if (isWeekendDay) {
                 const skipL2 = SETTINGS.skipBInL2;
                 
                 if (isGroupA) {
-                    // Group A: normally max 16 per batch (oven 1)
-                    // BUT in L2, if skipB is on, A can use full 31 (both ovens)
+                    // GROUP A WEEKEND PATTERN (from real data analysis):
+                    // L1: ~14 plates (not full 16, leave room for B)
+                    // L2: UP TO 26 plates (this is where A gets extra since B skips)
+                    // L3: ~14 plates
+                    // L4: remainder
+                    // L5: overflow if needed
+                    
+                    const l1Max = 14;  // Keep L1 moderate for balanced oven loading
+                    const l2Max = skipL2 ? 26 : 14;  // L2 gets extra when B skips
+                    const l3Max = 14;
+                    const l4Max = 14;
+                    const l5Max = 14;
+                    
+                    const limits = [l1Max, l2Max, l3Max, l4Max, l5Max];
+                    
                     for (let i = 0; i < 5 && remaining > 0; i++) {
-                        let maxForThisBatch = oven1Max; // default 16
-                        if (i === 1 && skipL2) {
-                            // L2: Group A gets full capacity since B is skipping
-                            maxForThisBatch = batchMax; // 31
-                        }
-                        batches[i] = Math.min(remaining, maxForThisBatch);
+                        batches[i] = Math.min(remaining, limits[i]);
                         remaining -= batches[i];
                     }
                 } else {
-                    // Group B: max 15 per batch (oven 2)
-                    // Skip L2 entirely if setting is on
-                    for (let i = 0; i < 5 && remaining > 0; i++) {
-                        if (i === 1 && skipL2) {
-                            // Skip L2 for Group B
-                            batches[i] = 0;
-                            continue;
-                        }
-                        batches[i] = Math.min(remaining, oven2Max);
-                        remaining -= batches[i];
+                    // GROUP B WEEKEND PATTERN (from real data analysis):
+                    // L1: ~10-12 plates
+                    // L2: ALWAYS 0 (skip)
+                    // L3: ~10-12 plates
+                    // L4: remainder
+                    // L5: overflow if needed
+                    
+                    const l1Max = 12;
+                    const l3Max = 13;
+                    const l4Max = 13;
+                    const l5Max = 10;
+                    
+                    // Fill L1 first
+                    batches[0] = Math.min(remaining, l1Max);
+                    remaining -= batches[0];
+                    
+                    // Skip L2 if setting is on
+                    if (skipL2) {
+                        batches[1] = 0;
+                    } else {
+                        batches[1] = Math.min(remaining, 12);
+                        remaining -= batches[1];
                     }
+                    
+                    // L3
+                    batches[2] = Math.min(remaining, l3Max);
+                    remaining -= batches[2];
+                    
+                    // L4
+                    batches[3] = Math.min(remaining, l4Max);
+                    remaining -= batches[3];
+                    
+                    // L5
+                    batches[4] = Math.min(remaining, l5Max);
+                    remaining -= batches[4];
                 }
             } else {
                 // Weekday: simple 50/50 split across L1 and L2
@@ -683,12 +724,35 @@
         }
         
         // ===== HISTORIEK =====
+        let historyRange = 7; // Default to 7 days
+        
+        function setHistoryRange(range) {
+            historyRange = range;
+            // Update button states
+            document.querySelectorAll('.range-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.range == range);
+            });
+            renderHistoriek();
+        }
+        
+        function getFilteredData() {
+            if (historyRange === 'all') return historicalData;
+            
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - historyRange);
+            const cutoffStr = formatDateISO(cutoff);
+            
+            return historicalData.filter(d => d.datum >= cutoffStr);
+        }
+        
         function renderHistoriek() {
+            const filteredData = getFilteredData();
+            
             let gebakken = 0, breuk = 0;
             const stats = {};
             PRODUCTS.forEach(p => stats[p.name] = { gebakken: 0, breuk: 0 });
             
-            historicalData.forEach(d => {
+            filteredData.forEach(d => {
                 const p = PRODUCTS.find(x => x.name === d.product);
                 if (p) {
                     const stuks = d.totaal * p.ppp;
@@ -726,9 +790,10 @@
             const width = rect.width, height = rect.height;
             const pad = { top: 15, right: 10, bottom: 25, left: 35 };
             
-            const dates = [...new Set(historicalData.map(d => d.datum))].sort().slice(-14);
+            const filteredData = getFilteredData();
+            const dates = [...new Set(filteredData.map(d => d.datum))].sort();
             const daily = dates.map(date => {
-                const recs = historicalData.filter(d => d.datum === date);
+                const recs = filteredData.filter(d => d.datum === date);
                 let geb = 0, brk = 0;
                 recs.forEach(r => {
                     const p = PRODUCTS.find(x => x.name === r.product);
