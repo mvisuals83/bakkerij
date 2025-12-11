@@ -367,11 +367,20 @@
         
         <div class="page" id="page-historiek">
             <div class="settings-section" style="margin-bottom: 12px;">
-                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
                     <button class="range-btn active" data-range="7" onclick="setHistoryRange(7)">7 dagen</button>
                     <button class="range-btn" data-range="14" onclick="setHistoryRange(14)">14 dagen</button>
                     <button class="range-btn" data-range="30" onclick="setHistoryRange(30)">Deze maand</button>
                     <button class="range-btn" data-range="all" onclick="setHistoryRange('all')">Alles</button>
+                    <button class="range-btn" data-range="custom" onclick="setHistoryRange('custom')">Aangepast</button>
+                </div>
+                <div id="custom-date-range" style="display: none; margin-top: 10px;">
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <label style="font-size: 0.85rem; color: var(--text-secondary);">Van:</label>
+                        <input type="date" id="history-date-from" onchange="applyCustomDateRange()" style="padding: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary);">
+                        <label style="font-size: 0.85rem; color: var(--text-secondary);">Tot:</label>
+                        <input type="date" id="history-date-to" onchange="applyCustomDateRange()" style="padding: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary);">
+                    </div>
                 </div>
             </div>
             <div class="stats-grid">
@@ -508,76 +517,78 @@
             return Math.max(1, sug);
         }
         
-        function distributeBatches(totaal, isGroupA, isWeekendDay) {
-            const batches = [0, 0, 0, 0, 0];
-            let remaining = totaal;
+        function getGroupBatchLimits(isGroupA, isWeekendDay, skipL2) {
+            // Returns max plates per batch for a group
+            if (!isWeekendDay) {
+                // Weekday: 2 batches only, split evenly
+                return [50, 50, 0, 0, 0]; // High limits, will be constrained by totaal
+            }
             
-            if (isWeekendDay) {
-                const skipL2 = SETTINGS.skipBInL2;
-                
-                if (isGroupA) {
-                    // GROUP A WEEKEND PATTERN (from real data analysis):
-                    // L1: ~14 plates (not full 16, leave room for B)
-                    // L2: UP TO 26 plates (this is where A gets extra since B skips)
-                    // L3: ~14 plates
-                    // L4: remainder
-                    // L5: overflow if needed
-                    
-                    const l1Max = 14;  // Keep L1 moderate for balanced oven loading
-                    const l2Max = skipL2 ? 26 : 14;  // L2 gets extra when B skips
-                    const l3Max = 14;
-                    const l4Max = 14;
-                    const l5Max = 14;
-                    
-                    const limits = [l1Max, l2Max, l3Max, l4Max, l5Max];
-                    
-                    for (let i = 0; i < 5 && remaining > 0; i++) {
-                        batches[i] = Math.min(remaining, limits[i]);
-                        remaining -= batches[i];
-                    }
-                } else {
-                    // GROUP B WEEKEND PATTERN (from real data analysis):
-                    // L1: ~10-12 plates
-                    // L2: ALWAYS 0 (skip)
-                    // L3: ~10-12 plates
-                    // L4: remainder
-                    // L5: overflow if needed
-                    
-                    const l1Max = 12;
-                    const l3Max = 13;
-                    const l4Max = 13;
-                    const l5Max = 10;
-                    
-                    // Fill L1 first
-                    batches[0] = Math.min(remaining, l1Max);
-                    remaining -= batches[0];
-                    
-                    // Skip L2 if setting is on
-                    if (skipL2) {
-                        batches[1] = 0;
-                    } else {
-                        batches[1] = Math.min(remaining, 12);
-                        remaining -= batches[1];
-                    }
-                    
-                    // L3
-                    batches[2] = Math.min(remaining, l3Max);
-                    remaining -= batches[2];
-                    
-                    // L4
-                    batches[3] = Math.min(remaining, l4Max);
-                    remaining -= batches[3];
-                    
-                    // L5
-                    batches[4] = Math.min(remaining, l5Max);
-                    remaining -= batches[4];
-                }
+            if (isGroupA) {
+                // Group A weekend: L1=14, L2=26 (extra when B skips), L3-L5=14
+                return [14, skipL2 ? 26 : 14, 14, 14, 14];
             } else {
-                // Weekday: simple 50/50 split across L1 and L2
-                batches[0] = Math.ceil(totaal / 2);
-                batches[1] = totaal - batches[0];
+                // Group B weekend: L1=12, L2=0 (skip), L3-L5=13
+                return [12, 0, 13, 13, 10];
+            }
+        }
+        
+        function distributeGroupToBatches(groupTotaal, limits) {
+            // Distribute group total across batches according to limits
+            const batches = [0, 0, 0, 0, 0];
+            let remaining = groupTotaal;
+            
+            for (let i = 0; i < 5 && remaining > 0; i++) {
+                batches[i] = Math.min(remaining, limits[i]);
+                remaining -= batches[i];
             }
             return batches;
+        }
+        
+        function distributeProductsInBatches(products, groupBatches, productTotals, groupTotaal) {
+            // Distribute each product proportionally within each batch
+            const result = {};
+            
+            products.forEach(p => {
+                result[p.id] = [0, 0, 0, 0, 0];
+            });
+            
+            if (groupTotaal === 0) return result;
+            
+            for (let batch = 0; batch < 5; batch++) {
+                const batchTotal = groupBatches[batch];
+                if (batchTotal === 0) continue;
+                
+                let batchRemaining = batchTotal;
+                const productShares = {};
+                
+                // Calculate proportional shares
+                products.forEach(p => {
+                    const ratio = productTotals[p.id] / groupTotaal;
+                    productShares[p.id] = Math.round(batchTotal * ratio);
+                });
+                
+                // Assign shares, ensuring we don't exceed product totals or batch total
+                products.forEach(p => {
+                    const productRemaining = productTotals[p.id] - result[p.id].reduce((a, b) => a + b, 0);
+                    const share = Math.min(productShares[p.id], productRemaining, batchRemaining);
+                    result[p.id][batch] = share;
+                    batchRemaining -= share;
+                });
+                
+                // If there's remaining capacity and products still need distribution, fill it
+                if (batchRemaining > 0) {
+                    for (const p of products) {
+                        const productRemaining = productTotals[p.id] - result[p.id].reduce((a, b) => a + b, 0);
+                        const extra = Math.min(productRemaining, batchRemaining);
+                        result[p.id][batch] += extra;
+                        batchRemaining -= extra;
+                        if (batchRemaining <= 0) break;
+                    }
+                }
+            }
+            
+            return result;
         }
         
         // ===== RENDERING =====
@@ -591,20 +602,60 @@
         
         function renderPlanning() {
             const weekend = isWeekend(currentDate);
+            const skipL2 = SETTINGS.skipBInL2;
             
             ['A', 'B'].forEach(group => {
                 const body = document.getElementById(`group-${group.toLowerCase()}-body`);
                 const products = PRODUCTS.filter(p => p.group === group);
-                let html = '';
-                let totals = { sug: 0, totaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
+                const isGroupA = group === 'A';
+                
+                // Step 1: Get product totals (from saved or suggestions)
+                const productTotals = {};
+                let groupTotaal = 0;
                 
                 products.forEach(p => {
                     const sug = calculateSuggestion(p);
                     const saved = planningData[p.id] || {};
                     const totaal = saved.totaal ?? sug;
-                    const batches = saved.l1 !== undefined 
-                        ? [saved.l1, saved.l2, saved.l3, saved.l4, saved.l5]
-                        : distributeBatches(totaal, group === 'A', weekend);
+                    productTotals[p.id] = totaal;
+                    groupTotaal += totaal;
+                });
+                
+                // Step 2: Check if any product has manual batch overrides
+                const hasManualOverrides = products.some(p => planningData[p.id]?.l1 !== undefined);
+                
+                let productBatches;
+                if (hasManualOverrides) {
+                    // Use saved batches
+                    productBatches = {};
+                    products.forEach(p => {
+                        const saved = planningData[p.id] || {};
+                        if (saved.l1 !== undefined) {
+                            productBatches[p.id] = [saved.l1, saved.l2, saved.l3, saved.l4, saved.l5];
+                        } else {
+                            // Fallback for products without overrides
+                            const limits = getGroupBatchLimits(isGroupA, weekend, skipL2);
+                            const ratio = groupTotaal > 0 ? productTotals[p.id] / groupTotaal : 0;
+                            productBatches[p.id] = limits.map(l => Math.round(l * ratio));
+                        }
+                    });
+                } else {
+                    // Step 3: Distribute group total to batches
+                    const limits = getGroupBatchLimits(isGroupA, weekend, skipL2);
+                    const groupBatches = distributeGroupToBatches(groupTotaal, limits);
+                    
+                    // Step 4: Distribute products proportionally within batches
+                    productBatches = distributeProductsInBatches(products, groupBatches, productTotals, groupTotaal);
+                }
+                
+                // Step 5: Render
+                let html = '';
+                let totals = { sug: 0, totaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
+                
+                products.forEach(p => {
+                    const sug = calculateSuggestion(p);
+                    const totaal = productTotals[p.id];
+                    const batches = productBatches[p.id];
                     
                     totals.sug += sug;
                     totals.totaal += totaal;
@@ -725,6 +776,8 @@
         
         // ===== HISTORIEK =====
         let historyRange = 7; // Default to 7 days
+        let customDateFrom = null;
+        let customDateTo = null;
         
         function setHistoryRange(range) {
             historyRange = range;
@@ -732,11 +785,37 @@
             document.querySelectorAll('.range-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.range == range);
             });
+            
+            // Show/hide custom date inputs
+            const customDiv = document.getElementById('custom-date-range');
+            if (range === 'custom') {
+                customDiv.style.display = 'block';
+                // Set default dates if not set
+                if (!document.getElementById('history-date-from').value) {
+                    const fromDate = new Date();
+                    fromDate.setDate(fromDate.getDate() - 7);
+                    document.getElementById('history-date-from').value = formatDateISO(fromDate);
+                    document.getElementById('history-date-to').value = formatDateISO(new Date());
+                }
+                applyCustomDateRange();
+            } else {
+                customDiv.style.display = 'none';
+                renderHistoriek();
+            }
+        }
+        
+        function applyCustomDateRange() {
+            customDateFrom = document.getElementById('history-date-from').value;
+            customDateTo = document.getElementById('history-date-to').value;
             renderHistoriek();
         }
         
         function getFilteredData() {
             if (historyRange === 'all') return historicalData;
+            
+            if (historyRange === 'custom' && customDateFrom && customDateTo) {
+                return historicalData.filter(d => d.datum >= customDateFrom && d.datum <= customDateTo);
+            }
             
             const cutoff = new Date();
             cutoff.setDate(cutoff.getDate() - historyRange);
