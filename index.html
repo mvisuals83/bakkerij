@@ -621,74 +621,105 @@
         function renderPlanning() {
             const weekend = isWeekend(currentDate);
             const skipL2 = SETTINGS.skipBInL2;
+            const batchMax = SETTINGS.batchMax;
+            
+            // First pass: calculate all product batches for both groups
+            const allProductBatches = {};
+            const allProductTotals = {};
             
             ['A', 'B'].forEach(group => {
-                const body = document.getElementById(`group-${group.toLowerCase()}-body`);
                 const products = PRODUCTS.filter(p => p.group === group);
                 const isGroupA = group === 'A';
                 
-                // Step 1: Get product totals (from saved or suggestions)
-                const productTotals = {};
+                // Get product totals
                 let groupTotaal = 0;
-                
                 products.forEach(p => {
                     const sug = calculateSuggestion(p);
                     const saved = planningData[p.id] || {};
                     const totaal = saved.totaal ?? sug;
-                    productTotals[p.id] = totaal;
+                    allProductTotals[p.id] = totaal;
                     groupTotaal += totaal;
                 });
                 
-                // Step 2: Check if any product has manual batch overrides
+                // Check for manual overrides
                 const hasManualOverrides = products.some(p => planningData[p.id]?.l1 !== undefined);
                 
-                let productBatches;
                 if (hasManualOverrides) {
-                    // Use saved batches
-                    productBatches = {};
                     products.forEach(p => {
                         const saved = planningData[p.id] || {};
                         if (saved.l1 !== undefined) {
-                            productBatches[p.id] = [saved.l1, saved.l2, saved.l3, saved.l4, saved.l5];
+                            allProductBatches[p.id] = [saved.l1, saved.l2, saved.l3, saved.l4, saved.l5];
                         } else {
-                            // Fallback: simple 50/50 for weekdays, proportional for weekends
                             if (weekend) {
                                 const limits = getGroupBatchLimits(isGroupA, weekend, skipL2);
-                                const ratio = groupTotaal > 0 ? productTotals[p.id] / groupTotaal : 0;
-                                productBatches[p.id] = limits.map(l => Math.round(l * ratio));
+                                const ratio = groupTotaal > 0 ? allProductTotals[p.id] / groupTotaal : 0;
+                                allProductBatches[p.id] = limits.map(l => Math.round(l * ratio));
                             } else {
-                                const tot = productTotals[p.id];
-                                productBatches[p.id] = [Math.ceil(tot / 2), tot - Math.ceil(tot / 2), 0, 0, 0];
+                                const tot = allProductTotals[p.id];
+                                allProductBatches[p.id] = [Math.ceil(tot / 2), tot - Math.ceil(tot / 2), 0, 0, 0];
                             }
                         }
                     });
                 } else if (weekend) {
-                    // WEEKEND: Use proportional batch distribution
-                    // Step 3: Distribute group total to batches
                     const limits = getGroupBatchLimits(isGroupA, weekend, skipL2);
                     const groupBatches = distributeGroupToBatches(groupTotaal, limits);
-                    
-                    // Step 4: Distribute products proportionally within batches
-                    productBatches = distributeProductsInBatches(products, groupBatches, productTotals, groupTotaal);
+                    const productBatches = distributeProductsInBatches(products, groupBatches, allProductTotals, groupTotaal);
+                    Object.assign(allProductBatches, productBatches);
                 } else {
-                    // WEEKDAY: Simple 50/50 split per product across L1 and L2
-                    productBatches = {};
                     products.forEach(p => {
-                        const tot = productTotals[p.id];
+                        const tot = allProductTotals[p.id];
                         const l1 = Math.ceil(tot / 2);
                         const l2 = tot - l1;
-                        productBatches[p.id] = [l1, l2, 0, 0, 0];
+                        allProductBatches[p.id] = [l1, l2, 0, 0, 0];
                     });
                 }
+            });
+            
+            // OPTIMIZATION: Move small remainders from late batches to earlier ones
+            // Check combined totals across ALL products
+            if (weekend) {
+                const combinedTotals = [0, 0, 0, 0, 0];
+                PRODUCTS.forEach(p => {
+                    for (let i = 0; i < 5; i++) {
+                        combinedTotals[i] += allProductBatches[p.id][i];
+                    }
+                });
                 
-                // Step 5: Render
+                // Check late batches (L5, L4, L3) for small amounts that can move earlier
+                for (let late = 4; late >= 2; late--) {
+                    if (combinedTotals[late] > 0 && combinedTotals[late] <= 3) {
+                        // Find an earlier batch with room
+                        for (let early = 0; early < late; early++) {
+                            const room = batchMax - combinedTotals[early];
+                            if (room >= combinedTotals[late]) {
+                                // Move plates from late to early - find which products have plates in late batch
+                                PRODUCTS.forEach(p => {
+                                    if (allProductBatches[p.id][late] > 0) {
+                                        allProductBatches[p.id][early] += allProductBatches[p.id][late];
+                                        allProductBatches[p.id][late] = 0;
+                                    }
+                                });
+                                combinedTotals[early] += combinedTotals[late];
+                                combinedTotals[late] = 0;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Now render both groups
+            ['A', 'B'].forEach(group => {
+                const body = document.getElementById(`group-${group.toLowerCase()}-body`);
+                const products = PRODUCTS.filter(p => p.group === group);
+                
                 let html = '';
                 let totals = { sug: 0, totaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
                 
                 products.forEach(p => {
                     const sug = calculateSuggestion(p);
-                    const totaal = productTotals[p.id];
-                    const batches = productBatches[p.id];
+                    const totaal = allProductTotals[p.id];
+                    const batches = allProductBatches[p.id];
                     
                     totals.sug += sug;
                     totals.totaal += totaal;
