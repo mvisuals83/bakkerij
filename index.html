@@ -633,19 +633,34 @@
                         if (saved.l1 !== undefined) {
                             productBatches[p.id] = [saved.l1, saved.l2, saved.l3, saved.l4, saved.l5];
                         } else {
-                            // Fallback for products without overrides
-                            const limits = getGroupBatchLimits(isGroupA, weekend, skipL2);
-                            const ratio = groupTotaal > 0 ? productTotals[p.id] / groupTotaal : 0;
-                            productBatches[p.id] = limits.map(l => Math.round(l * ratio));
+                            // Fallback: simple 50/50 for weekdays, proportional for weekends
+                            if (weekend) {
+                                const limits = getGroupBatchLimits(isGroupA, weekend, skipL2);
+                                const ratio = groupTotaal > 0 ? productTotals[p.id] / groupTotaal : 0;
+                                productBatches[p.id] = limits.map(l => Math.round(l * ratio));
+                            } else {
+                                const tot = productTotals[p.id];
+                                productBatches[p.id] = [Math.ceil(tot / 2), tot - Math.ceil(tot / 2), 0, 0, 0];
+                            }
                         }
                     });
-                } else {
+                } else if (weekend) {
+                    // WEEKEND: Use proportional batch distribution
                     // Step 3: Distribute group total to batches
                     const limits = getGroupBatchLimits(isGroupA, weekend, skipL2);
                     const groupBatches = distributeGroupToBatches(groupTotaal, limits);
                     
                     // Step 4: Distribute products proportionally within batches
                     productBatches = distributeProductsInBatches(products, groupBatches, productTotals, groupTotaal);
+                } else {
+                    // WEEKDAY: Simple 50/50 split per product across L1 and L2
+                    productBatches = {};
+                    products.forEach(p => {
+                        const tot = productTotals[p.id];
+                        const l1 = Math.ceil(tot / 2);
+                        const l2 = tot - l1;
+                        productBatches[p.id] = [l1, l2, 0, 0, 0];
+                    });
                 }
                 
                 // Step 5: Render
