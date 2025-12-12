@@ -542,6 +542,24 @@
                 batches[i] = Math.min(remaining, limits[i]);
                 remaining -= batches[i];
             }
+            
+            // OPTIMIZATION: Move small remainders (1-3 plates) from later batches to earlier ones
+            // This avoids wasting energy on nearly-empty batches
+            for (let late = 4; late >= 2; late--) {
+                if (batches[late] > 0 && batches[late] <= 3) {
+                    // Try to move these plates to an earlier batch that has room
+                    for (let early = 0; early < late; early++) {
+                        const room = limits[early] - batches[early];
+                        if (room >= batches[late]) {
+                            // Move all plates from late batch to early batch
+                            batches[early] += batches[late];
+                            batches[late] = 0;
+                            break;
+                        }
+                    }
+                }
+            }
+            
             return batches;
         }
         
