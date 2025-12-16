@@ -411,7 +411,7 @@
                         <option value="all">Alle producten</option>
                         <option value="pistolet_wit">Pist. wit</option>
                         <option value="pistolet_bruin">Pist. bruin</option>
-                        <option value="tijger">Tijger</option>
+                        <option value="tijger_pistolet">Tijger</option>
                         <option value="piccolo">Piccolo</option>
                         <option value="stokbrood_wit">Stok. wit</option>
                         <option value="stokbrood_bruin">Stok. bruin</option>
@@ -474,7 +474,7 @@
         // ===== SUPABASE CONFIG =====
         const SUPABASE_URL = 'https://ukkvaewmnedznviqnotr.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVra3ZhZXdtbmVkem52aXFub3RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyODY5NjMsImV4cCI6MjA4MDg2Mjk2M30.J_2OPImNOrrBlwjztqRmUS7Qs9Y3RF1qT6D9x4-C5UE';
-        let supabase = null;
+        let supabaseClient = null;
         
         // ===== DATA =====
         const PRODUCTS = [
@@ -890,7 +890,7 @@
                 if (rec) rec.breuk = parseInt(inp.value) || 0;
             });
             localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
-            if (supabase) syncToSupabase();
+            if (supabaseClient) syncToSupabase();
             showToast('✅ Breuk opgeslagen!');
         }
         
@@ -1140,7 +1140,7 @@
             
             historicalData.sort((a, b) => b.datum.localeCompare(a.datum));
             localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
-            if (supabase) syncToSupabase();
+            if (supabaseClient) syncToSupabase();
             markSaved();
             showToast(`✅ Planning voor ${formatDate(currentDate)} opgeslagen!`);
             renderBreukPage();
@@ -1172,8 +1172,8 @@
             }
             
             try {
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                const { error } = await supabase.from('planning_data').select('id').limit(1);
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                const { error } = await supabaseClient.from('planning_data').select('id').limit(1);
                 
                 if (error) {
                     document.getElementById('db-status').textContent = '🔴 ' + error.message.substring(0, 40);
@@ -1187,8 +1187,8 @@
         }
         
         async function loadFromSupabase() {
-            if (!supabase) return;
-            const { data } = await supabase.from('planning_data').select('*').order('datum', { ascending: false });
+            if (!supabaseClient) return;
+            const { data } = await supabaseClient.from('planning_data').select('*').order('datum', { ascending: false });
             if (data?.length) {
                 historicalData = data;
                 localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
@@ -1197,9 +1197,9 @@
         }
         
         async function syncToSupabase() {
-            if (!supabase) return;
+            if (!supabaseClient) return;
             for (const rec of historicalData) {
-                await supabase.from('planning_data').upsert({
+                await supabaseClient.from('planning_data').upsert({
                     datum: rec.datum, product: rec.product, totaal: rec.totaal,
                     l1: rec.l1, l2: rec.l2, l3: rec.l3, l4: rec.l4, l5: rec.l5,
                     breuk: rec.breuk, event: rec.event
