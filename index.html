@@ -103,6 +103,21 @@
             border: none; color: white; padding: 8px 16px; border-radius: var(--radius-sm);
             font-weight: 600; font-size: 0.9rem; cursor: pointer;
             display: flex; align-items: center; gap: 6px;
+            transition: all 0.3s ease;
+        }
+        
+        .save-btn.unsaved {
+            background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+            animation: pulse-unsaved 2s infinite;
+        }
+        
+        .save-btn.saved {
+            background: linear-gradient(135deg, var(--accent-green), #059669);
+        }
+        
+        @keyframes pulse-unsaved {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
         
         .tabs {
@@ -299,7 +314,7 @@
                 <option value="Holiday">🎉 Feestdag</option>
                 <option value="Promo">📢 Promo</option>
             </select>
-            <button class="save-btn" onclick="savePlanning()">💾 <span>Opslaan</span></button>
+            <button class="save-btn" id="save-btn" onclick="savePlanning()">💾 <span>Opslaan</span></button>
         </div>
     </header>
     
@@ -390,7 +405,18 @@
                 <div class="stat-card orange"><div class="label">Breuk %</div><div class="value" id="stat-percentage">0%</div></div>
             </div>
             <div class="settings-section" style="margin-bottom: 12px;">
-                <h3>📈 Trend</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <h3>📈 Trend</h3>
+                    <select id="chart-product-select" onchange="renderHistoriek()" style="padding: 6px 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem;">
+                        <option value="all">Alle producten</option>
+                        <option value="pistolet_wit">Pist. wit</option>
+                        <option value="pistolet_bruin">Pist. bruin</option>
+                        <option value="tijger">Tijger</option>
+                        <option value="piccolo">Piccolo</option>
+                        <option value="stokbrood_wit">Stok. wit</option>
+                        <option value="stokbrood_bruin">Stok. bruin</option>
+                    </select>
+                </div>
                 <div style="height: 180px; position: relative;">
                     <canvas id="chart-canvas" style="width: 100%; height: 100%;"></canvas>
                 </div>
@@ -799,7 +825,37 @@
                 planningData[id].l5 = parseInt(row.querySelector('[data-field="l5"]').value) || 0;
             }
             
+            // Mark as unsaved
+            markUnsaved();
+            
             renderPlanning();
+        }
+        
+        // ===== SAVE STATE TRACKING =====
+        let hasUnsavedChanges = false;
+        
+        function markUnsaved() {
+            hasUnsavedChanges = true;
+            const btn = document.getElementById('save-btn');
+            btn.classList.remove('saved');
+            btn.classList.add('unsaved');
+            btn.querySelector('span').textContent = 'Niet opgeslagen!';
+        }
+        
+        function markSaved() {
+            hasUnsavedChanges = false;
+            const btn = document.getElementById('save-btn');
+            btn.classList.remove('unsaved');
+            btn.classList.add('saved');
+            btn.querySelector('span').textContent = 'Opgeslagen ✓';
+            
+            // Reset to neutral after 3 seconds
+            setTimeout(() => {
+                if (!hasUnsavedChanges) {
+                    btn.classList.remove('saved');
+                    btn.querySelector('span').textContent = 'Opslaan';
+                }
+            }, 3000);
         }
         
         // ===== BREUK =====
@@ -934,11 +990,21 @@
             const pad = { top: 15, right: 10, bottom: 25, left: 35 };
             
             const filteredData = getFilteredData();
+            
+            // Get selected product filter
+            const selectedProduct = document.getElementById('chart-product-select')?.value || 'all';
+            const selectedProductName = selectedProduct !== 'all' 
+                ? PRODUCTS.find(p => p.id === selectedProduct)?.name 
+                : null;
+            
             const dates = [...new Set(filteredData.map(d => d.datum))].sort();
             const daily = dates.map(date => {
                 const recs = filteredData.filter(d => d.datum === date);
                 let geb = 0, brk = 0;
                 recs.forEach(r => {
+                    // If a product is selected, only show that product
+                    if (selectedProductName && r.product !== selectedProductName) return;
+                    
                     const p = PRODUCTS.find(x => x.name === r.product);
                     if (p) { geb += r.totaal * p.ppp; brk += r.breuk || 0; }
                 });
@@ -1075,13 +1141,25 @@
             historicalData.sort((a, b) => b.datum.localeCompare(a.datum));
             localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
             if (supabase) syncToSupabase();
+            markSaved();
             showToast(`✅ Planning voor ${formatDate(currentDate)} opgeslagen!`);
             renderBreukPage();
         }
         
         function changeDate(delta) {
+            // Warn if unsaved changes
+            if (hasUnsavedChanges) {
+                if (!confirm('⚠️ Je hebt niet-opgeslagen wijzigingen!\n\nWil je toch doorgaan?')) {
+                    return;
+                }
+            }
+            
             currentDate.setDate(currentDate.getDate() + delta);
             planningData = {};
+            hasUnsavedChanges = false;
+            const btn = document.getElementById('save-btn');
+            btn.classList.remove('unsaved', 'saved');
+            btn.querySelector('span').textContent = 'Opslaan';
             updateHeader();
             renderPlanning();
         }
