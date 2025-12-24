@@ -648,81 +648,137 @@
             const weekend = isWeekend(currentDate);
             const skipL2 = SETTINGS.skipBInL2;
             const batchMax = SETTINGS.batchMax;
+            const dateStr = formatDateISO(currentDate);
             
-            // First pass: calculate all product batches for both groups
-            const allProductBatches = {};
-            const allProductTotals = {};
+            // Check if this date has saved data in historicalData
+            const savedDayData = historicalData.filter(d => d.datum === dateStr);
+            const hasSavedData = savedDayData.length > 0;
             
+            // Build display data for each product
+            const displayData = {};
+            
+            PRODUCTS.forEach(p => {
+                const sug = calculateSuggestion(p);
+                const savedRecord = savedDayData.find(d => d.product === p.name);
+                const sessionEdit = planningData[p.id];
+                
+                // Priority: 1) Current session edits, 2) Saved data, 3) Suggestion
+                if (sessionEdit && sessionEdit.totaal !== undefined) {
+                    // User edited in this session
+                    if (sessionEdit.l1 !== undefined) {
+                        // User edited batches - use their values
+                        displayData[p.id] = {
+                            sug,
+                            totaal: sessionEdit.totaal,
+                            batches: [sessionEdit.l1, sessionEdit.l2, sessionEdit.l3, sessionEdit.l4, sessionEdit.l5]
+                        };
+                    } else {
+                        // User only edited total - need to distribute
+                        displayData[p.id] = {
+                            sug,
+                            totaal: sessionEdit.totaal,
+                            batches: null // Will be calculated below
+                        };
+                    }
+                } else if (savedRecord) {
+                    // Load from saved data
+                    displayData[p.id] = {
+                        sug,
+                        totaal: savedRecord.totaal,
+                        batches: [savedRecord.l1 || 0, savedRecord.l2 || 0, savedRecord.l3 || 0, savedRecord.l4 || 0, savedRecord.l5 || 0]
+                    };
+                } else {
+                    // Use suggestion
+                    displayData[p.id] = {
+                        sug,
+                        totaal: sug,
+                        batches: null // Will be calculated below
+                    };
+                }
+            });
+            
+            // Calculate batches for products that need it (where batches is null)
             ['A', 'B'].forEach(group => {
                 const products = PRODUCTS.filter(p => p.group === group);
                 const isGroupA = group === 'A';
                 
-                // Get product totals
-                let groupTotaal = 0;
-                products.forEach(p => {
-                    const sug = calculateSuggestion(p);
-                    const saved = planningData[p.id] || {};
-                    const totaal = saved.totaal ?? sug;
-                    allProductTotals[p.id] = totaal;
-                    groupTotaal += totaal;
-                });
+                // Check if any product in this group needs batch calculation
+                const needsCalc = products.filter(p => displayData[p.id].batches === null);
+                if (needsCalc.length === 0) return;
                 
-                // Check for manual overrides
-                const hasManualOverrides = products.some(p => planningData[p.id]?.l1 !== undefined);
-                
-                if (hasManualOverrides) {
-                    products.forEach(p => {
-                        const saved = planningData[p.id] || {};
-                        if (saved.l1 !== undefined) {
-                            allProductBatches[p.id] = [saved.l1, saved.l2, saved.l3, saved.l4, saved.l5];
+                // If some products have batches and some don't, calculate only for those that don't
+                if (needsCalc.length < products.length) {
+                    // Mixed: some saved, some new - distribute individually
+                    needsCalc.forEach(p => {
+                        const tot = displayData[p.id].totaal;
+                        if (weekend) {
+                            const limits = isGroupA ? [14, 26, 14, 14, 14] : [12, 0, 13, 13, 10];
+                            displayData[p.id].batches = distributeSimple(tot, limits);
                         } else {
-                            if (weekend) {
-                                const limits = getGroupBatchLimits(isGroupA, weekend, skipL2);
-                                const ratio = groupTotaal > 0 ? allProductTotals[p.id] / groupTotaal : 0;
-                                allProductBatches[p.id] = limits.map(l => Math.round(l * ratio));
-                            } else {
-                                const tot = allProductTotals[p.id];
-                                allProductBatches[p.id] = [Math.ceil(tot / 2), tot - Math.ceil(tot / 2), 0, 0, 0];
-                            }
+                            const l1 = Math.ceil(tot / 2);
+                            displayData[p.id].batches = [l1, tot - l1, 0, 0, 0];
                         }
                     });
-                } else if (weekend) {
-                    const limits = getGroupBatchLimits(isGroupA, weekend, skipL2);
-                    const groupBatches = distributeGroupToBatches(groupTotaal, limits);
-                    const productBatches = distributeProductsInBatches(products, groupBatches, allProductTotals, groupTotaal);
-                    Object.assign(allProductBatches, productBatches);
                 } else {
+                    // All products need calculation - use group distribution
+                    let groupTotaal = 0;
+                    const productTotals = {};
                     products.forEach(p => {
-                        const tot = allProductTotals[p.id];
-                        const l1 = Math.ceil(tot / 2);
-                        const l2 = tot - l1;
-                        allProductBatches[p.id] = [l1, l2, 0, 0, 0];
+                        productTotals[p.id] = displayData[p.id].totaal;
+                        groupTotaal += displayData[p.id].totaal;
                     });
+                    
+                    if (weekend) {
+                        const limits = getGroupBatchLimits(isGroupA, weekend, skipL2);
+                        const groupBatches = distributeGroupToBatches(groupTotaal, limits);
+                        const productBatches = distributeProductsInBatches(products, groupBatches, productTotals, groupTotaal);
+                        products.forEach(p => {
+                            displayData[p.id].batches = productBatches[p.id];
+                        });
+                    } else {
+                        products.forEach(p => {
+                            const tot = displayData[p.id].totaal;
+                            const l1 = Math.ceil(tot / 2);
+                            displayData[p.id].batches = [l1, tot - l1, 0, 0, 0];
+                        });
+                    }
                 }
             });
             
-            // OPTIMIZATION: Move small remainders from late batches to earlier ones
-            // Check combined totals across ALL products
+            // Fix rounding errors: ensure batches sum to totaal
+            PRODUCTS.forEach(p => {
+                const data = displayData[p.id];
+                const batchSum = data.batches.reduce((a, b) => a + b, 0);
+                if (batchSum !== data.totaal) {
+                    // Adjust last non-zero batch
+                    const diff = data.totaal - batchSum;
+                    for (let i = 4; i >= 0; i--) {
+                        if (data.batches[i] > 0 || i === 0) {
+                            data.batches[i] += diff;
+                            break;
+                        }
+                    }
+                }
+            });
+            
+            // Weekend optimization: move small remainders from late batches
             if (weekend) {
                 const combinedTotals = [0, 0, 0, 0, 0];
                 PRODUCTS.forEach(p => {
                     for (let i = 0; i < 5; i++) {
-                        combinedTotals[i] += allProductBatches[p.id][i];
+                        combinedTotals[i] += displayData[p.id].batches[i];
                     }
                 });
                 
-                // Check late batches (L5, L4, L3) for small amounts that can move earlier
                 for (let late = 4; late >= 2; late--) {
                     if (combinedTotals[late] > 0 && combinedTotals[late] <= 3) {
-                        // Find an earlier batch with room
                         for (let early = 0; early < late; early++) {
                             const room = batchMax - combinedTotals[early];
                             if (room >= combinedTotals[late]) {
-                                // Move plates from late to early - find which products have plates in late batch
                                 PRODUCTS.forEach(p => {
-                                    if (allProductBatches[p.id][late] > 0) {
-                                        allProductBatches[p.id][early] += allProductBatches[p.id][late];
-                                        allProductBatches[p.id][late] = 0;
+                                    if (displayData[p.id].batches[late] > 0) {
+                                        displayData[p.id].batches[early] += displayData[p.id].batches[late];
+                                        displayData[p.id].batches[late] = 0;
                                     }
                                 });
                                 combinedTotals[early] += combinedTotals[late];
@@ -734,7 +790,7 @@
                 }
             }
             
-            // Now render both groups
+            // Render both groups
             ['A', 'B'].forEach(group => {
                 const body = document.getElementById(`group-${group.toLowerCase()}-body`);
                 const products = PRODUCTS.filter(p => p.group === group);
@@ -743,23 +799,21 @@
                 let totals = { sug: 0, totaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
                 
                 products.forEach(p => {
-                    const sug = calculateSuggestion(p);
-                    const totaal = allProductTotals[p.id];
-                    const batches = allProductBatches[p.id];
+                    const data = displayData[p.id];
                     
-                    totals.sug += sug;
-                    totals.totaal += totaal;
-                    for (let i = 0; i < 5; i++) totals[`l${i+1}`] += batches[i];
+                    totals.sug += data.sug;
+                    totals.totaal += data.totaal;
+                    for (let i = 0; i < 5; i++) totals[`l${i+1}`] += data.batches[i];
                     
                     html += `<tr>
                         <td>${p.short}</td>
-                        <td class="sug-value">${sug}</td>
-                        <td><input type="number" value="${totaal}" data-id="${p.id}" data-field="totaal" onchange="onInput(this)"></td>
-                        <td><input type="number" value="${batches[0]}" data-id="${p.id}" data-field="l1" onchange="onInput(this)"></td>
-                        <td><input type="number" value="${batches[1]}" data-id="${p.id}" data-field="l2" onchange="onInput(this)"></td>
-                        <td><input type="number" value="${batches[2]}" data-id="${p.id}" data-field="l3" onchange="onInput(this)"></td>
-                        <td><input type="number" value="${batches[3]}" data-id="${p.id}" data-field="l4" onchange="onInput(this)"></td>
-                        <td><input type="number" value="${batches[4]}" data-id="${p.id}" data-field="l5" onchange="onInput(this)"></td>
+                        <td class="sug-value">${data.sug}</td>
+                        <td><input type="number" value="${data.totaal}" data-id="${p.id}" data-field="totaal" onchange="onInput(this)"></td>
+                        <td><input type="number" value="${data.batches[0]}" data-id="${p.id}" data-field="l1" onchange="onInput(this)"></td>
+                        <td><input type="number" value="${data.batches[1]}" data-id="${p.id}" data-field="l2" onchange="onInput(this)"></td>
+                        <td><input type="number" value="${data.batches[2]}" data-id="${p.id}" data-field="l3" onchange="onInput(this)"></td>
+                        <td><input type="number" value="${data.batches[3]}" data-id="${p.id}" data-field="l4" onchange="onInput(this)"></td>
+                        <td><input type="number" value="${data.batches[4]}" data-id="${p.id}" data-field="l5" onchange="onInput(this)"></td>
                     </tr>`;
                 });
                 
@@ -784,6 +838,17 @@
             renderReference();
         }
         
+        // Simple distribution for single product
+        function distributeSimple(totaal, limits) {
+            const batches = [0, 0, 0, 0, 0];
+            let remaining = totaal;
+            for (let i = 0; i < 5 && remaining > 0; i++) {
+                batches[i] = Math.min(remaining, limits[i]);
+                remaining -= batches[i];
+            }
+            return batches;
+        }
+        
         function renderReference() {
             let html = '';
             PRODUCTS.forEach(p => {
@@ -801,34 +866,88 @@
             const id = input.dataset.id;
             const field = input.dataset.field;
             const value = parseInt(input.value) || 0;
+            const row = input.closest('tr');
             
             if (!planningData[id]) planningData[id] = {};
             
             if (field === 'totaal') {
-                // When totaal changes, recalculate batches
+                // User changed total - store it, batches will be recalculated
                 planningData[id] = { totaal: value };
+                // Clear batch overrides so they get recalculated
             } else {
-                // When batch changes, store it and recalc totaal
-                planningData[id][field] = value;
-                // Calculate totaal from all batches
-                const row = input.closest('tr');
-                let sum = 0;
-                for (let i = 1; i <= 5; i++) {
-                    const inp = row.querySelector(`input[data-field="l${i}"]`);
-                    sum += parseInt(inp?.value) || 0;
-                }
-                planningData[id].totaal = sum;
-                planningData[id].l1 = parseInt(row.querySelector('[data-field="l1"]').value) || 0;
-                planningData[id].l2 = parseInt(row.querySelector('[data-field="l2"]').value) || 0;
-                planningData[id].l3 = parseInt(row.querySelector('[data-field="l3"]').value) || 0;
-                planningData[id].l4 = parseInt(row.querySelector('[data-field="l4"]').value) || 0;
-                planningData[id].l5 = parseInt(row.querySelector('[data-field="l5"]').value) || 0;
+                // User changed a batch - update only totaal, keep all batches as user set them
+                const l1 = parseInt(row.querySelector('[data-field="l1"]').value) || 0;
+                const l2 = parseInt(row.querySelector('[data-field="l2"]').value) || 0;
+                const l3 = parseInt(row.querySelector('[data-field="l3"]').value) || 0;
+                const l4 = parseInt(row.querySelector('[data-field="l4"]').value) || 0;
+                const l5 = parseInt(row.querySelector('[data-field="l5"]').value) || 0;
+                
+                planningData[id] = {
+                    totaal: l1 + l2 + l3 + l4 + l5,
+                    l1, l2, l3, l4, l5
+                };
+                
+                // Update only the totaal display for this row, don't re-render everything
+                const totaalInput = row.querySelector('[data-field="totaal"]');
+                totaalInput.value = planningData[id].totaal;
+                
+                // Update group total row
+                updateGroupTotals();
+                
+                // Update lading totals
+                updateLadingTotals();
+                
+                // Mark as unsaved
+                markUnsaved();
+                return; // Don't call full renderPlanning
             }
             
             // Mark as unsaved
             markUnsaved();
             
             renderPlanning();
+        }
+        
+        function updateGroupTotals() {
+            ['A', 'B'].forEach(group => {
+                const body = document.getElementById(`group-${group.toLowerCase()}-body`);
+                const rows = body.querySelectorAll('tr:not(.total-row)');
+                let totals = { sug: 0, totaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
+                
+                rows.forEach(row => {
+                    totals.sug += parseInt(row.querySelector('.sug-value')?.textContent) || 0;
+                    totals.totaal += parseInt(row.querySelector('[data-field="totaal"]')?.value) || 0;
+                    totals.l1 += parseInt(row.querySelector('[data-field="l1"]')?.value) || 0;
+                    totals.l2 += parseInt(row.querySelector('[data-field="l2"]')?.value) || 0;
+                    totals.l3 += parseInt(row.querySelector('[data-field="l3"]')?.value) || 0;
+                    totals.l4 += parseInt(row.querySelector('[data-field="l4"]')?.value) || 0;
+                    totals.l5 += parseInt(row.querySelector('[data-field="l5"]')?.value) || 0;
+                });
+                
+                const totalRow = body.querySelector('.total-row');
+                if (totalRow) {
+                    const cells = totalRow.querySelectorAll('td');
+                    cells[1].textContent = totals.sug;
+                    cells[2].textContent = totals.totaal;
+                    cells[3].textContent = totals.l1;
+                    cells[4].textContent = totals.l2;
+                    cells[5].textContent = totals.l3;
+                    cells[6].textContent = totals.l4;
+                    cells[7].textContent = totals.l5;
+                }
+            });
+        }
+        
+        function updateLadingTotals() {
+            for (let i = 1; i <= 5; i++) {
+                let total = 0;
+                document.querySelectorAll(`input[data-field="l${i}"]`).forEach(inp => {
+                    total += parseInt(inp.value) || 0;
+                });
+                const el = document.getElementById(`lading-l${i}`);
+                el.textContent = total;
+                el.parentElement.className = 'lading-item' + (total > SETTINGS.batchMax ? ' danger' : total > 25 ? ' warning' : '');
+            }
         }
         
         // ===== SAVE STATE TRACKING =====
