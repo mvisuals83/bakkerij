@@ -307,11 +307,11 @@
             </div>
         </div>
         <div class="header-controls">
-            <select class="event-select" id="event-select">
+            <select class="event-select" id="event-select" onchange="onEventChange()">
                 <option value="Normal">Normal</option>
-                <option value="Snow">❄️ Snow</option>
-                <option value="BBQ">🔥 BBQ</option>
-                <option value="Holiday">🎉 Feestdag</option>
+                <option value="Sneeuw">❄️ Sneeuw</option>
+                <option value="BBQ">☀️ BBQ Weer</option>
+                <option value="Feestdag">🎉 Feestdag</option>
                 <option value="Promo">📢 Promo</option>
             </select>
             <button class="save-btn" id="save-btn" onclick="savePlanning()">💾 <span>Opslaan</span></button>
@@ -654,6 +654,13 @@
             const savedDayData = historicalData.filter(d => d.datum === dateStr);
             const hasSavedData = savedDayData.length > 0;
             
+            // Load saved event if exists, otherwise default to 'Normal'
+            const savedEvent = savedDayData[0]?.event || 'Normal';
+            const eventSelect = document.getElementById('event-select');
+            if (eventSelect && !planningData._eventEdited) {
+                eventSelect.value = savedEvent;
+            }
+            
             // Build display data for each product
             const displayData = {};
             
@@ -851,6 +858,25 @@
         
         function renderReference() {
             let html = '';
+            
+            // First add the event row
+            html += '<tr style="background: var(--bg-card);"><td style="font-weight: 600;">Event</td>';
+            for (let w = 1; w <= 3; w++) {
+                const weekData = getSameWeekdayData(currentDate, w);
+                const event = weekData[0]?.event || 'Normal';
+                const eventIcons = {
+                    'Normal': '',
+                    'Sneeuw': '❄️',
+                    'BBQ': '☀️',
+                    'Feestdag': '🎉',
+                    'Promo': '📢'
+                };
+                const icon = eventIcons[event] || '';
+                html += `<td colspan="2" style="text-align: center; font-size: 0.75rem; color: var(--text-secondary);">${icon} ${event}</td>`;
+            }
+            html += '</tr>';
+            
+            // Then product rows
             PRODUCTS.forEach(p => {
                 html += `<tr><td>${p.short}</td>`;
                 for (let w = 1; w <= 3; w++) {
@@ -952,6 +978,11 @@
         
         // ===== SAVE STATE TRACKING =====
         let hasUnsavedChanges = false;
+        
+        function onEventChange() {
+            planningData._eventEdited = true;
+            markUnsaved();
+        }
         
         function markUnsaved() {
             hasUnsavedChanges = true;
