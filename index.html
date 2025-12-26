@@ -426,7 +426,7 @@
                 </div>
             </div>
             <table class="history-table">
-                <thead><tr><th>Product</th><th>Gebakken</th><th>Breuk</th><th>%</th></tr></thead>
+                <thead><tr><th>Product</th><th>Gebakken</th><th>Verkocht</th><th>Breuk</th><th>%</th></tr></thead>
                 <tbody id="history-body"></tbody>
             </table>
         </div>
@@ -1119,8 +1119,9 @@
             
             document.getElementById('history-body').innerHTML = PRODUCTS.map(p => {
                 const s = stats[p.name];
+                const verkocht = s.gebakken - s.breuk;
                 const pct = s.gebakken > 0 ? (s.breuk / s.gebakken * 100).toFixed(1) : 0;
-                return `<tr><td>${p.name}</td><td>${s.gebakken}</td><td style="color:var(--accent-red)">${s.breuk}</td><td>${pct}%</td></tr>`;
+                return `<tr><td>${p.name}</td><td>${s.gebakken}</td><td style="color:var(--accent-green)">${verkocht}</td><td style="color:var(--accent-red)">${s.breuk}</td><td>${pct}%</td></tr>`;
             }).join('');
             
             drawChart();
