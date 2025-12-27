@@ -268,9 +268,18 @@
         .stat-card.blue .value { color: var(--accent-blue); }
         .stat-card.orange .value { color: var(--accent-orange); }
         
-        .history-table { width: 100%; background: var(--bg-dark); border-radius: var(--radius); overflow: hidden; }
+        .history-table-wrapper { overflow-x: auto; border-radius: var(--radius); }
+        .history-table { width: 100%; background: var(--bg-dark); border-collapse: collapse; }
         .history-table th { padding: 10px; background: var(--bg-card); font-size: 0.75rem; text-align: left; color: var(--text-secondary); }
         .history-table td { padding: 10px; border-bottom: 1px solid var(--border-light); font-family: var(--font-mono); font-size: 0.85rem; }
+        .history-table th:first-child,
+        .history-table td:first-child {
+            position: sticky;
+            left: 0;
+            background: var(--bg-card);
+            z-index: 1;
+            font-family: var(--font-main);
+        }
         
         .settings-section { background: var(--bg-dark); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
         .settings-section h3 { font-size: 0.95rem; margin-bottom: 12px; color: var(--text-secondary); }
@@ -436,10 +445,12 @@
                     <span style="color: var(--accent-red);">● Breuk</span>
                 </div>
             </div>
-            <table class="history-table">
-                <thead><tr><th>Product</th><th>Gebakken</th><th>Verkocht</th><th>Omzet</th><th>Breuk</th><th>%</th></tr></thead>
-                <tbody id="history-body"></tbody>
-            </table>
+            <div class="history-table-wrapper">
+                <table class="history-table">
+                    <thead><tr><th>Product</th><th>Gebakken</th><th>Verkocht</th><th>Omzet</th><th>Breuk</th><th>%</th></tr></thead>
+                    <tbody id="history-body"></tbody>
+                </table>
+            </div>
         </div>
         
         <div class="page" id="page-instellingen">
