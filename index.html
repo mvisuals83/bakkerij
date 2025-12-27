@@ -80,15 +80,14 @@
             display: flex; align-items: center; justify-content: center;
         }
         
-        .current-date { text-align: center; min-width: 120px; }
+        .current-date { text-align: center; min-width: 120px; padding: 4px 12px; border-radius: var(--radius-sm); transition: all 0.3s ease; }
         .current-date .day { font-size: 1rem; font-weight: 600; }
         .current-date .date { font-size: 0.8rem; color: var(--text-secondary); }
-        
-        .weekend-badge {
-            background: linear-gradient(135deg, var(--accent-orange), var(--accent-red));
-            color: white; padding: 2px 8px; border-radius: 20px;
-            font-size: 0.65rem; font-weight: 600; margin-left: 6px;
+        .current-date.weekend { 
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-red)); 
         }
+        .current-date.weekend .day,
+        .current-date.weekend .date { color: white; }
         
         .weather-badge {
             background: var(--bg-card);
@@ -306,12 +305,11 @@
             <div class="logo">🥖 Bakkerij</div>
             <div class="date-nav">
                 <button class="date-btn" onclick="changeDate(-1)">‹</button>
-                <div class="current-date">
+                <div class="current-date" id="current-date-box">
                     <div class="day" id="current-day">zaterdag</div>
                     <div class="date" id="current-date">06/12/2025</div>
                 </div>
                 <button class="date-btn" onclick="changeDate(1)">›</button>
-                <span class="weekend-badge" id="weekend-badge" style="display: none;">WEEKEND</span>
             </div>
         </div>
         <div class="header-controls">
@@ -657,9 +655,12 @@
         function updateHeader() {
             document.getElementById('current-day').textContent = getDayName(currentDate);
             document.getElementById('current-date').textContent = formatDate(currentDate);
-            const badge = document.getElementById('weekend-badge');
-            badge.style.display = isWeekend(currentDate) ? 'inline-block' : 'none';
-            badge.textContent = isSaturday(currentDate) ? 'ZATERDAG' : 'ZONDAG';
+            const dateBox = document.getElementById('current-date-box');
+            if (isWeekend(currentDate)) {
+                dateBox.classList.add('weekend');
+            } else {
+                dateBox.classList.remove('weekend');
+            }
         }
         
         function renderPlanning() {
@@ -1366,9 +1367,9 @@
         }
         
         // ===== WEATHER =====
-        // Aarschot, Belgium coordinates
-        const WEATHER_LAT = 50.9867;
-        const WEATHER_LON = 4.8307;
+        // Herent/Leuven, Belgium coordinates
+        const WEATHER_LAT = 50.9069;
+        const WEATHER_LON = 4.6725;
         let weatherCache = {};
         
         async function updateWeather() {
