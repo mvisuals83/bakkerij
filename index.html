@@ -312,10 +312,10 @@
                 </div>
                 <button class="date-btn" onclick="changeDate(1)">›</button>
                 <span class="weekend-badge" id="weekend-badge" style="display: none;">WEEKEND</span>
-                <span class="weather-badge" id="weather-badge" title="Weer voorspelling">--</span>
             </div>
         </div>
         <div class="header-controls">
+            <span class="weather-badge" id="weather-badge" title="Weer voorspelling">--</span>
             <select class="event-select" id="event-select" onchange="onEventChange()">
                 <option value="Normal">Normal</option>
                 <option value="Sneeuw">❄️ Sneeuw</option>
@@ -413,9 +413,9 @@
                 <div class="stat-card red"><div class="label">Totaal Breuk</div><div class="value" id="stat-breuk">0</div></div>
                 <div class="stat-card orange"><div class="label">Breuk %</div><div class="value" id="stat-percentage">0%</div></div>
             </div>
-            <div class="stat-card" style="background: linear-gradient(135deg, #059669, #10b981); margin-bottom: 12px;">
+            <div class="stat-card" style="margin-bottom: 12px;">
                 <div class="label" style="font-size: 0.9rem;">💰 Omzet (verkocht)</div>
-                <div class="value" id="stat-omzet" style="font-size: 1.8rem;">€0.00</div>
+                <div class="value" id="stat-omzet" style="font-size: 1.8rem; color: var(--accent-green);">€0.00</div>
             </div>
             <div class="settings-section" style="margin-bottom: 12px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
