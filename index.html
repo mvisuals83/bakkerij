@@ -53,23 +53,29 @@
             min-height: 100vh;
         }
         
-        .header {
-            background: linear-gradient(135deg, var(--bg-dark), var(--bg-darkest));
-            padding: 12px 16px;
-            border-bottom: 1px solid var(--border-light);
-            position: sticky;
-            top: 0;
-            z-index: 100;
+        .logo { font-size: 1.3rem; font-weight: 700; }
+        
+        .planning-header {
+            background: var(--bg-dark);
+            border-radius: var(--radius);
+            padding: 12px;
+            margin-bottom: 12px;
         }
         
-        .header-top {
+        .planning-header-top {
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            justify-content: center;
+            gap: 10px;
             margin-bottom: 10px;
         }
         
-        .logo { font-size: 1.3rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .planning-header-bottom {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            align-items: center;
+        }
         
         .date-nav { display: flex; align-items: center; gap: 6px; }
         
@@ -92,12 +98,10 @@
         .weather-badge {
             background: var(--bg-card);
             color: var(--text-primary); padding: 4px 8px; border-radius: 20px;
-            font-size: 0.75rem; margin-left: 6px;
+            font-size: 0.75rem;
             display: inline-flex; align-items: center; gap: 4px;
             border: 1px solid var(--border-color);
         }
-        
-        .header-controls { display: flex; gap: 10px; align-items: center; }
         
         .event-select {
             background: var(--bg-card); border: 1px solid var(--border-color);
@@ -130,14 +134,13 @@
         .tabs {
             display: flex; background: var(--bg-dark);
             border-bottom: 1px solid var(--border-light);
-            overflow-x: auto;
         }
         
         .tab {
-            flex: 1; min-width: 70px; padding: 12px 8px;
+            flex: 1; padding: 10px 6px;
             background: transparent; border: none; color: var(--text-secondary);
             font-size: 0.8rem; font-weight: 500; cursor: pointer;
-            position: relative; white-space: nowrap;
+            position: relative; white-space: nowrap; text-align: center;
         }
         
         .tab.active { color: var(--accent-blue); }
@@ -189,6 +192,8 @@
         
         .planning-table th:first-child { text-align: left; padding-left: 8px; }
         
+        .planning-table th.totaal-col { color: var(--accent-cyan); }
+        
         .planning-table td {
             padding: 5px 3px; text-align: center;
             border-bottom: 1px solid var(--border-light);
@@ -197,6 +202,11 @@
         .planning-table td:first-child {
             text-align: left; padding-left: 8px;
             font-weight: 500; font-size: 0.75rem;
+        }
+        
+        .planning-table td.totaal-col input {
+            color: var(--accent-cyan);
+            font-weight: 600;
         }
         
         .planning-table .total-row { background: var(--bg-card); font-weight: 600; }
@@ -314,46 +324,46 @@
     </style>
 </head>
 <body>
-    <header class="header">
-        <div class="header-top">
-            <div class="logo">🥖 Bakkerij</div>
-            <div class="date-nav">
-                <button class="date-btn" onclick="changeDate(-1)">‹</button>
-                <div class="current-date" id="current-date-box">
-                    <div class="day" id="current-day">zaterdag</div>
-                    <div class="date" id="current-date">06/12/2025</div>
-                </div>
-                <button class="date-btn" onclick="changeDate(1)">›</button>
-            </div>
-        </div>
-        <div class="header-controls">
-            <span class="weather-badge" id="weather-badge" title="Weer voorspelling">--</span>
-            <select class="event-select" id="event-select" onchange="onEventChange()">
-                <option value="Normal">Normal</option>
-                <option value="Sneeuw">❄️ Sneeuw</option>
-                <option value="BBQ">☀️ BBQ Weer</option>
-                <option value="Feestdag">🎉 Feestdag</option>
-                <option value="Promo">📢 Promo</option>
-            </select>
-            <button class="save-btn" id="save-btn" onclick="savePlanning()">💾 <span>Opslaan</span></button>
-        </div>
-    </header>
-    
     <nav class="tabs">
-        <button class="tab active" data-page="planning">📋 Planning</button>
-        <button class="tab" data-page="breuk">📊 Breuk</button>
-        <button class="tab" data-page="historiek">📈 Historiek</button>
-        <button class="tab" data-page="instellingen">⚙️ Instellingen</button>
+        <button class="tab active" data-page="planning">Planning</button>
+        <button class="tab" data-page="breuk">Breuk</button>
+        <button class="tab" data-page="historiek">Historiek</button>
+        <button class="tab" data-page="instellingen">Instelling</button>
     </nav>
     
     <main class="main">
         <div class="page active" id="page-planning">
+            <div class="planning-header">
+                <div class="planning-header-top">
+                    <div class="logo">🥖</div>
+                    <div class="date-nav">
+                        <button class="date-btn" onclick="changeDate(-1)">‹</button>
+                        <div class="current-date" id="current-date-box">
+                            <div class="day" id="current-day">zaterdag</div>
+                            <div class="date" id="current-date">06/12/2025</div>
+                        </div>
+                        <button class="date-btn" onclick="changeDate(1)">›</button>
+                    </div>
+                    <span class="weather-badge" id="weather-badge" title="Weer voorspelling">--</span>
+                </div>
+                <div class="planning-header-bottom">
+                    <select class="event-select" id="event-select" onchange="onEventChange()">
+                        <option value="Normal">Normal</option>
+                        <option value="Sneeuw">❄️ Sneeuw</option>
+                        <option value="BBQ">☀️ BBQ Weer</option>
+                        <option value="Feestdag">🎉 Feestdag</option>
+                        <option value="Promo">📢 Promo</option>
+                    </select>
+                    <button class="save-btn" id="save-btn" onclick="savePlanning()">💾 <span>Opslaan</span></button>
+                </div>
+            </div>
+            
             <div class="group-card">
                 <div class="group-header group-a">🔶 GROEP A — Pistolets</div>
                 <div class="table-wrapper">
                     <table class="planning-table">
                         <thead>
-                            <tr><th>Product</th><th>Sug</th><th>Totaal</th><th>L1</th><th>L2</th><th>L3</th><th>L4</th><th>L5</th></tr>
+                            <tr><th>Product</th><th>Sug</th><th class="totaal-col">Totaal</th><th>L1</th><th>L2</th><th>L3</th><th>L4</th><th>L5</th></tr>
                         </thead>
                         <tbody id="group-a-body"></tbody>
                     </table>
@@ -365,7 +375,7 @@
                 <div class="table-wrapper">
                     <table class="planning-table">
                         <thead>
-                            <tr><th>Product</th><th>Sug</th><th>Totaal</th><th>L1</th><th>L2</th><th>L3</th><th>L4</th><th>L5</th></tr>
+                            <tr><th>Product</th><th>Sug</th><th class="totaal-col">Totaal</th><th>L1</th><th>L2</th><th>L3</th><th>L4</th><th>L5</th></tr>
                         </thead>
                         <tbody id="group-b-body"></tbody>
                     </table>
@@ -850,7 +860,7 @@
                     html += `<tr>
                         <td>${p.short}</td>
                         <td class="sug-value">${data.sug}</td>
-                        <td><input type="number" value="${data.totaal}" data-id="${p.id}" data-field="totaal" onchange="onInput(this)"></td>
+                        <td class="totaal-col"><input type="number" value="${data.totaal}" data-id="${p.id}" data-field="totaal" onchange="onInput(this)"></td>
                         <td><input type="number" value="${data.batches[0]}" data-id="${p.id}" data-field="l1" onchange="onInput(this)"></td>
                         <td><input type="number" value="${data.batches[1]}" data-id="${p.id}" data-field="l2" onchange="onInput(this)"></td>
                         <td><input type="number" value="${data.batches[2]}" data-id="${p.id}" data-field="l3" onchange="onInput(this)"></td>
@@ -860,7 +870,7 @@
                 });
                 
                 html += `<tr class="total-row">
-                    <td>TOTAAL ${group}</td><td>${totals.sug}</td><td>${totals.totaal}</td>
+                    <td>TOTAAL ${group}</td><td>${totals.sug}</td><td class="totaal-col" style="color: var(--accent-cyan);">${totals.totaal}</td>
                     <td>${totals.l1}</td><td>${totals.l2}</td><td>${totals.l3}</td><td>${totals.l4}</td><td>${totals.l5}</td>
                 </tr>`;
                 body.innerHTML = html;
