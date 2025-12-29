@@ -257,17 +257,17 @@
         .reference-table td:first-child { text-align: left; font-family: var(--font-sans); }
         .reference-table .breuk { color: var(--accent-red); font-weight: 600; }
         
-        .breuk-date-selector { background: var(--bg-dark); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; }
-        .breuk-date-selector label { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 6px; display: block; }
-        .breuk-date-selector select { width: 100%; padding: 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); }
+        .breuk-date-selector { background: var(--bg-dark); border-radius: var(--radius); padding: 10px; margin-bottom: 10px; }
+        .breuk-date-selector label { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; display: block; }
+        .breuk-date-selector select { width: 100%; padding: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); }
         
-        .breuk-grid { display: grid; gap: 10px; }
-        .breuk-item { background: var(--bg-dark); border-radius: var(--radius); padding: 12px; display: flex; justify-content: space-between; align-items: center; }
-        .breuk-item .product-name { font-weight: 600; margin-bottom: 2px; }
-        .breuk-item .product-baked { font-size: 0.8rem; color: var(--text-secondary); }
-        .breuk-item input { width: 70px; padding: 10px; background: var(--bg-card); border: 2px solid var(--border-color); border-radius: var(--radius-sm); color: var(--accent-red); font-family: var(--font-mono); font-size: 1.1rem; font-weight: 600; text-align: center; }
+        .breuk-grid { display: grid; gap: 6px; }
+        .breuk-item { background: var(--bg-dark); border-radius: var(--radius-sm); padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; }
+        .breuk-item .product-name { font-weight: 600; font-size: 0.9rem; margin-bottom: 1px; }
+        .breuk-item .product-baked { font-size: 0.75rem; color: var(--text-secondary); }
+        .breuk-item input { width: 60px; padding: 6px; background: var(--bg-card); border: 2px solid var(--border-color); border-radius: var(--radius-sm); color: var(--accent-red); font-family: var(--font-mono); font-size: 1rem; font-weight: 600; text-align: center; }
         
-        .breuk-save-btn { width: 100%; padding: 14px; margin-top: 12px; background: linear-gradient(135deg, var(--accent-green), #059669); border: none; border-radius: var(--radius); color: white; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .breuk-save-btn { width: 100%; padding: 12px; margin-top: 10px; background: linear-gradient(135deg, var(--accent-green), #059669); border: none; border-radius: var(--radius); color: white; font-size: 1rem; font-weight: 600; cursor: pointer; }
         
         .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
         .stat-card { background: var(--bg-dark); border-radius: var(--radius); padding: 12px; }
@@ -439,6 +439,17 @@
                 <div class="label" style="font-size: 0.9rem;">💰 Omzet (verkocht)</div>
                 <div class="value" id="stat-omzet" style="font-size: 1.8rem; color: var(--accent-green);">€0.00</div>
             </div>
+            
+            <div class="settings-section" style="margin-bottom: 12px;">
+                <h3 style="margin-bottom: 10px;">📊 Week Vergelijking (zelfde dag)</h3>
+                <div class="history-table-wrapper">
+                    <table class="history-table" id="week-compare-table">
+                        <thead><tr><th>Dag</th><th>Vorige</th><th>Deze</th><th>Verschil</th></tr></thead>
+                        <tbody id="week-compare-body"></tbody>
+                    </table>
+                </div>
+            </div>
+            
             <div class="settings-section" style="margin-bottom: 12px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <h3>📈 Trend</h3>
@@ -460,11 +471,15 @@
                     <span style="color: var(--accent-red);">● Breuk</span>
                 </div>
             </div>
-            <div class="history-table-wrapper">
-                <table class="history-table">
-                    <thead><tr><th>Product</th><th>Gebakken</th><th>Verkocht</th><th>Omzet</th><th>Breuk</th><th>%</th></tr></thead>
-                    <tbody id="history-body"></tbody>
-                </table>
+            
+            <div class="settings-section">
+                <h3 style="margin-bottom: 10px;">🥖 Per Product</h3>
+                <div class="history-table-wrapper">
+                    <table class="history-table">
+                        <thead><tr><th>Product</th><th>Gebakken</th><th>Verkocht</th><th>Omzet</th><th>Breuk</th><th>%</th></tr></thead>
+                        <tbody id="history-body"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
         
@@ -1181,6 +1196,9 @@
             document.getElementById('stat-percentage').textContent = gebakken > 0 ? (breuk / gebakken * 100).toFixed(1) + '%' : '0%';
             document.getElementById('stat-omzet').textContent = '€' + totalOmzet.toFixed(2).replace('.', ',');
             
+            // Week comparison - compare same weekdays
+            renderWeekComparison();
+            
             document.getElementById('history-body').innerHTML = PRODUCTS.map(p => {
                 const s = stats[p.name];
                 const verkocht = s.gebakken - s.breuk;
@@ -1189,6 +1207,72 @@
             }).join('');
             
             drawChart();
+        }
+        
+        function renderWeekComparison() {
+            const dayNames = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
+            const today = new Date();
+            let html = '';
+            
+            // Compare last 7 days with week before
+            for (let i = 6; i >= 0; i--) {
+                const thisDate = new Date(today);
+                thisDate.setDate(today.getDate() - i);
+                const lastWeekDate = new Date(thisDate);
+                lastWeekDate.setDate(thisDate.getDate() - 7);
+                
+                const thisDateStr = formatDateISO(thisDate);
+                const lastWeekDateStr = formatDateISO(lastWeekDate);
+                
+                // Get verkocht (gebakken - breuk) for each day
+                const thisDay = historicalData.filter(d => d.datum === thisDateStr);
+                const lastWeekDay = historicalData.filter(d => d.datum === lastWeekDateStr);
+                
+                let thisVerkocht = 0, lastVerkocht = 0;
+                
+                thisDay.forEach(d => {
+                    const p = PRODUCTS.find(x => x.name === d.product);
+                    if (p) {
+                        const stuks = d.totaal * p.ppp;
+                        thisVerkocht += stuks - (d.breuk || 0);
+                    }
+                });
+                
+                lastWeekDay.forEach(d => {
+                    const p = PRODUCTS.find(x => x.name === d.product);
+                    if (p) {
+                        const stuks = d.totaal * p.ppp;
+                        lastVerkocht += stuks - (d.breuk || 0);
+                    }
+                });
+                
+                // Calculate difference
+                let diffPct = 0;
+                let diffStr = '-';
+                let diffColor = 'var(--text-secondary)';
+                
+                if (lastVerkocht > 0 && thisVerkocht > 0) {
+                    diffPct = ((thisVerkocht - lastVerkocht) / lastVerkocht * 100);
+                    const arrow = diffPct > 0 ? '↑' : diffPct < 0 ? '↓' : '';
+                    diffStr = `${diffPct > 0 ? '+' : ''}${diffPct.toFixed(0)}% ${arrow}`;
+                    diffColor = diffPct > 0 ? 'var(--accent-green)' : diffPct < 0 ? 'var(--accent-red)' : 'var(--text-secondary)';
+                } else if (thisVerkocht > 0) {
+                    diffStr = 'nieuw';
+                    diffColor = 'var(--accent-blue)';
+                }
+                
+                const dayName = dayNames[thisDate.getDay()];
+                const dateLabel = `${dayName} ${thisDate.getDate()}/${thisDate.getMonth() + 1}`;
+                
+                html += `<tr>
+                    <td>${dateLabel}</td>
+                    <td>${lastVerkocht || '-'}</td>
+                    <td>${thisVerkocht || '-'}</td>
+                    <td style="color: ${diffColor}; font-weight: 600;">${diffStr}</td>
+                </tr>`;
+            }
+            
+            document.getElementById('week-compare-body').innerHTML = html;
         }
         
         function drawChart() {
