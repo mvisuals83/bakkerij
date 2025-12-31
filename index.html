@@ -263,14 +263,33 @@
         .collapsible-header:hover { background: var(--bg-card); }
         .collapse-icon { transition: transform 0.2s; font-size: 0.7rem; color: var(--text-muted); }
         .collapsible-header.open .collapse-icon { transform: rotate(90deg); }
-        .collapsible-content { padding: 0 12px 12px 12px; }
+        .collapsible-content { padding: 12px; padding-top: 0; }
         
-        .ref-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .ref-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 10px; }
         .ref-table th { padding: 6px 4px; background: var(--bg-card); font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); text-align: center; }
         .ref-table th:first-child { text-align: left; }
-        .ref-table td { padding: 6px 4px; text-align: center; border-bottom: 1px solid var(--border-light); font-family: var(--font-mono); }
+        .ref-table td { padding: 6px 4px; text-align: center; border-bottom: 1px solid var(--border-light); font-family: var(--font-mono); color: var(--text-primary); }
         .ref-table td:first-child { text-align: left; font-family: var(--font-sans); }
         .ref-table td.totaal-col { color: var(--accent-cyan); font-weight: 600; }
+        
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center;
+            z-index: 1000; padding: 20px;
+        }
+        .modal-box {
+            background: var(--bg-dark); border-radius: var(--radius); padding: 20px;
+            max-width: 300px; width: 100%; text-align: center;
+            border: 1px solid var(--border-color);
+        }
+        .modal-box p { margin-bottom: 16px; font-size: 1rem; }
+        .modal-buttons { display: flex; gap: 10px; justify-content: center; }
+        .modal-btn {
+            padding: 10px 20px; border: none; border-radius: var(--radius-sm);
+            font-weight: 600; cursor: pointer; font-size: 0.9rem;
+        }
+        .modal-btn.confirm { background: var(--accent-blue); color: white; }
+        .modal-btn.cancel { background: var(--bg-card); color: var(--text-primary); }
         
         .breuk-date-selector { background: var(--bg-dark); border-radius: var(--radius); padding: 10px; margin-bottom: 10px; }
         .breuk-date-selector label { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; display: block; }
@@ -554,6 +573,16 @@
     </main>
     
     <div class="toast" id="toast"></div>
+    
+    <div class="modal-overlay" id="confirm-modal" style="display: none;">
+        <div class="modal-box">
+            <p id="modal-message">Deze planning gebruiken?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn confirm" onclick="confirmModalAction()">Ja</button>
+                <button class="modal-btn cancel" onclick="closeModal()">Annuleer</button>
+            </div>
+        </div>
+    </div>
     
     <script>
         // ===== SUPABASE CONFIG =====
@@ -1131,28 +1160,47 @@
                 return;
             }
             
-            if (!confirm('Deze planning gebruiken?')) {
-                return;
-            }
-            
-            // Copy values to planningData and re-render
-            PRODUCTS.forEach(p => {
-                const data = dayData.find(d => d.product === p.name);
-                if (data) {
-                    planningData[p.id] = {
-                        totaal: data.totaal || 0,
-                        l1: data.l1 || 0,
-                        l2: data.l2 || 0,
-                        l3: data.l3 || 0,
-                        l4: data.l4 || 0,
-                        l5: data.l5 || 0
-                    };
-                }
+            // Show custom modal
+            showModal('Deze planning gebruiken?', () => {
+                // Copy values to planningData and re-render
+                PRODUCTS.forEach(p => {
+                    const data = dayData.find(d => d.product === p.name);
+                    if (data) {
+                        planningData[p.id] = {
+                            totaal: data.totaal || 0,
+                            l1: data.l1 || 0,
+                            l2: data.l2 || 0,
+                            l3: data.l3 || 0,
+                            l4: data.l4 || 0,
+                            l5: data.l5 || 0
+                        };
+                    }
+                });
+                
+                markUnsaved();
+                renderPlanning();
+                showToast('✅ Planning gekopieerd!');
             });
-            
-            markUnsaved();
-            renderPlanning();
-            showToast('✅ Planning gekopieerd!');
+        }
+        
+        // ===== MODAL =====
+        let modalCallback = null;
+        
+        function showModal(message, onConfirm) {
+            document.getElementById('modal-message').textContent = message;
+            document.getElementById('confirm-modal').style.display = 'flex';
+            modalCallback = onConfirm;
+        }
+        
+        function confirmModalAction() {
+            document.getElementById('confirm-modal').style.display = 'none';
+            if (modalCallback) modalCallback();
+            modalCallback = null;
+        }
+        
+        function closeModal() {
+            document.getElementById('confirm-modal').style.display = 'none';
+            modalCallback = null;
         }
         
         // ===== SAVE STATE TRACKING =====
