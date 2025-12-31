@@ -255,6 +255,23 @@
         .reference-table td:first-child { text-align: left; font-family: var(--font-sans); }
         .reference-table .breuk { color: var(--accent-red); font-weight: 600; }
         
+        .collapsible-section { background: var(--bg-dark); border-radius: var(--radius); margin-top: 12px; overflow: hidden; }
+        .collapsible-header { 
+            padding: 12px; display: flex; justify-content: space-between; align-items: center;
+            cursor: pointer; font-weight: 600; font-size: 0.9rem;
+        }
+        .collapsible-header:hover { background: var(--bg-card); }
+        .collapse-icon { transition: transform 0.2s; font-size: 0.7rem; color: var(--text-muted); }
+        .collapsible-header.open .collapse-icon { transform: rotate(90deg); }
+        .collapsible-content { padding: 0 12px 12px 12px; }
+        
+        .ref-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .ref-table th { padding: 6px 4px; background: var(--bg-card); font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); text-align: center; }
+        .ref-table th:first-child { text-align: left; }
+        .ref-table td { padding: 6px 4px; text-align: center; border-bottom: 1px solid var(--border-light); font-family: var(--font-mono); }
+        .ref-table td:first-child { text-align: left; font-family: var(--font-sans); }
+        .ref-table td.totaal-col { color: var(--accent-cyan); font-weight: 600; }
+        
         .breuk-date-selector { background: var(--bg-dark); border-radius: var(--radius); padding: 10px; margin-bottom: 10px; }
         .breuk-date-selector label { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; display: block; }
         .breuk-date-selector select { width: 100%; padding: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); }
@@ -396,6 +413,20 @@
                     <thead><tr><th>Product</th><th>W-1</th><th>Brk</th><th>W-2</th><th>Brk</th><th>W-3</th><th>Brk</th></tr></thead>
                     <tbody id="reference-body"></tbody>
                 </table>
+            </div>
+            
+            <div class="collapsible-section">
+                <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <span>📅 Referentie</span>
+                    <span class="collapse-icon">▶</span>
+                </div>
+                <div class="collapsible-content" style="display: none;">
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                        <input type="date" id="ref-date-picker" onchange="loadReferencePlanning()" style="flex: 1; padding: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary);">
+                        <button onclick="copyReferencePlanning()" style="padding: 8px 12px; background: var(--accent-blue); border: none; border-radius: var(--radius-sm); color: white; font-weight: 600; cursor: pointer; white-space: nowrap;">📋 Kopieer</button>
+                    </div>
+                    <div id="ref-planning-content" style="color: var(--text-muted); font-size: 0.85rem;">Selecteer een datum...</div>
+                </div>
             </div>
         </div>
         
@@ -1040,6 +1071,88 @@
                 el.textContent = total;
                 el.parentElement.className = 'lading-item' + (total > SETTINGS.batchMax ? ' danger' : total > 25 ? ' warning' : '');
             }
+        }
+        
+        // ===== COLLAPSIBLE & REFERENCE =====
+        function toggleCollapsible(header) {
+            header.classList.toggle('open');
+            const content = header.nextElementSibling;
+            content.style.display = content.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        function loadReferencePlanning() {
+            const dateStr = document.getElementById('ref-date-picker').value;
+            if (!dateStr) {
+                document.getElementById('ref-planning-content').innerHTML = '<span style="color: var(--text-muted);">Selecteer een datum...</span>';
+                return;
+            }
+            
+            const dayData = historicalData.filter(d => d.datum === dateStr);
+            
+            if (dayData.length === 0) {
+                document.getElementById('ref-planning-content').innerHTML = '<span style="color: var(--text-muted);">Geen data voor deze datum</span>';
+                return;
+            }
+            
+            // Build table
+            let html = `<table class="ref-table">
+                <thead><tr><th>Product</th><th class="totaal-col">Totaal</th><th>L1</th><th>L2</th><th>L3</th><th>L4</th><th>L5</th></tr></thead>
+                <tbody>`;
+            
+            PRODUCTS.forEach(p => {
+                const data = dayData.find(d => d.product === p.name);
+                if (data) {
+                    html += `<tr>
+                        <td>${p.short}</td>
+                        <td class="totaal-col">${data.totaal || 0}</td>
+                        <td>${data.l1 || 0}</td>
+                        <td>${data.l2 || 0}</td>
+                        <td>${data.l3 || 0}</td>
+                        <td>${data.l4 || 0}</td>
+                        <td>${data.l5 || 0}</td>
+                    </tr>`;
+                }
+            });
+            
+            html += '</tbody></table>';
+            document.getElementById('ref-planning-content').innerHTML = html;
+        }
+        
+        function copyReferencePlanning() {
+            const dateStr = document.getElementById('ref-date-picker').value;
+            if (!dateStr) {
+                showToast('⚠️ Selecteer eerst een datum');
+                return;
+            }
+            
+            const dayData = historicalData.filter(d => d.datum === dateStr);
+            if (dayData.length === 0) {
+                showToast('⚠️ Geen data voor deze datum');
+                return;
+            }
+            
+            if (!confirm('Deze planning gebruiken?')) {
+                return;
+            }
+            
+            // Copy values to planningData and re-render
+            PRODUCTS.forEach(p => {
+                const data = dayData.find(d => d.product === p.name);
+                if (data) {
+                    planningData[p.id] = {
+                        totaal: data.totaal || 0,
+                        l1: data.l1 || 0,
+                        l2: data.l2 || 0,
+                        l3: data.l3 || 0,
+                        l4: data.l4 || 0,
+                        l5: data.l5 || 0
+                    };
+                }
+            });
+            
+            markUnsaved();
+            renderPlanning();
+            showToast('✅ Planning gekopieerd!');
         }
         
         // ===== SAVE STATE TRACKING =====
