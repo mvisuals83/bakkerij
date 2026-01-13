@@ -1065,15 +1065,15 @@
                 html += '</tr>';
             });
             
-            // Add totals row
-            html += '<tr style="background: var(--bg-card); font-weight: 600;"><td>TOTAAL</td>';
+            // Add totals row with top border separator
+            html += '<tr style="border-top: 1px solid var(--text-muted);"><td style="font-weight: 600; color: var(--text-muted);">Totaal</td>';
             for (let w = 0; w < 3; w++) {
-                html += `<td style="color: var(--accent-cyan);">${weekTotals[w]}</td><td class="breuk">${weekBreuk[w]}</td>`;
+                html += `<td style="color: var(--accent-cyan); font-weight: 600;">${weekTotals[w]}</td><td class="breuk">${weekBreuk[w]}</td>`;
             }
             html += '</tr>';
             
             // Add note row
-            html += '<tr style="background: var(--bg-card);"><td style="font-weight: 600;">Notitie</td>';
+            html += '<tr><td style="font-weight: 600; color: var(--text-muted);">Notitie</td>';
             for (let w = 1; w <= 3; w++) {
                 const weekData = getSameWeekdayData(currentDate, w);
                 const note = weekData[0]?.note || '';
