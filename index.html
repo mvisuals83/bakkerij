@@ -548,7 +548,7 @@
                 <h3 style="margin-bottom: 10px;">📊 Week Vergelijking (verkocht)</h3>
                 <div class="history-table-wrapper">
                     <table class="history-table" id="week-compare-table">
-                        <thead><tr><th>Dag</th><th>W-1</th><th>W-2</th><th>W-3</th><th>W-4</th></tr></thead>
+                        <thead><tr><th>Dag</th><th>W-1</th><th>W-2</th><th>W-3</th></tr></thead>
                         <tbody id="week-compare-body"></tbody>
                     </table>
                 </div>
@@ -1523,34 +1523,37 @@
                 return verkocht;
             }
             
-            // Compare last 7 days with 1-4 weeks before
+            // Show last 7 days and their week-over-week trends
             for (let i = 6; i >= 0; i--) {
-                const thisDate = new Date(today);
-                thisDate.setDate(today.getDate() - i);
-                const thisDateStr = formatDateISO(thisDate);
-                const thisVerkocht = getVerkocht(thisDateStr);
+                const baseDate = new Date(today);
+                baseDate.setDate(today.getDate() - i);
                 
-                const dayName = dayNames[thisDate.getDay()];
-                const dateLabel = `${dayName} ${thisDate.getDate()}/${thisDate.getMonth() + 1}`;
+                const dayName = dayNames[baseDate.getDay()];
+                const dateLabel = `${dayName} ${baseDate.getDate()}/${baseDate.getMonth() + 1}`;
                 
                 html += `<tr><td>${dateLabel}</td>`;
                 
-                // Show % change for weeks 1-4
-                for (let w = 1; w <= 4; w++) {
-                    const compareDate = new Date(thisDate);
-                    compareDate.setDate(thisDate.getDate() - (w * 7));
-                    const compareDateStr = formatDateISO(compareDate);
-                    const compareVerkocht = getVerkocht(compareDateStr);
+                // W-1 = this week vs last week (week 0 vs week 1)
+                // W-2 = last week vs 2 weeks ago (week 1 vs week 2)
+                // W-3 = 2 weeks ago vs 3 weeks ago (week 2 vs week 3)
+                for (let w = 0; w < 3; w++) {
+                    const thisWeekDate = new Date(baseDate);
+                    thisWeekDate.setDate(baseDate.getDate() - (w * 7));
+                    const lastWeekDate = new Date(baseDate);
+                    lastWeekDate.setDate(baseDate.getDate() - ((w + 1) * 7));
+                    
+                    const thisVerkocht = getVerkocht(formatDateISO(thisWeekDate));
+                    const lastVerkocht = getVerkocht(formatDateISO(lastWeekDate));
                     
                     let diffStr = '-';
                     let diffColor = 'var(--text-muted)';
                     
-                    if (compareVerkocht > 0 && thisVerkocht > 0) {
-                        const diffPct = ((thisVerkocht - compareVerkocht) / compareVerkocht * 100);
+                    if (lastVerkocht > 0 && thisVerkocht > 0) {
+                        const diffPct = ((thisVerkocht - lastVerkocht) / lastVerkocht * 100);
                         const arrow = diffPct > 0 ? '↑' : diffPct < 0 ? '↓' : '';
                         diffStr = `${diffPct > 0 ? '+' : ''}${diffPct.toFixed(0)}%${arrow}`;
                         diffColor = diffPct > 0 ? 'var(--accent-green)' : diffPct < 0 ? 'var(--accent-red)' : 'var(--text-secondary)';
-                    } else if (thisVerkocht > 0 && compareVerkocht === 0) {
+                    } else if (thisVerkocht > 0 && lastVerkocht === 0) {
                         diffStr = 'nieuw';
                         diffColor = 'var(--accent-blue)';
                     }
