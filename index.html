@@ -1917,7 +1917,25 @@
             if (!supabaseClient) return;
             const { data } = await supabaseClient.from('planning_data').select('*').order('datum', { ascending: false });
             if (data?.length) {
-                historicalData = data;
+                // Merge with localStorage to preserve fields that might not be in Supabase
+                const localData = JSON.parse(localStorage.getItem('bakkerij_data') || '[]');
+                
+                // Create a map of local data for quick lookup
+                const localMap = {};
+                localData.forEach(rec => {
+                    localMap[`${rec.datum}-${rec.product}`] = rec;
+                });
+                
+                // Merge: use Supabase data but preserve local weather/note if Supabase doesn't have them
+                historicalData = data.map(rec => {
+                    const localRec = localMap[`${rec.datum}-${rec.product}`];
+                    return {
+                        ...rec,
+                        weather: rec.weather || localRec?.weather,
+                        note: rec.note || localRec?.note
+                    };
+                });
+                
                 localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
                 renderPlanning();
             }
@@ -1929,7 +1947,7 @@
                 await supabaseClient.from('planning_data').upsert({
                     datum: rec.datum, product: rec.product, totaal: rec.totaal,
                     l1: rec.l1, l2: rec.l2, l3: rec.l3, l4: rec.l4, l5: rec.l5,
-                    breuk: rec.breuk, event: rec.event
+                    breuk: rec.breuk, event: rec.event, weather: rec.weather, note: rec.note
                 }, { onConflict: 'datum,product' });
             }
         }
