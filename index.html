@@ -817,9 +817,12 @@
                 eventSelect.value = savedEvent;
             }
             
-            // Load saved note if exists
-            if (!planningData._note && savedDayData[0]?.note) {
-                planningData._note = savedDayData[0].note;
+            // Load saved note if exists (find any record that has a note for this date)
+            if (!planningData._note) {
+                const recordWithNote = savedDayData.find(d => d.note && d.note.length > 0);
+                if (recordWithNote) {
+                    planningData._note = recordWithNote.note;
+                }
             }
             updateNoteButton();
             
@@ -1076,7 +1079,8 @@
             html += '<tr><td style="font-weight: 600; color: var(--text-muted);">Notitie</td>';
             for (let w = 1; w <= 3; w++) {
                 const weekData = getSameWeekdayData(currentDate, w);
-                const note = weekData[0]?.note || '';
+                const recordWithNote = weekData.find(d => d.note && d.note.length > 0);
+                const note = recordWithNote?.note || '';
                 const dateStr = weekData[0]?.datum;
                 const hasNote = note && note.length > 0;
                 const iconClass = hasNote ? 'note-icon has-note' : 'note-icon';
@@ -1292,9 +1296,15 @@
             const saveBtn = document.getElementById('note-save-btn');
             const dateLabel = document.getElementById('note-modal-date');
             
-            // Load existing note
-            const dayData = historicalData.filter(d => d.datum === currentNoteDate);
-            const existingNote = dayData[0]?.note || '';
+            // Load existing note - check planningData first for current date, then find any record with note
+            let existingNote = '';
+            if (!dateStr && planningData._note) {
+                existingNote = planningData._note;
+            } else {
+                const dayData = historicalData.filter(d => d.datum === currentNoteDate);
+                const recordWithNote = dayData.find(d => d.note && d.note.length > 0);
+                existingNote = recordWithNote?.note || '';
+            }
             
             textarea.value = existingNote;
             textarea.readOnly = readOnly;
@@ -1331,7 +1341,8 @@
             const btn = document.getElementById('note-btn');
             const dateStr = formatDateISO(currentDate);
             const dayData = historicalData.filter(d => d.datum === dateStr);
-            const hasNote = planningData._note || dayData[0]?.note;
+            const recordWithNote = dayData.find(d => d.note && d.note.length > 0);
+            const hasNote = (planningData._note && planningData._note.length > 0) || recordWithNote;
             
             if (hasNote) {
                 btn.classList.add('has-note');
