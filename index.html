@@ -1416,7 +1416,11 @@
             const dates = [...new Set(historicalData.map(d => d.datum))].sort().reverse();
             select.innerHTML = dates.slice(0, 14).map(d => {
                 const dt = new Date(d);
-                return `<option value="${d}">${formatDate(dt)} (${getDayName(dt)})</option>`;
+                // Check if any product has breuk filled (not null) for this date
+                const dayData = historicalData.filter(rec => rec.datum === d);
+                const hasBreuk = dayData.some(rec => rec.breuk !== null && rec.breuk !== undefined);
+                const checkmark = hasBreuk ? ' ✓' : '';
+                return `<option value="${d}">${formatDate(dt)} (${getDayName(dt)})${checkmark}</option>`;
             }).join('');
             loadBreukData();
         }
@@ -1444,6 +1448,11 @@
             localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
             if (supabaseClient) syncToSupabase();
             showToast('✅ Breuk opgeslagen!');
+            
+            // Refresh dropdown to show checkmark
+            const currentValue = document.getElementById('breuk-date-select').value;
+            renderBreukPage();
+            document.getElementById('breuk-date-select').value = currentValue;
         }
         
         // ===== HISTORIEK =====
