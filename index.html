@@ -148,6 +148,10 @@
             background: linear-gradient(135deg, var(--accent-green), #059669);
         }
         
+        .save-btn.viewing-saved {
+            background: linear-gradient(135deg, var(--accent-green), #059669);
+        }
+        
         @keyframes pulse-unsaved {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.7; }
@@ -1007,6 +1011,13 @@
                 el.parentElement.className = 'lading-item' + (total > SETTINGS.batchMax ? ' danger' : total > 25 ? ' warning' : '');
             }
             
+            // Update save button state based on whether viewing saved data
+            if (hasSavedData && !hasUnsavedChanges) {
+                markViewingSaved();
+            } else if (!hasSavedData && !hasUnsavedChanges) {
+                markDefault();
+            }
+            
             renderReference();
         }
         
@@ -1362,7 +1373,7 @@
         function markUnsaved() {
             hasUnsavedChanges = true;
             const btn = document.getElementById('save-btn');
-            btn.classList.remove('saved');
+            btn.classList.remove('saved', 'viewing-saved');
             btn.classList.add('unsaved');
             btn.querySelector('span').textContent = 'Niet opgeslagen!';
         }
@@ -1374,13 +1385,29 @@
             btn.classList.add('saved');
             btn.querySelector('span').textContent = 'Opgeslagen ✓';
             
-            // Reset to neutral after 3 seconds
+            // Change to viewing-saved after 3 seconds
             setTimeout(() => {
                 if (!hasUnsavedChanges) {
                     btn.classList.remove('saved');
-                    btn.querySelector('span').textContent = 'Opslaan';
+                    btn.classList.add('viewing-saved');
+                    btn.querySelector('span').textContent = 'Opgeslagen';
                 }
             }, 3000);
+        }
+        
+        function markViewingSaved() {
+            hasUnsavedChanges = false;
+            const btn = document.getElementById('save-btn');
+            btn.classList.remove('unsaved', 'saved');
+            btn.classList.add('viewing-saved');
+            btn.querySelector('span').textContent = 'Opgeslagen';
+        }
+        
+        function markDefault() {
+            hasUnsavedChanges = false;
+            const btn = document.getElementById('save-btn');
+            btn.classList.remove('unsaved', 'saved', 'viewing-saved');
+            btn.querySelector('span').textContent = 'Opslaan';
         }
         
         // ===== BREUK =====
@@ -1772,9 +1799,6 @@
             currentDate.setDate(currentDate.getDate() + delta);
             planningData = {};
             hasUnsavedChanges = false;
-            const btn = document.getElementById('save-btn');
-            btn.classList.remove('unsaved', 'saved');
-            btn.querySelector('span').textContent = 'Opslaan';
             updateHeader();
             renderPlanning();
             updateWeather();
