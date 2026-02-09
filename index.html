@@ -3,659 +3,1339 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🥖 Bakkerij Planning</title>
+    <title>ðŸ¥– Bakkerij Planning</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>ðŸ¥–</text></svg>">
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Supabase CDN -->
+    <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <style>
         :root {
+            /* Dark Slate & Blue Theme */
             --bg-darkest: #0f172a;
             --bg-dark: #1e293b;
             --bg-card: #334155;
             --bg-input: #475569;
+            --bg-hover: #3b4d63;
+            
             --text-primary: #f1f5f9;
             --text-secondary: #94a3b8;
             --text-muted: #64748b;
+            
             --accent-blue: #3b82f6;
+            --accent-blue-hover: #2563eb;
             --accent-cyan: #06b6d4;
             --accent-green: #10b981;
             --accent-orange: #f97316;
             --accent-red: #ef4444;
+            --accent-yellow: #eab308;
+            
             --border-color: #475569;
             --border-light: #334155;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+            
             --radius: 12px;
             --radius-sm: 8px;
-            --font-sans: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            
+            --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
             --font-mono: 'JetBrains Mono', monospace;
         }
         
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
         
+        /* Remove number input spinners/arrows */
         input[type="number"]::-webkit-inner-spin-button,
-        input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-        input[type="number"] { -moz-appearance: textfield; }
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
         
         html, body {
             font-family: var(--font-sans);
             background: var(--bg-darkest);
             color: var(--text-primary);
             min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
         
-        .planning-header {
-            background: var(--bg-dark);
-            border-radius: var(--radius);
-            padding: 12px;
+        /* ===== HEADER ===== */
+        .header {
+            background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-darkest) 100%);
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border-light);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+        
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             margin-bottom: 12px;
         }
         
-        .planning-header-top {
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 10px;
+            gap: 8px;
         }
         
-        .planning-header-bottom {
+        .logo-icon {
+            font-size: 1.8rem;
+        }
+        
+        .date-nav {
             display: flex;
-            gap: 10px;
-            justify-content: center;
             align-items: center;
+            gap: 8px;
         }
-        
-        .date-nav { display: flex; align-items: center; gap: 6px; }
         
         .date-btn {
-            width: 36px; height: 36px; border-radius: 50%; border: none;
-            background: var(--bg-card); color: var(--text-primary);
-            font-size: 1.1rem; cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-        }
-        
-        .current-date { text-align: center; min-width: 120px; padding: 4px 12px; border-radius: var(--radius-sm); transition: all 0.3s ease; }
-        .current-date .day { font-size: 1rem; font-weight: 600; }
-        .current-date .date { font-size: 0.8rem; color: var(--text-secondary); }
-        .current-date.weekend { 
-            background: linear-gradient(135deg, var(--accent-orange), var(--accent-red)); 
-        }
-        .current-date.weekend .day,
-        .current-date.weekend .date { color: white; }
-        
-        .weather-badge {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
             background: var(--bg-card);
-            color: var(--text-primary); padding: 4px 8px; border-radius: 20px;
-            font-size: 0.75rem;
-            display: inline-flex; align-items: center; gap: 4px;
-            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-size: 1.2rem;
             cursor: pointer;
-        }
-        
-        .weather-badge.snow-warning {
-            background: linear-gradient(135deg, #1e40af, #3b82f6);
-            border-color: #60a5fa;
-            animation: pulse-snow 1.5s infinite;
-        }
-        
-        @keyframes pulse-snow {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
-            50% { box-shadow: 0 0 12px 4px rgba(59, 130, 246, 0.5); }
-        }
-        
-        .note-btn {
-            background: var(--bg-card); border: 1px solid var(--border-color);
-            color: var(--text-muted); padding: 8px 10px; border-radius: var(--radius-sm);
-            cursor: pointer; font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             transition: all 0.2s;
         }
-        .note-btn:hover { background: var(--bg-hover); }
-        .note-btn.has-note { color: var(--accent-orange); border-color: var(--accent-orange); }
         
-        .note-icon { cursor: pointer; opacity: 0.4; }
-        .note-icon.has-note { opacity: 1; color: var(--accent-orange); }
+        .date-btn:hover {
+            background: var(--accent-blue);
+            transform: scale(1.05);
+        }
+        
+        .date-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .current-date {
+            text-align: center;
+            min-width: 140px;
+        }
+        
+        .current-date .day {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        .current-date .date {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        
+        .weekend-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--accent-orange), var(--accent-red));
+            color: white;
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-left: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .header-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
         
         .event-select {
-            background: var(--bg-card); border: 1px solid var(--border-color);
-            color: var(--text-primary); padding: 6px 10px; border-radius: var(--radius-sm);
-            font-size: 0.85rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: var(--radius-sm);
+            font-family: var(--font-sans);
+            font-size: 0.9rem;
+            cursor: pointer;
         }
         
         .save-btn {
             background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
-            border: none; color: white; padding: 8px 16px; border-radius: var(--radius-sm);
-            font-weight: 600; font-size: 0.9rem; cursor: pointer;
-            display: flex; align-items: center; gap: 6px;
-            transition: all 0.3s ease;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+            box-shadow: var(--shadow);
         }
         
-        .save-btn.unsaved {
-            background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
-            animation: pulse-unsaved 2s infinite;
+        .save-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
         }
         
-        .save-btn.saved {
-            background: linear-gradient(135deg, var(--accent-green), #059669);
+        .save-btn:active {
+            transform: translateY(0);
         }
         
-        .save-btn.viewing-saved {
-            background: linear-gradient(135deg, var(--accent-green), #059669);
-        }
-        
-        @keyframes pulse-unsaved {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
-        
+        /* ===== NAVIGATION TABS ===== */
         .tabs {
-            display: flex; background: var(--bg-dark);
+            display: flex;
+            background: var(--bg-dark);
             border-bottom: 1px solid var(--border-light);
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
         
         .tab {
-            flex: 1; padding: 10px 6px;
-            background: transparent; border: none; color: var(--text-secondary);
-            font-size: 0.8rem; font-weight: 500; cursor: pointer;
-            position: relative; white-space: nowrap; text-align: center;
+            flex: 1;
+            min-width: 80px;
+            padding: 14px 16px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-family: var(--font-sans);
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            white-space: nowrap;
         }
         
-        .tab.active { color: var(--accent-blue); }
+        .tab.active {
+            color: var(--accent-blue);
+        }
+        
         .tab.active::after {
-            content: ''; position: absolute; bottom: 0; left: 0; right: 0;
-            height: 3px; background: var(--accent-blue);
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--accent-blue);
+            border-radius: 3px 3px 0 0;
         }
         
-        .main { padding: 12px; padding-bottom: 100px; }
+        .tab:hover:not(.active) {
+            color: var(--text-primary);
+            background: var(--bg-card);
+        }
         
-        .page { display: none; }
-        .page.active { display: block; }
+        /* ===== MAIN CONTENT ===== */
+        .main {
+            padding: 16px;
+            padding-bottom: 100px;
+        }
         
+        .page {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .page.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* ===== PLANNING TABLE ===== */
         .group-card {
-            background: var(--bg-dark); border-radius: var(--radius);
-            margin-bottom: 12px; overflow: hidden;
+            background: var(--bg-dark);
+            border-radius: var(--radius);
+            margin-bottom: 16px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
             border: 1px solid var(--border-light);
         }
         
         .group-header {
-            padding: 10px 12px; font-weight: 600; font-size: 0.85rem;
-            display: flex; align-items: center; gap: 6px;
+            padding: 12px 16px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         
         .group-header.group-a {
             background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(239, 68, 68, 0.1));
             color: var(--accent-orange);
+            border-bottom: 1px solid rgba(249, 115, 22, 0.3);
         }
         
         .group-header.group-b {
             background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(6, 182, 212, 0.1));
             color: var(--accent-cyan);
-        }
-        
-        .table-wrapper {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
+            border-bottom: 1px solid rgba(59, 130, 246, 0.3);
         }
         
         .planning-table {
-            width: 100%; min-width: 380px; border-collapse: collapse;
+            width: 100%;
+            border-collapse: collapse;
         }
         
         .planning-table th {
-            padding: 6px 3px; font-size: 0.65rem; font-weight: 600;
-            text-transform: uppercase; color: var(--text-muted);
-            text-align: center; background: var(--bg-card);
+            padding: 8px 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: var(--text-muted);
+            text-align: center;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-light);
         }
         
-        .planning-table th:first-child { text-align: left; padding-left: 8px; }
-        
-        .planning-table th.totaal-col { color: var(--accent-cyan); }
+        .planning-table th:first-child {
+            text-align: left;
+            padding-left: 8px;
+            max-width: 70px;
+        }
         
         .planning-table td {
-            padding: 5px 3px; text-align: center;
+            padding: 6px 3px;
+            text-align: center;
             border-bottom: 1px solid var(--border-light);
         }
         
         .planning-table td:first-child {
-            text-align: left; padding-left: 8px;
-            font-weight: 500; font-size: 0.75rem;
+            text-align: left;
+            padding-left: 8px;
+            font-weight: 500;
+            font-size: 0.7rem;
+            max-width: 70px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
-        .planning-table td.totaal-col input {
-            color: var(--accent-cyan);
+        .planning-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .planning-table .total-row {
+            background: var(--bg-card);
             font-weight: 600;
         }
         
-        .planning-table .total-row { background: var(--bg-card); font-weight: 600; }
+        .planning-table .total-row td {
+            color: var(--text-primary);
+        }
         
         .planning-table input {
-            width: 34px; padding: 5px 2px;
-            background: var(--bg-input); border: 1px solid var(--border-color);
-            border-radius: 4px; color: var(--text-primary);
-            font-family: var(--font-mono); font-size: 0.85rem; text-align: center;
+            width: 38px;
+            padding: 6px 2px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            text-align: center;
+            transition: all 0.2s;
         }
         
-        .planning-table input:focus { outline: none; border-color: var(--accent-blue); }
+        .planning-table input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+        
+        .planning-table input.highlight {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: var(--accent-blue);
+        }
         
         .planning-table .sug-value {
-            color: var(--text-secondary); font-family: var(--font-mono); font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
         }
         
+        /* Lading totals card */
         .lading-card {
-            background: var(--bg-card); border-radius: var(--radius);
-            padding: 12px; margin-bottom: 12px;
-        }
-        
-        .lading-header { font-weight: 600; margin-bottom: 10px; font-size: 0.9rem; }
-        
-        .lading-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-        
-        .lading-item {
-            text-align: center; padding: 8px 4px;
-            background: var(--bg-dark); border-radius: var(--radius-sm);
-        }
-        
-        .lading-item .label { font-size: 0.7rem; color: var(--text-muted); margin-bottom: 2px; }
-        .lading-item .value { font-size: 1.2rem; font-weight: 700; font-family: var(--font-mono); color: var(--accent-blue); }
-        .lading-item.warning .value { color: var(--accent-orange); }
-        .lading-item.danger .value { color: var(--accent-red); }
-        
-        .reference-card {
-            background: var(--bg-dark); border-radius: var(--radius);
-            padding: 12px; margin-top: 16px;
-        }
-        
-        .reference-header { font-weight: 600; margin-bottom: 10px; color: var(--text-secondary); font-size: 0.85rem; }
-        
-        .reference-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-        .reference-table th { padding: 6px; font-size: 0.65rem; color: var(--text-muted); text-align: center; }
-        .reference-table th:first-child { text-align: left; }
-        .reference-table td { padding: 5px; text-align: center; font-family: var(--font-mono); }
-        .reference-table td:first-child { text-align: left; font-family: var(--font-sans); }
-        .reference-table .breuk { color: var(--accent-red); font-weight: 600; }
-        
-        .collapsible-section { background: var(--bg-dark); border-radius: var(--radius); margin-top: 12px; overflow: hidden; }
-        .collapsible-header { 
-            padding: 12px; display: flex; justify-content: space-between; align-items: center;
-            cursor: pointer; font-weight: 600; font-size: 0.9rem;
-        }
-        .collapsible-header:hover { background: var(--bg-card); }
-        .collapse-icon { transition: transform 0.2s; font-size: 0.7rem; color: var(--text-muted); }
-        .collapsible-header.open .collapse-icon { transform: rotate(90deg); }
-        .collapsible-content { padding: 12px; }
-        
-        .ref-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-top: 10px; }
-        .ref-table th { padding: 6px 4px; background: var(--bg-card); font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); text-align: center; }
-        .ref-table th:first-child { text-align: left; }
-        .ref-table td { padding: 6px 4px; text-align: center; border-bottom: 1px solid var(--border-light); font-family: var(--font-mono); color: var(--text-primary); }
-        .ref-table td:first-child { text-align: left; font-family: var(--font-sans); }
-        .ref-table td.totaal-col { color: var(--accent-cyan); font-weight: 600; }
-        
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center;
-            z-index: 1000; padding: 20px;
-        }
-        .modal-box {
-            background: var(--bg-dark); border-radius: var(--radius); padding: 20px;
-            max-width: 300px; width: 100%; text-align: center;
+            background: linear-gradient(135deg, var(--bg-card), var(--bg-dark));
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
             border: 1px solid var(--border-color);
         }
-        .modal-box p { margin-bottom: 16px; font-size: 1rem; }
-        .modal-buttons { display: flex; gap: 10px; justify-content: center; }
-        .modal-btn {
-            padding: 10px 20px; border: none; border-radius: var(--radius-sm);
-            font-weight: 600; cursor: pointer; font-size: 0.9rem;
+        
+        .lading-header {
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        .modal-btn.confirm { background: var(--accent-blue); color: white; }
-        .modal-btn.cancel { background: var(--bg-card); color: var(--text-primary); }
         
-        .breuk-date-selector { background: var(--bg-dark); border-radius: var(--radius); padding: 10px; margin-bottom: 10px; }
-        .breuk-date-selector label { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; display: block; }
-        .breuk-date-selector select { width: 100%; padding: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); }
+        .lading-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+        }
         
-        .breuk-grid { display: grid; gap: 6px; }
-        .breuk-item { background: var(--bg-dark); border-radius: var(--radius-sm); padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; }
-        .breuk-item .product-name { font-weight: 600; font-size: 0.9rem; margin-bottom: 1px; }
-        .breuk-item .product-baked { font-size: 0.75rem; color: var(--text-secondary); }
-        .breuk-item input { width: 60px; padding: 6px; background: var(--bg-card); border: 2px solid var(--border-color); border-radius: var(--radius-sm); color: var(--accent-red); font-family: var(--font-mono); font-size: 1rem; font-weight: 600; text-align: center; }
+        .lading-item {
+            text-align: center;
+            padding: 10px 8px;
+            background: var(--bg-dark);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-light);
+        }
         
-        .breuk-save-btn { width: 100%; padding: 12px; margin-top: 10px; background: linear-gradient(135deg, var(--accent-green), #059669); border: none; border-radius: var(--radius); color: white; font-size: 1rem; font-weight: 600; cursor: pointer; }
+        .lading-item .label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
         
-        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
-        .stat-card { background: var(--bg-dark); border-radius: var(--radius); padding: 12px; }
-        .stat-card .label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px; }
-        .stat-card .value { font-size: 1.3rem; font-weight: 700; font-family: var(--font-mono); }
+        .lading-item .value {
+            font-size: 1.3rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            color: var(--accent-blue);
+        }
+        
+        .lading-item.warning .value {
+            color: var(--accent-orange);
+        }
+        
+        .lading-item.danger .value {
+            color: var(--accent-red);
+        }
+        
+        /* ===== VORIGE WEKEN (Reference) ===== */
+        .reference-card {
+            background: var(--bg-dark);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-top: 24px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-light);
+        }
+        
+        .reference-header {
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+        }
+        
+        .reference-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        
+        .reference-table th {
+            padding: 8px 6px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            text-align: center;
+            border-bottom: 1px solid var(--border-light);
+        }
+        
+        .reference-table th:first-child {
+            text-align: left;
+        }
+        
+        .reference-table td {
+            padding: 6px;
+            text-align: center;
+            border-bottom: 1px solid var(--border-light);
+            font-family: var(--font-mono);
+        }
+        
+        .reference-table td:first-child {
+            text-align: left;
+            font-family: var(--font-sans);
+            font-weight: 500;
+        }
+        
+        .reference-table .breuk {
+            color: var(--accent-red);
+            font-weight: 600;
+        }
+        
+        .reference-table .event-row td {
+            color: var(--text-muted);
+            font-style: italic;
+            font-family: var(--font-sans);
+            font-size: 0.8rem;
+        }
+        
+        /* ===== BREUK INVOER PAGE ===== */
+        .breuk-date-selector {
+            background: var(--bg-dark);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+        }
+        
+        .breuk-date-selector label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        
+        .breuk-date-selector select {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            font-size: 1rem;
+        }
+        
+        .breuk-grid {
+            display: grid;
+            gap: 12px;
+        }
+        
+        .breuk-item {
+            background: var(--bg-dark);
+            border-radius: var(--radius);
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-light);
+        }
+        
+        .breuk-item .product-info {
+            flex: 1;
+        }
+        
+        .breuk-item .product-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .breuk-item .product-baked {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        
+        .breuk-item input {
+            width: 80px;
+            padding: 12px;
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--accent-red);
+            font-family: var(--font-mono);
+            font-size: 1.2rem;
+            font-weight: 600;
+            text-align: center;
+        }
+        
+        .breuk-item input:focus {
+            outline: none;
+            border-color: var(--accent-red);
+        }
+        
+        .breuk-save-btn {
+            width: 100%;
+            padding: 16px;
+            margin-top: 16px;
+            background: linear-gradient(135deg, var(--accent-green), #059669);
+            border: none;
+            border-radius: var(--radius);
+            color: white;
+            font-family: var(--font-sans);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: var(--shadow);
+        }
+        
+        /* ===== HISTORIEK PAGE ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: var(--bg-dark);
+            border-radius: var(--radius);
+            padding: 16px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-light);
+        }
+        
+        .stat-card .label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+        
+        .stat-card .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+        }
+        
         .stat-card.green .value { color: var(--accent-green); }
         .stat-card.red .value { color: var(--accent-red); }
         .stat-card.blue .value { color: var(--accent-blue); }
         .stat-card.orange .value { color: var(--accent-orange); }
         
-        .history-table-wrapper { overflow-x: auto; border-radius: var(--radius); }
-        .history-table { width: 100%; background: var(--bg-dark); border-collapse: collapse; }
-        .history-table th { padding: 10px; background: var(--bg-card); font-size: 0.75rem; text-align: left; color: var(--text-secondary); }
-        .history-table td { padding: 10px; border-bottom: 1px solid var(--border-light); font-family: var(--font-mono); font-size: 0.85rem; }
-        .history-table th:first-child {
-            position: sticky;
-            left: 0;
-            background: var(--bg-card);
-            z-index: 1;
-        }
-        .history-table td:first-child {
-            position: sticky;
-            left: 0;
+        .history-table {
+            width: 100%;
             background: var(--bg-dark);
-            z-index: 1;
-            font-family: var(--font-main);
+            border-radius: var(--radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
         }
         
-        .settings-section { background: var(--bg-dark); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
-        .settings-section h3 { font-size: 0.95rem; margin-bottom: 12px; color: var(--text-secondary); }
-        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-light); }
-        .setting-row:last-child { border-bottom: none; }
-        .setting-row input[type="number"] { width: 70px; padding: 6px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-mono); text-align: center; }
+        .history-table th {
+            padding: 12px;
+            background: var(--bg-card);
+            font-size: 0.8rem;
+            text-align: left;
+            color: var(--text-secondary);
+        }
         
-        .toggle { position: relative; width: 46px; height: 26px; }
-        .toggle input { opacity: 0; width: 0; height: 0; }
-        .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-input); border-radius: 26px; transition: 0.3s; }
-        .toggle-slider::before { content: ''; position: absolute; height: 20px; width: 20px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
-        .toggle input:checked + .toggle-slider { background: var(--accent-green); }
-        .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+        .history-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-light);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+        }
         
-        .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--bg-card); color: var(--text-primary); padding: 12px 20px; border-radius: var(--radius); opacity: 0; transition: all 0.3s; z-index: 1000; }
-        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-        .toast.success { border-left: 4px solid var(--accent-green); }
+        .history-table td:first-child {
+            font-family: var(--font-sans);
+        }
         
-        .range-btn { padding: 8px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
-        .range-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-        .range-btn.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+        .history-table .group-total-row {
+            background: var(--bg-card);
+            font-weight: 700;
+            border-top: 2px solid var(--border-light);
+        }
         
-        @media (max-width: 400px) {
-            .save-btn span { display: none; }
-            .planning-table { min-width: 360px; }
+        .history-table .group-total-row td {
+            padding: 10px 12px;
+            font-family: var(--font-sans);
+            font-size: 0.85rem;
+        }
+        
+        .history-date-filter {
+            background: var(--bg-dark);
+            border-radius: var(--radius);
+            padding: 12px;
+            margin-bottom: 12px;
+            box-shadow: var(--shadow);
+        }
+        
+        .history-date-filter .filter-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .history-date-filter label {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            min-width: 30px;
+        }
+        
+        .history-date-filter input[type="date"] {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 6px 8px;
+            font-size: 0.85rem;
+            font-family: var(--font-sans);
+            flex: 1;
+            min-width: 120px;
+        }
+        
+        .date-mode-toggle {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 10px;
+        }
+        
+        .date-mode-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--border-light);
+            background: var(--bg-card);
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .date-mode-btn:first-child {
+            border-radius: 8px 0 0 8px;
+        }
+        
+        .date-mode-btn:last-child {
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .date-mode-btn.active {
+            background: var(--accent-blue);
+            color: white;
+            border-color: var(--accent-blue);
+        }
+        
+        /* ===== INSTELLINGEN PAGE ===== */
+        .settings-section {
+            background: var(--bg-dark);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border-light);
+        }
+        
+        .settings-section h3 {
+            font-size: 1rem;
+            margin-bottom: 16px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+        
+        .setting-row:last-child {
+            border-bottom: none;
+        }
+        
+        .setting-row label {
+            font-size: 0.95rem;
+        }
+        
+        .setting-row input[type="number"] {
+            width: 80px;
+            padding: 8px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            text-align: center;
+        }
+        
+        .setting-row select {
+            padding: 8px 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+        }
+        
+        .toggle {
+            position: relative;
+            width: 50px;
+            height: 28px;
+        }
+        
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-input);
+            border-radius: 28px;
+            transition: 0.3s;
+        }
+        
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        
+        .toggle input:checked + .toggle-slider {
+            background: var(--accent-green);
+        }
+        
+        .toggle input:checked + .toggle-slider::before {
+            transform: translateX(22px);
+        }
+        
+        /* ===== TOAST NOTIFICATIONS ===== */
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            padding: 14px 24px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 1000;
+            opacity: 0;
+            transition: all 0.3s ease;
+            border: 1px solid var(--border-color);
+        }
+        
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        
+        .toast.success {
+            border-left: 4px solid var(--accent-green);
+        }
+        
+        .toast.error {
+            border-left: 4px solid var(--accent-red);
+        }
+        
+        /* ===== LOADING STATE ===== */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 480px) {
+            .header {
+                padding: 12px 16px;
+            }
+            
+            .logo {
+                font-size: 1.2rem;
+            }
+            
+            .save-btn span {
+                display: none;
+            }
+            
+            .planning-table th,
+            .planning-table td {
+                padding: 6px 4px;
+                font-size: 0.8rem;
+            }
+            
+            .planning-table input {
+                max-width: 40px;
+                padding: 4px 2px;
+                font-size: 0.85rem;
+            }
+            
+            .lading-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            
+            .lading-item:nth-child(4),
+            .lading-item:nth-child(5) {
+                display: none;
+            }
         }
     </style>
 </head>
 <body>
-    <nav class="tabs">
-        <button class="tab active" data-page="planning">Planning</button>
-        <button class="tab" data-page="breuk">Breuk</button>
-        <button class="tab" data-page="historiek">Historiek</button>
-        <button class="tab" data-page="instellingen">Instelling</button>
-    </nav>
-    
-    <main class="main">
-        <div class="page active" id="page-planning">
-            <div class="planning-header">
-                <div class="planning-header-top">
-                    <div class="date-nav">
-                        <button class="date-btn" onclick="changeDate(-1)">‹</button>
-                        <div class="current-date" id="current-date-box">
-                            <div class="day" id="current-day">zaterdag</div>
-                            <div class="date" id="current-date">06/12/2025</div>
-                        </div>
-                        <button class="date-btn" onclick="changeDate(1)">›</button>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-top">
+                <div class="logo">
+                    <span class="logo-icon">ðŸ¥–</span>
+                    <span>Bakkerij</span>
+                </div>
+                <div class="date-nav">
+                    <button class="date-btn" onclick="changeDate(-1)">â€¹</button>
+                    <div class="current-date">
+                        <div class="day" id="current-day">zaterdag</div>
+                        <div class="date" id="current-date">06/12/2025</div>
+                    </div>
+                    <button class="date-btn" onclick="changeDate(1)">â€º</button>
+                    <span class="weekend-badge" id="weekend-badge" style="display: none;">WEEKEND</span>
+                </div>
+            </div>
+            <div class="header-controls">
+                <select class="event-select" id="event-select">
+                    <option value="Normal">Normal</option>
+                    <option value="Snow">â„ï¸ Snow</option>
+                    <option value="BBQ">ðŸ”¥ BBQ Weer</option>
+                    <option value="Holiday">ðŸŽ‰ Feestdag</option>
+                    <option value="Promo">ðŸ“¢ Promotie</option>
+                </select>
+                <button class="save-btn" onclick="savePlanning()">
+                    ðŸ’¾ <span>Opslaan</span>
+                </button>
+            </div>
+        </header>
+        
+        <!-- Navigation Tabs -->
+        <nav class="tabs">
+            <button class="tab active" data-page="planning">ðŸ“‹ Planning</button>
+            <button class="tab" data-page="breuk">ðŸ“Š Breuk</button>
+            <button class="tab" data-page="historiek">ðŸ“ˆ Historiek</button>
+            <button class="tab" data-page="instellingen">âš™ï¸ Instellingen</button>
+        </nav>
+        
+        <!-- Main Content -->
+        <main class="main">
+            <!-- PLANNING PAGE -->
+            <div class="page active" id="page-planning">
+                <!-- Group A -->
+                <div class="group-card">
+                    <div class="group-header group-a">ðŸ”¶ GROEP A â€” Pistolets</div>
+                    <table class="planning-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Sug</th>
+                                <th>Finaal</th>
+                                <th>L1</th>
+                                <th>L2</th>
+                                <th>L3</th>
+                                <th>L4</th>
+                                <th>L5</th>
+                            </tr>
+                        </thead>
+                        <tbody id="group-a-body">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Group B -->
+                <div class="group-card">
+                    <div class="group-header group-b">ðŸ”· GROEP B â€” Stokbrood</div>
+                    <table class="planning-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Sug</th>
+                                <th>Finaal</th>
+                                <th>L1</th>
+                                <th>L2</th>
+                                <th>L3</th>
+                                <th>L4</th>
+                                <th>L5</th>
+                            </tr>
+                        </thead>
+                        <tbody id="group-b-body">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Lading Totals - BELOW BOTH GROUPS -->
+                <div class="lading-card">
+                    <div class="lading-header">ðŸ“¦ Totaal Lading</div>
+                    <div class="lading-grid" id="lading-totals">
+                        <div class="lading-item"><div class="label">L1</div><div class="value" id="lading-l1">0</div></div>
+                        <div class="lading-item"><div class="label">L2</div><div class="value" id="lading-l2">0</div></div>
+                        <div class="lading-item"><div class="label">L3</div><div class="value" id="lading-l3">0</div></div>
+                        <div class="lading-item"><div class="label">L4</div><div class="value" id="lading-l4">0</div></div>
+                        <div class="lading-item"><div class="label">L5</div><div class="value" id="lading-l5">0</div></div>
                     </div>
                 </div>
-                <div class="planning-header-bottom">
-                    <span class="weather-badge" id="weather-badge" title="Weer voorspelling" onclick="dismissSnowWarning()">--</span>
-                    <select class="event-select" id="event-select" onchange="onEventChange()">
-                        <option value="Normal">Normal</option>
-                        <option value="Sneeuw">❄️ Sneeuw</option>
-                        <option value="BBQ">☀️ BBQ Weer</option>
-                        <option value="Feestdag">🎉 Feestdag</option>
-                        <option value="Promo">📢 Promo</option>
+                
+                <!-- Reference Section -->
+                <div class="reference-card">
+                    <div class="reference-header">ðŸ“Š Vorige Weken (zelfde dag)</div>
+                    <table class="reference-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>W-1</th>
+                                <th>Brk</th>
+                                <th>W-2</th>
+                                <th>Brk</th>
+                                <th>W-3</th>
+                                <th>Brk</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reference-body">
+                            <!-- Filled by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- BREUK PAGE -->
+            <div class="page" id="page-breuk">
+                <div class="breuk-date-selector">
+                    <label>Selecteer datum voor breuk invoer:</label>
+                    <select id="breuk-date-select" onchange="loadBreukData()">
+                        <!-- Filled by JS -->
                     </select>
-                    <button class="note-btn" id="note-btn" onclick="openNotePopup()">📝</button>
-                    <button class="save-btn" id="save-btn" onclick="savePlanning()">💾 <span>Opslaan</span></button>
                 </div>
+                <div class="breuk-grid" id="breuk-grid">
+                    <!-- Filled by JS -->
+                </div>
+                <button class="breuk-save-btn" onclick="saveBreuk()">
+                    âœ… Breuk Opslaan
+                </button>
             </div>
             
-            <div class="group-card">
-                <div class="group-header group-a">🔶 GROEP A — Pistolets</div>
-                <div class="table-wrapper">
-                    <table class="planning-table">
-                        <thead>
-                            <tr><th>Product</th><th>Sug</th><th class="totaal-col">Totaal</th><th>L1</th><th>L2</th><th>L3</th><th>L4</th><th>L5</th></tr>
-                        </thead>
-                        <tbody id="group-a-body"></tbody>
-                    </table>
+            <!-- HISTORIEK PAGE -->
+                        <div class="page" id="page-historiek">
+                <!-- Date Filter -->
+                <div class="history-date-filter">
+                    <div class="date-mode-toggle">
+                        <button class="date-mode-btn active" onclick="setDateMode('single')">📅 Dag</button>
+                        <button class="date-mode-btn" onclick="setDateMode('range')">📅 Van – Tot</button>
+                    </div>
+                    <div id="date-single-mode">
+                        <input type="date" id="history-single-date" onchange="applyDateFilter()" style="width: 100%;">
+                    </div>
+                    <div id="date-range-mode" style="display: none;">
+                        <div class="filter-row">
+                            <label>Van</label>
+                            <input type="date" id="history-date-from" onchange="applyDateFilter()">
+                            <label>Tot</label>
+                            <input type="date" id="history-date-to" onchange="applyDateFilter()">
+                        </div>
+                    </div>
                 </div>
-            </div>
-            
-            <div class="group-card">
-                <div class="group-header group-b">🔷 GROEP B — Stokbrood</div>
-                <div class="table-wrapper">
-                    <table class="planning-table">
-                        <thead>
-                            <tr><th>Product</th><th>Sug</th><th class="totaal-col">Totaal</th><th>L1</th><th>L2</th><th>L3</th><th>L4</th><th>L5</th></tr>
-                        </thead>
-                        <tbody id="group-b-body"></tbody>
-                    </table>
+                
+                <div class="stats-grid">
+                    <div class="stat-card green">
+                        <div class="label">Totaal Gebakken</div>
+                        <div class="value" id="stat-gebakken">0</div>
+                    </div>
+                    <div class="stat-card red">
+                        <div class="label">Totaal Breuk</div>
+                        <div class="value" id="stat-breuk">0</div>
+                    </div>
+                    <div class="stat-card blue">
+                        <div class="label">Verkocht</div>
+                        <div class="value" id="stat-verkocht">0</div>
+                    </div>
+                    <div class="stat-card orange">
+                        <div class="label">Breuk %</div>
+                        <div class="value" id="stat-percentage">0%</div>
+                    </div>
                 </div>
-            </div>
-            
-            <div class="lading-card">
-                <div class="lading-header">📦 Totaal Lading</div>
-                <div class="lading-grid">
-                    <div class="lading-item"><div class="label">L1</div><div class="value" id="lading-l1">0</div></div>
-                    <div class="lading-item"><div class="label">L2</div><div class="value" id="lading-l2">0</div></div>
-                    <div class="lading-item"><div class="label">L3</div><div class="value" id="lading-l3">0</div></div>
-                    <div class="lading-item"><div class="label">L4</div><div class="value" id="lading-l4">0</div></div>
-                    <div class="lading-item"><div class="label">L5</div><div class="value" id="lading-l5">0</div></div>
+                
+                <!-- Trend Chart -->
+                <div class="settings-section" style="margin-bottom: 16px;">
+                    <h3 style="margin-bottom: 12px;">📈 Productie Trend</h3>
+                    <div id="trend-chart" style="height: 200px; position: relative; overflow: hidden;">
+                        <canvas id="chart-canvas" style="width: 100%; height: 100%;"></canvas>
+                    </div>
+                    <div style="display: flex; justify-content: center; gap: 16px; margin-top: 8px; font-size: 0.75rem;">
+                        <span style="color: var(--accent-green);">● Gebakken</span>
+                        <span style="color: var(--accent-red);">● Breuk</span>
+                    </div>
                 </div>
-            </div>
-            
-            <div class="reference-card">
-                <div class="reference-header">📊 Vorige Weken (zelfde dag)</div>
-                <table class="reference-table">
-                    <thead><tr><th>Product</th><th>W-1</th><th>Brk</th><th>W-2</th><th>Brk</th><th>W-3</th><th>Brk</th></tr></thead>
-                    <tbody id="reference-body"></tbody>
+                
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Gebakken</th>
+                            <th>Breuk</th>
+                            <th>%</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-body">
+                        <!-- Filled by JS -->
+                    </tbody>
                 </table>
             </div>
             
-            <div class="collapsible-section">
-                <div class="collapsible-header" onclick="toggleCollapsible(this)">
-                    <span>📅 Referentie</span>
-                    <span class="collapse-icon">▶</span>
-                </div>
-                <div class="collapsible-content" style="display: none;">
-                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
-                        <input type="date" id="ref-date-picker" onchange="loadReferencePlanning()" style="flex: 1; padding: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary);">
-                        <button onclick="copyReferencePlanning()" style="padding: 8px 12px; background: var(--accent-blue); border: none; border-radius: var(--radius-sm); color: white; font-weight: 600; cursor: pointer; white-space: nowrap;">📋 Kopieer</button>
+            <!-- INSTELLINGEN PAGE -->
+            <div class="page" id="page-instellingen">
+                <div class="settings-section">
+                    <h3>âš™ï¸ Capaciteit</h3>
+                    <div class="setting-row">
+                        <label>Oven 1 max</label>
+                        <input type="number" id="setting-oven1" value="16" onchange="saveSettings()">
                     </div>
-                    <div id="ref-planning-content" style="color: var(--text-muted); font-size: 0.85rem;">Selecteer een datum...</div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="page" id="page-breuk">
-            <div class="breuk-date-selector">
-                <label>Selecteer datum:</label>
-                <select id="breuk-date-select" onchange="loadBreukData()"></select>
-            </div>
-            <div class="breuk-grid" id="breuk-grid"></div>
-            <button class="breuk-save-btn" onclick="saveBreuk()">✅ Breuk Opslaan</button>
-        </div>
-        
-        <div class="page" id="page-historiek">
-            <div class="settings-section" style="margin-bottom: 12px;">
-                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;">
-                    <button class="range-btn active" data-range="7" onclick="setHistoryRange(7)">7 dagen</button>
-                    <button class="range-btn" data-range="14" onclick="setHistoryRange(14)">14 dagen</button>
-                    <button class="range-btn" data-range="30" onclick="setHistoryRange(30)">Deze maand</button>
-                    <button class="range-btn" data-range="all" onclick="setHistoryRange('all')">Alles</button>
-                    <button class="range-btn" data-range="custom" onclick="setHistoryRange('custom')">Aangepast</button>
-                </div>
-                <div id="custom-date-range" style="display: none; margin-top: 10px;">
-                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                        <label style="font-size: 0.85rem; color: var(--text-secondary);">Van:</label>
-                        <input type="date" id="history-date-from" onchange="applyCustomDateRange()" style="padding: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary);">
-                        <label style="font-size: 0.85rem; color: var(--text-secondary);">Tot:</label>
-                        <input type="date" id="history-date-to" onchange="applyCustomDateRange()" style="padding: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary);">
+                    <div class="setting-row">
+                        <label>Oven 2 max</label>
+                        <input type="number" id="setting-oven2" value="15" onchange="saveSettings()">
+                    </div>
+                    <div class="setting-row">
+                        <label>Batch max (O1+O2)</label>
+                        <input type="number" id="setting-batch-max" value="31" onchange="saveSettings()">
                     </div>
                 </div>
-            </div>
-            <div class="stats-grid">
-                <div class="stat-card green"><div class="label">Totaal Gebakken</div><div class="value" id="stat-gebakken">0</div></div>
-                <div class="stat-card blue"><div class="label">Verkocht</div><div class="value" id="stat-verkocht">0</div></div>
-                <div class="stat-card red"><div class="label">Totaal Breuk</div><div class="value" id="stat-breuk">0</div></div>
-                <div class="stat-card orange"><div class="label">Breuk %</div><div class="value" id="stat-percentage">0%</div></div>
-            </div>
-            <div class="stat-card" style="margin-bottom: 12px;">
-                <div class="label" style="font-size: 0.9rem;">💰 Omzet (verkocht)</div>
-                <div class="value" id="stat-omzet" style="font-size: 1.8rem; color: var(--accent-green);">€0.00</div>
-            </div>
-            
-            <div class="settings-section" style="margin-bottom: 12px;">
-                <h3 style="margin-bottom: 10px;">🥖 Per Product</h3>
-                <div class="history-table-wrapper">
-                    <table class="history-table">
-                        <thead><tr><th>Product</th><th>Gebakken</th><th>Verkocht</th><th>Omzet</th><th>Breuk</th><th>%</th></tr></thead>
-                        <tbody id="history-body"></tbody>
-                    </table>
+                
+                <div class="settings-section">
+                    <h3>ðŸ”¥ Weekend Strategie</h3>
+                    <div class="setting-row">
+                        <label>Skip Groep B in L2</label>
+                        <label class="toggle">
+                            <input type="checkbox" id="setting-skip-b" checked onchange="saveSettings()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>ðŸ¥– Stuks per Plaat</h3>
+                    <div id="ppp-settings-body"></div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>ðŸ“Š Product Drempels</h3>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;">
+                        Bij 0 = verhogen als breuk=0 | D1/D2/D3 = verlagen als breuk > drempel
+                    </p>
+                    <div style="overflow-x: auto;">
+                        <table class="planning-table" style="min-width: 320px;">
+                            <thead>
+                                <tr><th>Product</th><th>+Bij0</th><th>-1 &gt;</th><th>-2 &gt;</th><th>-3 &gt;</th></tr>
+                            </thead>
+                            <tbody id="product-settings-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Database Connection - At Bottom, Collapsible -->
+                <div class="settings-section" style="margin-top: 30px; border: 1px dashed var(--border-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleDatabaseSettings()">
+                        <h3 style="display: flex; align-items: center; gap: 8px;">
+                            <span id="db-status-indicator" style="width: 10px; height: 10px; border-radius: 50%; background: var(--accent-red);"></span>
+                            â˜ï¸ Database Sync
+                        </h3>
+                        <span id="db-toggle-arrow" style="color: var(--text-muted);">â–¼</span>
+                    </div>
+                    <div id="database-settings" style="display: none; margin-top: 12px;">
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px;">
+                            Verbind met Supabase om data te delen tussen apparaten.
+                        </p>
+                        <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                            <label style="font-size: 0.8rem;">Project URL</label>
+                            <input type="text" id="setting-supabase-url" placeholder="https://xxxxx.supabase.co" style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem;">
+                        </div>
+                        <div class="setting-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+                            <label style="font-size: 0.8rem;">Anon Key</label>
+                            <input type="text" id="setting-supabase-key" placeholder="eyJhbGc..." style="width: 100%; padding: 10px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem;">
+                        </div>
+                        <div class="setting-row">
+                            <span id="supabase-status" style="font-size: 0.85rem; color: var(--text-muted);">âšª Niet verbonden</span>
+                            <button onclick="testSupabaseConnection()" style="background: var(--accent-blue); color: white; border: none; padding: 8px 16px; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.85rem;">Test & Opslaan</button>
+                        </div>
+                    </div>
                 </div>
             </div>
-            
-            <div class="settings-section" style="margin-bottom: 12px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <h3>📈 Trend</h3>
-                    <select id="chart-product-select" onchange="renderHistoriek()" style="padding: 6px 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.85rem;">
-                        <option value="all">Alle producten</option>
-                        <option value="pistolet_wit">Pist. wit</option>
-                        <option value="pistolet_bruin">Pist. bruin</option>
-                        <option value="tijger_pistolet">Tijger</option>
-                        <option value="piccolo">Piccolo</option>
-                        <option value="stokbrood_wit">Stok. wit</option>
-                        <option value="stokbrood_bruin">Stok. bruin</option>
-                    </select>
-                </div>
-                <div style="height: 180px; position: relative;">
-                    <canvas id="chart-canvas" style="width: 100%; height: 100%;"></canvas>
-                </div>
-                <div style="display: flex; justify-content: center; gap: 16px; margin-top: 6px; font-size: 0.7rem;">
-                    <span style="color: var(--accent-green);">● Gebakken</span>
-                    <span style="color: var(--accent-red);">● Breuk</span>
-                </div>
-            </div>
-            
-            <div class="settings-section">
-                <h3 style="margin-bottom: 10px;">📊 Week Vergelijking (verkocht)</h3>
-                <div class="history-table-wrapper">
-                    <table class="history-table" id="week-compare-table">
-                        <thead><tr><th>Dag</th><th>W-1</th><th>W-2</th><th>W-3</th></tr></thead>
-                        <tbody id="week-compare-body"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+        </main>
         
-        <div class="page" id="page-instellingen">
-            <div class="settings-section">
-                <h3>⚙️ Capaciteit</h3>
-                <div class="setting-row"><label>Oven 1 max</label><input type="number" id="setting-oven1" value="16" onchange="saveCapacitySettings()"></div>
-                <div class="setting-row"><label>Oven 2 max</label><input type="number" id="setting-oven2" value="15" onchange="saveCapacitySettings()"></div>
-                <div class="setting-row"><label>Batch max</label><input type="number" id="setting-batch-max" value="31" onchange="saveCapacitySettings()"></div>
-            </div>
-            <div class="settings-section">
-                <h3>🔥 Weekend Strategie</h3>
-                <div class="setting-row">
-                    <label>Skip Groep B in L2</label>
-                    <label class="toggle"><input type="checkbox" id="setting-skip-b" checked onchange="saveCapacitySettings()"><span class="toggle-slider"></span></label>
-                </div>
-            </div>
-            <div class="settings-section">
-                <h3>💰 Prijzen</h3>
-                <div class="setting-row"><label>Groep A (Pistolets)</label><span style="color: var(--text-muted);">€</span><input type="number" step="0.01" id="setting-price-a" value="0.69" onchange="savePriceSettings()" style="width: 70px;"></div>
-                <div class="setting-row"><label>Groep B (Stokbrood)</label><span style="color: var(--text-muted);">€</span><input type="number" step="0.01" id="setting-price-b" value="1.59" onchange="savePriceSettings()" style="width: 70px;"></div>
-            </div>
-            <div class="settings-section">
-                <h3>🥖 Stuks per Plaat</h3>
-                <div id="ppp-settings"></div>
-            </div>
-            <div class="settings-section">
-                <h3>📊 Breuk Drempels</h3>
-                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">+Bij0 = extra als breuk=0 | -1/-2/-3 = verlagen bij breuk boven drempel</p>
-                <div class="table-wrapper">
-                    <table class="planning-table" style="min-width: 300px;">
-                        <thead><tr><th>Product</th><th>+Bij0</th><th>-1&gt;</th><th>-2&gt;</th><th>-3&gt;</th></tr></thead>
-                        <tbody id="drempel-settings"></tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="settings-section" style="margin-top: 20px; opacity: 0.7;">
-                <h3>☁️ Database Status</h3>
-                <div class="setting-row">
-                    <span id="db-status">⚪ Controleren...</span>
-                </div>
-            </div>
-        </div>
-    </main>
-    
-    <div class="toast" id="toast"></div>
-    
-    <div class="modal-overlay" id="confirm-modal" style="display: none;">
-        <div class="modal-box">
-            <p id="modal-message">Deze planning gebruiken?</p>
-            <div class="modal-buttons">
-                <button class="modal-btn confirm" onclick="confirmModalAction()">Ja</button>
-                <button class="modal-btn cancel" onclick="closeModal()">Annuleer</button>
-            </div>
-        </div>
-    </div>
-    
-    <div class="modal-overlay" id="note-modal" style="display: none;">
-        <div class="modal-box" style="max-width: 350px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <span style="font-weight: 600;">📝 Notitie</span>
-                <span id="note-modal-date" style="font-size: 0.8rem; color: var(--text-secondary);"></span>
-            </div>
-            <textarea id="note-textarea" placeholder="Schrijf hier je notitie..." style="width: 100%; height: 100px; padding: 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-sans); font-size: 0.9rem; resize: none;"></textarea>
-            <div class="modal-buttons" style="margin-top: 12px;">
-                <button class="modal-btn confirm" id="note-save-btn" onclick="saveNote()">Opslaan</button>
-                <button class="modal-btn cancel" onclick="closeNoteModal()">Sluiten</button>
-            </div>
-        </div>
+        <!-- Toast -->
+        <div class="toast" id="toast"></div>
     </div>
     
     <script>
-        // ===== SUPABASE CONFIG =====
-        const SUPABASE_URL = 'https://ukkvaewmnedznviqnotr.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVra3ZhZXdtbmVkem52aXFub3RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyODY5NjMsImV4cCI6MjA4MDg2Mjk2M30.J_2OPImNOrrBlwjztqRmUS7Qs9Y3RF1qT6D9x4-C5UE';
-        let supabaseClient = null;
-        
-        // ===== DATA =====
+        // ===== DATA & STATE =====
         const PRODUCTS = [
-            { id: 'pistolet_wit', name: 'pistolet wit', short: 'Pist. wit', group: 'A', ppp: 15, bij0: 1, d1: 30, d2: 60, d3: 90, price: 0.69 },
-            { id: 'pistolet_bruin', name: 'pistolet bruin', short: 'Pist. bruin', group: 'A', ppp: 15, bij0: 1, d1: 20, d2: 40, d3: 60, price: 0.69 },
-            { id: 'tijger_pistolet', name: 'tijger pistolet', short: 'Tijger', group: 'A', ppp: 15, bij0: 1, d1: 20, d2: 40, d3: 60, price: 0.69 },
-            { id: 'piccolo', name: 'piccolo', short: 'Piccolo', group: 'A', ppp: 12, bij0: 1, d1: 20, d2: 40, d3: 60, price: 0.69 },
-            { id: 'stokbrood_wit', name: 'stokbrood wit', short: 'Stok. wit', group: 'B', ppp: 5, bij0: 1, d1: 15, d2: 30, d3: 45, price: 1.59 },
-            { id: 'stokbrood_bruin', name: 'stokbrood bruin', short: 'Stok. bruin', group: 'B', ppp: 4, bij0: 1, d1: 12, d2: 24, d3: 36, price: 1.59 }
+            { id: 'pistolet_wit', name: 'pistolet wit', group: 'A', ppp: 15, bij0: 1, d1: 30, d2: 60, d3: 90 },
+            { id: 'pistolet_bruin', name: 'pistolet bruin', group: 'A', ppp: 15, bij0: 1, d1: 20, d2: 40, d3: 60 },
+            { id: 'tijger_pistolet', name: 'tijger pistolet', group: 'A', ppp: 15, bij0: 1, d1: 20, d2: 40, d3: 60 },
+            { id: 'piccolo', name: 'piccolo', group: 'A', ppp: 12, bij0: 1, d1: 20, d2: 40, d3: 60 },
+            { id: 'stokbrood_wit', name: 'stokbrood wit', group: 'B', ppp: 5, bij0: 1, d1: 15, d2: 30, d3: 45 },
+            { id: 'stokbrood_bruin', name: 'stokbrood bruin', group: 'B', ppp: 4, bij0: 1, d1: 12, d2: 24, d3: 36 }
         ];
         
-        let SETTINGS = { oven1Max: 16, oven2Max: 15, batchMax: 31, skipBInL2: true, priceA: 0.69, priceB: 1.59 };
-        let currentDate = new Date();
+        const SETTINGS = {
+            oven1Max: 16,
+            oven2Max: 15,
+            batchMax: 31,
+            skipBInL2: true,
+            saturdayMaxBatches: 6,
+            sundayMaxBatches: 4
+        };
+        
+        let currentDate = new Date(2025, 11, 6); // December 6, 2025
         let planningData = {};
         let historicalData = [];
         
-        // Initial data
+        // ===== HISTORICAL DATA (from your spreadsheet) =====
         const INITIAL_DATA = [
+            // Week 1: 17-23 Nov 2025
+            { datum: '2025-11-17', product: 'pistolet wit', totaal: 8, l1: 4, l2: 4, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-17', product: 'pistolet bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 8, event: 'Normal' },
+            { datum: '2025-11-17', product: 'piccolo', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 1, event: 'Normal' },
+            { datum: '2025-11-17', product: 'tijger pistolet', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 6, event: 'Normal' },
+            { datum: '2025-11-17', product: 'stokbrood wit', totaal: 12, l1: 6, l2: 6, l3: 0, l4: 0, l5: 0, breuk: 16, event: 'Normal' },
+            { datum: '2025-11-17', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 7, event: 'Normal' },
+            
+            { datum: '2025-11-18', product: 'pistolet wit', totaal: 8, l1: 4, l2: 4, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-18', product: 'pistolet bruin', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-18', product: 'piccolo', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-18', product: 'tijger pistolet', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-18', product: 'stokbrood wit', totaal: 8, l1: 4, l2: 4, l3: 0, l4: 0, l5: 0, breuk: 8, event: 'Normal' },
+            { datum: '2025-11-18', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 4, event: 'Normal' },
+            
+            { datum: '2025-11-19', product: 'pistolet wit', totaal: 10, l1: 5, l2: 5, l3: 0, l4: 0, l5: 0, breuk: 8, event: 'Normal' },
+            { datum: '2025-11-19', product: 'pistolet bruin', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 2, event: 'Normal' },
+            { datum: '2025-11-19', product: 'piccolo', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 18, event: 'Normal' },
+            { datum: '2025-11-19', product: 'tijger pistolet', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-19', product: 'stokbrood wit', totaal: 8, l1: 4, l2: 4, l3: 0, l4: 0, l5: 0, breuk: 4, event: 'Normal' },
+            { datum: '2025-11-19', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            
+            { datum: '2025-11-20', product: 'pistolet wit', totaal: 7, l1: 4, l2: 3, l3: 0, l4: 0, l5: 0, breuk: 21, event: 'Normal' },
+            { datum: '2025-11-20', product: 'pistolet bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 14, event: 'Normal' },
+            { datum: '2025-11-20', product: 'piccolo', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 2, event: 'Normal' },
+            { datum: '2025-11-20', product: 'tijger pistolet', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 12, event: 'Normal' },
+            { datum: '2025-11-20', product: 'stokbrood wit', totaal: 10, l1: 5, l2: 5, l3: 0, l4: 0, l5: 0, breuk: 11, event: 'Normal' },
+            { datum: '2025-11-20', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 6, event: 'Normal' },
+            
+            { datum: '2025-11-21', product: 'pistolet wit', totaal: 12, l1: 6, l2: 6, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-21', product: 'pistolet bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-21', product: 'piccolo', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 1, event: 'Normal' },
+            { datum: '2025-11-21', product: 'tijger pistolet', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 8, event: 'Normal' },
+            { datum: '2025-11-21', product: 'stokbrood wit', totaal: 12, l1: 6, l2: 6, l3: 0, l4: 0, l5: 0, breuk: 6, event: 'Normal' },
+            { datum: '2025-11-21', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 2, event: 'Normal' },
+            
+            { datum: '2025-11-22', product: 'pistolet wit', totaal: 44, l1: 10, l2: 20, l3: 14, l4: 0, l5: 0, breuk: 39, event: 'Normal' },
+            { datum: '2025-11-22', product: 'pistolet bruin', totaal: 4, l1: 1, l2: 2, l3: 1, l4: 0, l5: 0, breuk: 12, event: 'Normal' },
+            { datum: '2025-11-22', product: 'piccolo', totaal: 4, l1: 1, l2: 1, l3: 2, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-22', product: 'tijger pistolet', totaal: 6, l1: 2, l2: 3, l3: 1, l4: 0, l5: 0, breuk: 1, event: 'Normal' },
+            { datum: '2025-11-22', product: 'stokbrood wit', totaal: 26, l1: 10, l2: 0, l3: 10, l4: 6, l5: 0, breuk: 2, event: 'Normal' },
+            { datum: '2025-11-22', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 0, l3: 1, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            
+            { datum: '2025-11-23', product: 'pistolet wit', totaal: 37, l1: 11, l2: 11, l3: 11, l4: 4, l5: 0, breuk: 29, event: 'Normal' },
+            { datum: '2025-11-23', product: 'pistolet bruin', totaal: 3, l1: 1, l2: 1, l3: 1, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-23', product: 'piccolo', totaal: 4, l1: 1, l2: 1, l3: 1, l4: 1, l5: 0, breuk: 20, event: 'Normal' },
+            { datum: '2025-11-23', product: 'tijger pistolet', totaal: 4, l1: 1, l2: 1, l3: 1, l4: 1, l5: 0, breuk: 7, event: 'Normal' },
+            { datum: '2025-11-23', product: 'stokbrood wit', totaal: 14, l1: 7, l2: 0, l3: 7, l4: 0, l5: 0, breuk: 25, event: 'Normal' },
+            { datum: '2025-11-23', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 0, l3: 1, l4: 0, l5: 0, breuk: 1, event: 'Normal' },
+            
+            // Week 2: 24-30 Nov 2025
+            { datum: '2025-11-24', product: 'pistolet wit', totaal: 10, l1: 5, l2: 5, l3: 0, l4: 0, l5: 0, breuk: 77, event: 'Normal' },
+            { datum: '2025-11-24', product: 'pistolet bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 17, event: 'Normal' },
+            { datum: '2025-11-24', product: 'piccolo', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-24', product: 'tijger pistolet', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 7, event: 'Normal' },
+            { datum: '2025-11-24', product: 'stokbrood wit', totaal: 9, l1: 5, l2: 4, l3: 0, l4: 0, l5: 0, breuk: 33, event: 'Normal' },
+            { datum: '2025-11-24', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 2, event: 'Normal' },
+            
+            { datum: '2025-11-25', product: 'pistolet wit', totaal: 7, l1: 4, l2: 3, l3: 0, l4: 0, l5: 0, breuk: 2, event: 'Normal' },
+            { datum: '2025-11-25', product: 'pistolet bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 13, event: 'Normal' },
+            { datum: '2025-11-25', product: 'piccolo', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 10, event: 'Normal' },
+            { datum: '2025-11-25', product: 'tijger pistolet', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 2, event: 'Normal' },
+            { datum: '2025-11-25', product: 'stokbrood wit', totaal: 9, l1: 5, l2: 4, l3: 0, l4: 0, l5: 0, breuk: 8, event: 'Normal' },
+            { datum: '2025-11-25', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 5, event: 'Normal' },
+            
+            { datum: '2025-11-26', product: 'pistolet wit', totaal: 10, l1: 5, l2: 5, l3: 0, l4: 0, l5: 0, breuk: 12, event: 'Normal' },
+            { datum: '2025-11-26', product: 'pistolet bruin', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-26', product: 'piccolo', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-26', product: 'tijger pistolet', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 7, event: 'Normal' },
+            { datum: '2025-11-26', product: 'stokbrood wit', totaal: 9, l1: 5, l2: 4, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-26', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            
+            { datum: '2025-11-27', product: 'pistolet wit', totaal: 6, l1: 3, l2: 3, l3: 0, l4: 0, l5: 0, breuk: 15, event: 'Normal' },
+            { datum: '2025-11-27', product: 'pistolet bruin', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-27', product: 'piccolo', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 5, event: 'Normal' },
+            { datum: '2025-11-27', product: 'tijger pistolet', totaal: 1, l1: 1, l2: 0, l3: 0, l4: 0, l5: 0, breuk: 3, event: 'Normal' },
+            { datum: '2025-11-27', product: 'stokbrood wit', totaal: 8, l1: 4, l2: 4, l3: 0, l4: 0, l5: 0, breuk: 5, event: 'Normal' },
+            { datum: '2025-11-27', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 3, event: 'Normal' },
+            
+            { datum: '2025-11-28', product: 'pistolet wit', totaal: 14, l1: 7, l2: 7, l3: 0, l4: 0, l5: 0, breuk: 2, event: 'Normal' },
+            { datum: '2025-11-28', product: 'pistolet bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 5, event: 'Normal' },
+            { datum: '2025-11-28', product: 'piccolo', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
+            { datum: '2025-11-28', product: 'tijger pistolet', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 16, event: 'Normal' },
+            { datum: '2025-11-28', product: 'stokbrood wit', totaal: 12, l1: 6, l2: 6, l3: 0, l4: 0, l5: 0, breuk: 8, event: 'Normal' },
+            { datum: '2025-11-28', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 1, l3: 0, l4: 0, l5: 0, breuk: 10, event: 'Normal' },
+            
             { datum: '2025-11-29', product: 'pistolet wit', totaal: 45, l1: 10, l2: 20, l3: 10, l4: 5, l5: 0, breuk: 1, event: 'Normal' },
             { datum: '2025-11-29', product: 'pistolet bruin', totaal: 4, l1: 1, l2: 1, l3: 1, l4: 1, l5: 0, breuk: 0, event: 'Normal' },
             { datum: '2025-11-29', product: 'piccolo', totaal: 6, l1: 1, l2: 3, l3: 2, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
             { datum: '2025-11-29', product: 'tijger pistolet', totaal: 6, l1: 2, l2: 2, l3: 1, l4: 1, l5: 0, breuk: 0, event: 'Normal' },
             { datum: '2025-11-29', product: 'stokbrood wit', totaal: 28, l1: 10, l2: 0, l3: 10, l4: 8, l5: 0, breuk: 1, event: 'Normal' },
             { datum: '2025-11-29', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 0, l3: 1, l4: 0, l5: 0, breuk: 5, event: 'Normal' },
+            
             { datum: '2025-11-30', product: 'pistolet wit', totaal: 36, l1: 10, l2: 20, l3: 6, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
             { datum: '2025-11-30', product: 'pistolet bruin', totaal: 4, l1: 1, l2: 2, l3: 1, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
             { datum: '2025-11-30', product: 'piccolo', totaal: 6, l1: 2, l2: 2, l3: 2, l4: 0, l5: 0, breuk: 0, event: 'Normal' },
@@ -664,764 +1344,309 @@
             { datum: '2025-11-30', product: 'stokbrood bruin', totaal: 2, l1: 1, l2: 0, l3: 1, l4: 0, l5: 0, breuk: 0, event: 'Normal' }
         ];
         
-        // ===== UTILITIES =====
-        function formatDate(d) { return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; }
-        function formatDateISO(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
-        function getDayName(d) { return ['zondag','maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag'][d.getDay()]; }
-        function isWeekend(d) { return d.getDay() === 0 || d.getDay() === 6; }
-        function isSaturday(d) { return d.getDay() === 6; }
+        // Initialize historical data
+        historicalData = [...INITIAL_DATA];
         
-        function showToast(msg) {
-            const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.className = 'toast success show';
-            setTimeout(() => t.classList.remove('show'), 3000);
+        // ===== UTILITY FUNCTIONS =====
+        function formatDate(date) {
+            const d = String(date.getDate()).padStart(2, '0');
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const y = date.getFullYear();
+            return `${d}/${m}/${y}`;
+        }
+        
+        function formatDateISO(date) {
+            const d = String(date.getDate()).padStart(2, '0');
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const y = date.getFullYear();
+            return `${y}-${m}-${d}`;
+        }
+        
+        function getDayName(date) {
+            const days = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'];
+            return days[date.getDay()];
+        }
+        
+        function isWeekend(date) {
+            const day = date.getDay();
+            return day === 0 || day === 6;
+        }
+        
+        function isSaturday(date) {
+            return date.getDay() === 6;
+        }
+        
+        function isSunday(date) {
+            return date.getDay() === 0;
+        }
+        
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            setTimeout(() => toast.classList.remove('show'), 3000);
         }
         
         // ===== CALCULATIONS =====
         function getSameWeekdayData(date, weeksAgo) {
-            const target = new Date(date);
-            target.setDate(target.getDate() - (weeksAgo * 7));
-            return historicalData.filter(d => d.datum === formatDateISO(target));
+            const targetDate = new Date(date);
+            targetDate.setDate(targetDate.getDate() - (weeksAgo * 7));
+            const dateStr = formatDateISO(targetDate);
+            return historicalData.filter(d => d.datum === dateStr);
         }
         
-        function calculateSuggestion(product) {
-            const lastWeek = getSameWeekdayData(currentDate, 1).find(d => d.product === product.name);
-            if (!lastWeek) return 1;
+        function calculateSuggestion(product, date) {
+            const lastWeekData = getSameWeekdayData(date, 1);
+            const productData = lastWeekData.find(d => d.product === product.name);
             
-            let sug = lastWeek.totaal;
-            const breuk = lastWeek.breuk || 0;
+            if (!productData) return 1;
             
-            if (breuk === 0) sug += product.bij0;
-            else if (breuk > product.d3) sug -= 3;
-            else if (breuk > product.d2) sug -= 2;
-            else if (breuk > product.d1) sug -= 1;
+            let suggestion = productData.totaal;
+            const breuk = productData.breuk || 0;
             
-            return Math.max(1, sug);
+            // Apply adjustment based on breuk
+            if (breuk === 0) {
+                suggestion += product.bij0;
+            } else if (breuk > product.d3) {
+                suggestion -= 3;
+            } else if (breuk > product.d2) {
+                suggestion -= 2;
+            } else if (breuk > product.d1) {
+                suggestion -= 1;
+            }
+            
+            return Math.max(1, suggestion);
         }
         
-        function getGroupBatchLimits(isGroupA, isWeekendDay, skipL2) {
-            // Returns max plates per batch for a group
-            if (!isWeekendDay) {
-                // Weekday: 2 batches only, split evenly
-                return [50, 50, 0, 0, 0]; // High limits, will be constrained by totaal
-            }
-            
-            if (isGroupA) {
-                // Group A weekend: L1=14, L2=26 (extra when B skips), L3-L5=14
-                return [14, skipL2 ? 26 : 14, 14, 14, 14];
-            } else {
-                // Group B weekend: L1=12, L2=0 (skip), L3-L5=13
-                return [12, 0, 13, 13, 10];
-            }
-        }
-        
-        function distributeGroupToBatches(groupTotaal, limits) {
-            // Distribute group total across batches according to limits
-            const batches = [0, 0, 0, 0, 0];
-            let remaining = groupTotaal;
-            
-            for (let i = 0; i < 5 && remaining > 0; i++) {
-                batches[i] = Math.min(remaining, limits[i]);
-                remaining -= batches[i];
-            }
-            
-            // OPTIMIZATION: Move small remainders (1-3 plates) from later batches to earlier ones
-            // This avoids wasting energy on nearly-empty batches
-            for (let late = 4; late >= 2; late--) {
-                if (batches[late] > 0 && batches[late] <= 3) {
-                    // Try to move these plates to an earlier batch that has room
-                    for (let early = 0; early < late; early++) {
-                        const room = limits[early] - batches[early];
-                        if (room >= batches[late]) {
-                            // Move all plates from late batch to early batch
-                            batches[early] += batches[late];
-                            batches[late] = 0;
-                            break;
-                        }
-                    }
-                }
-            }
-            
-            return batches;
-        }
-        
-        function distributeProductsInBatches(products, groupBatches, productTotals, groupTotaal) {
-            // Distribute each product proportionally within each batch
+        function calculateBatchDistribution(products, isWeekendDay, skipBInL2) {
             const result = {};
+            const groupA = products.filter(p => p.group === 'A');
+            const groupB = products.filter(p => p.group === 'B');
             
-            products.forEach(p => {
-                result[p.id] = [0, 0, 0, 0, 0];
+            // Get totals for each group
+            let totalA = 0, totalB = 0;
+            groupA.forEach(p => {
+                const finaal = planningData[p.id]?.finaal || calculateSuggestion(p, currentDate);
+                result[p.id] = { finaal, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
+                totalA += finaal;
+            });
+            groupB.forEach(p => {
+                const finaal = planningData[p.id]?.finaal || calculateSuggestion(p, currentDate);
+                result[p.id] = { finaal, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
+                totalB += finaal;
             });
             
-            if (groupTotaal === 0) return result;
+            // Calculate batch totals for groups
+            let batchesA = [0, 0, 0, 0, 0];
+            let batchesB = [0, 0, 0, 0, 0];
             
-            for (let batch = 0; batch < 5; batch++) {
-                const batchTotal = groupBatches[batch];
-                if (batchTotal === 0) continue;
+            if (isWeekendDay) {
+                // Weekend logic
+                let remainingA = totalA;
+                let remainingB = totalB;
                 
-                let batchRemaining = batchTotal;
-                const productShares = {};
+                // L1: A up to 16, B fills remaining (up to 15)
+                batchesA[0] = Math.min(remainingA, SETTINGS.oven1Max);
+                remainingA -= batchesA[0];
+                batchesB[0] = Math.min(remainingB, SETTINGS.batchMax - batchesA[0]);
+                remainingB -= batchesB[0];
                 
-                // Calculate proportional shares
-                products.forEach(p => {
-                    const ratio = productTotals[p.id] / groupTotaal;
-                    productShares[p.id] = Math.round(batchTotal * ratio);
-                });
-                
-                // Assign shares, ensuring we don't exceed product totals or batch total
-                products.forEach(p => {
-                    const productRemaining = productTotals[p.id] - result[p.id].reduce((a, b) => a + b, 0);
-                    const share = Math.min(productShares[p.id], productRemaining, batchRemaining);
-                    result[p.id][batch] = share;
-                    batchRemaining -= share;
-                });
-                
-                // If there's remaining capacity and products still need distribution, fill it
-                if (batchRemaining > 0) {
-                    for (const p of products) {
-                        const productRemaining = productTotals[p.id] - result[p.id].reduce((a, b) => a + b, 0);
-                        const extra = Math.min(productRemaining, batchRemaining);
-                        result[p.id][batch] += extra;
-                        batchRemaining -= extra;
-                        if (batchRemaining <= 0) break;
-                    }
+                // L2: If skipB, all A (up to 31), else normal
+                if (skipBInL2) {
+                    batchesA[1] = Math.min(remainingA, SETTINGS.batchMax);
+                    remainingA -= batchesA[1];
+                    batchesB[1] = 0;
+                } else {
+                    batchesA[1] = Math.min(remainingA, SETTINGS.oven1Max);
+                    remainingA -= batchesA[1];
+                    batchesB[1] = Math.min(remainingB, SETTINGS.batchMax - batchesA[1]);
+                    remainingB -= batchesB[1];
                 }
+                
+                // L3-L5: Continue filling
+                for (let i = 2; i < 5; i++) {
+                    batchesA[i] = Math.min(remainingA, SETTINGS.oven1Max);
+                    remainingA -= batchesA[i];
+                    batchesB[i] = Math.min(remainingB, SETTINGS.batchMax - batchesA[i]);
+                    remainingB -= batchesB[i];
+                }
+            } else {
+                // Weekday logic: 50/50 split
+                batchesA[0] = Math.ceil(totalA / 2);
+                batchesA[1] = totalA - batchesA[0];
+                batchesB[0] = Math.ceil(totalB / 2);
+                batchesB[1] = totalB - batchesB[0];
             }
             
-            return result;
+            // Distribute to individual products proportionally
+            groupA.forEach(p => {
+                const finaal = result[p.id].finaal;
+                const ratio = totalA > 0 ? finaal / totalA : 0;
+                for (let i = 0; i < 5; i++) {
+                    result[p.id][`l${i+1}`] = Math.round(batchesA[i] * ratio);
+                }
+            });
+            
+            groupB.forEach(p => {
+                const finaal = result[p.id].finaal;
+                const ratio = totalB > 0 ? finaal / totalB : 0;
+                for (let i = 0; i < 5; i++) {
+                    result[p.id][`l${i+1}`] = Math.round(batchesB[i] * ratio);
+                }
+            });
+            
+            return { products: result, batchesA, batchesB };
         }
         
-        // ===== RENDERING =====
+        // ===== UI RENDERING =====
         function updateHeader() {
             document.getElementById('current-day').textContent = getDayName(currentDate);
             document.getElementById('current-date').textContent = formatDate(currentDate);
-            const dateBox = document.getElementById('current-date-box');
+            
+            const badge = document.getElementById('weekend-badge');
             if (isWeekend(currentDate)) {
-                dateBox.classList.add('weekend');
+                badge.style.display = 'inline-block';
+                badge.textContent = isSaturday(currentDate) ? 'ZATERDAG' : 'ZONDAG';
             } else {
-                dateBox.classList.remove('weekend');
+                badge.style.display = 'none';
             }
         }
         
         function renderPlanning() {
             const weekend = isWeekend(currentDate);
-            const skipL2 = SETTINGS.skipBInL2;
-            const batchMax = SETTINGS.batchMax;
-            const dateStr = formatDateISO(currentDate);
+            const distribution = calculateBatchDistribution(PRODUCTS, weekend, SETTINGS.skipBInL2);
             
-            // Check if this date has saved data in historicalData
-            const savedDayData = historicalData.filter(d => d.datum === dateStr);
-            const hasSavedData = savedDayData.length > 0;
+            // Group A
+            const groupABody = document.getElementById('group-a-body');
+            const groupAProducts = PRODUCTS.filter(p => p.group === 'A');
+            let htmlA = '';
+            let totalA = { sug: 0, finaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
             
-            // Load saved event if exists, otherwise default to 'Normal'
-            const savedEvent = savedDayData[0]?.event || 'Normal';
-            const eventSelect = document.getElementById('event-select');
-            if (eventSelect && !planningData._eventEdited) {
-                eventSelect.value = savedEvent;
-            }
-            
-            // Load saved note if exists (find any record that has a note for this date)
-            if (!planningData._note) {
-                const recordWithNote = savedDayData.find(d => d.note && d.note.length > 0);
-                if (recordWithNote) {
-                    planningData._note = recordWithNote.note;
-                }
-            }
-            updateNoteButton();
-            
-            // Build display data for each product
-            const displayData = {};
-            
-            PRODUCTS.forEach(p => {
-                const sug = calculateSuggestion(p);
-                const savedRecord = savedDayData.find(d => d.product === p.name);
-                const sessionEdit = planningData[p.id];
+            groupAProducts.forEach(p => {
+                const sug = calculateSuggestion(p, currentDate);
+                const data = distribution.products[p.id];
+                totalA.sug += sug;
+                totalA.finaal += data.finaal;
+                for (let i = 1; i <= 5; i++) totalA[`l${i}`] += data[`l${i}`];
                 
-                // Priority: 1) Current session edits, 2) Saved data, 3) Suggestion
-                if (sessionEdit && sessionEdit.totaal !== undefined) {
-                    // User edited in this session
-                    if (sessionEdit.l1 !== undefined) {
-                        // User edited batches - use their values
-                        displayData[p.id] = {
-                            sug,
-                            totaal: sessionEdit.totaal,
-                            batches: [sessionEdit.l1, sessionEdit.l2, sessionEdit.l3, sessionEdit.l4, sessionEdit.l5]
-                        };
-                    } else {
-                        // User only edited total - need to distribute
-                        displayData[p.id] = {
-                            sug,
-                            totaal: sessionEdit.totaal,
-                            batches: null // Will be calculated below
-                        };
-                    }
-                } else if (savedRecord) {
-                    // Load from saved data
-                    displayData[p.id] = {
-                        sug,
-                        totaal: savedRecord.totaal,
-                        batches: [savedRecord.l1 || 0, savedRecord.l2 || 0, savedRecord.l3 || 0, savedRecord.l4 || 0, savedRecord.l5 || 0]
-                    };
-                } else {
-                    // Use suggestion
-                    displayData[p.id] = {
-                        sug,
-                        totaal: sug,
-                        batches: null // Will be calculated below
-                    };
-                }
+                htmlA += `
+                    <tr>
+                        <td>${p.name}</td>
+                        <td class="sug-value">${sug}</td>
+                        <td><input type="number" value="${data.finaal}" data-product="${p.id}" data-field="finaal" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l1}" data-product="${p.id}" data-field="l1" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l2}" data-product="${p.id}" data-field="l2" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l3}" data-product="${p.id}" data-field="l3" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l4}" data-product="${p.id}" data-field="l4" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l5}" data-product="${p.id}" data-field="l5" onchange="updatePlanning(this)"></td>
+                    </tr>
+                `;
             });
             
-            // Calculate batches for products that need it (where batches is null)
-            ['A', 'B'].forEach(group => {
-                const products = PRODUCTS.filter(p => p.group === group);
-                const isGroupA = group === 'A';
+            htmlA += `
+                <tr class="total-row">
+                    <td>TOTAAL A</td>
+                    <td>${totalA.sug}</td>
+                    <td>${totalA.finaal}</td>
+                    <td>${totalA.l1}</td>
+                    <td>${totalA.l2}</td>
+                    <td>${totalA.l3}</td>
+                    <td>${totalA.l4}</td>
+                    <td>${totalA.l5}</td>
+                </tr>
+            `;
+            groupABody.innerHTML = htmlA;
+            
+            // Group B
+            const groupBBody = document.getElementById('group-b-body');
+            const groupBProducts = PRODUCTS.filter(p => p.group === 'B');
+            let htmlB = '';
+            let totalB = { sug: 0, finaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
+            
+            groupBProducts.forEach(p => {
+                const sug = calculateSuggestion(p, currentDate);
+                const data = distribution.products[p.id];
+                totalB.sug += sug;
+                totalB.finaal += data.finaal;
+                for (let i = 1; i <= 5; i++) totalB[`l${i}`] += data[`l${i}`];
                 
-                // Check if any product in this group needs batch calculation
-                const needsCalc = products.filter(p => displayData[p.id].batches === null);
-                if (needsCalc.length === 0) return;
-                
-                // If some products have batches and some don't, calculate only for those that don't
-                if (needsCalc.length < products.length) {
-                    // Mixed: some saved, some new - distribute individually
-                    needsCalc.forEach(p => {
-                        const tot = displayData[p.id].totaal;
-                        if (weekend) {
-                            const limits = isGroupA ? [14, 26, 14, 14, 14] : [12, 0, 13, 13, 10];
-                            displayData[p.id].batches = distributeSimple(tot, limits);
-                        } else {
-                            const l1 = Math.ceil(tot / 2);
-                            displayData[p.id].batches = [l1, tot - l1, 0, 0, 0];
-                        }
-                    });
-                } else {
-                    // All products need calculation - use group distribution
-                    let groupTotaal = 0;
-                    const productTotals = {};
-                    products.forEach(p => {
-                        productTotals[p.id] = displayData[p.id].totaal;
-                        groupTotaal += displayData[p.id].totaal;
-                    });
-                    
-                    if (weekend) {
-                        const limits = getGroupBatchLimits(isGroupA, weekend, skipL2);
-                        const groupBatches = distributeGroupToBatches(groupTotaal, limits);
-                        const productBatches = distributeProductsInBatches(products, groupBatches, productTotals, groupTotaal);
-                        products.forEach(p => {
-                            displayData[p.id].batches = productBatches[p.id];
-                        });
-                    } else {
-                        products.forEach(p => {
-                            const tot = displayData[p.id].totaal;
-                            const l1 = Math.ceil(tot / 2);
-                            displayData[p.id].batches = [l1, tot - l1, 0, 0, 0];
-                        });
-                    }
-                }
+                htmlB += `
+                    <tr>
+                        <td>${p.name}</td>
+                        <td class="sug-value">${sug}</td>
+                        <td><input type="number" value="${data.finaal}" data-product="${p.id}" data-field="finaal" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l1}" data-product="${p.id}" data-field="l1" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l2}" data-product="${p.id}" data-field="l2" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l3}" data-product="${p.id}" data-field="l3" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l4}" data-product="${p.id}" data-field="l4" onchange="updatePlanning(this)"></td>
+                        <td><input type="number" value="${data.l5}" data-product="${p.id}" data-field="l5" onchange="updatePlanning(this)"></td>
+                    </tr>
+                `;
             });
             
-            // Fix rounding errors: ensure batches sum to totaal
-            PRODUCTS.forEach(p => {
-                const data = displayData[p.id];
-                const batchSum = data.batches.reduce((a, b) => a + b, 0);
-                if (batchSum !== data.totaal) {
-                    // Adjust last non-zero batch
-                    const diff = data.totaal - batchSum;
-                    for (let i = 4; i >= 0; i--) {
-                        if (data.batches[i] > 0 || i === 0) {
-                            data.batches[i] += diff;
-                            break;
-                        }
-                    }
-                }
-            });
+            htmlB += `
+                <tr class="total-row">
+                    <td>TOTAAL B</td>
+                    <td>${totalB.sug}</td>
+                    <td>${totalB.finaal}</td>
+                    <td>${totalB.l1}</td>
+                    <td>${totalB.l2}</td>
+                    <td>${totalB.l3}</td>
+                    <td>${totalB.l4}</td>
+                    <td>${totalB.l5}</td>
+                </tr>
+            `;
+            groupBBody.innerHTML = htmlB;
             
-            // Weekend optimization: move small remainders from late batches
-            if (weekend) {
-                const combinedTotals = [0, 0, 0, 0, 0];
-                PRODUCTS.forEach(p => {
-                    for (let i = 0; i < 5; i++) {
-                        combinedTotals[i] += displayData[p.id].batches[i];
-                    }
-                });
-                
-                for (let late = 4; late >= 2; late--) {
-                    if (combinedTotals[late] > 0 && combinedTotals[late] <= 3) {
-                        for (let early = 0; early < late; early++) {
-                            const room = batchMax - combinedTotals[early];
-                            if (room >= combinedTotals[late]) {
-                                PRODUCTS.forEach(p => {
-                                    if (displayData[p.id].batches[late] > 0) {
-                                        displayData[p.id].batches[early] += displayData[p.id].batches[late];
-                                        displayData[p.id].batches[late] = 0;
-                                    }
-                                });
-                                combinedTotals[early] += combinedTotals[late];
-                                combinedTotals[late] = 0;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Render both groups
-            ['A', 'B'].forEach(group => {
-                const body = document.getElementById(`group-${group.toLowerCase()}-body`);
-                const products = PRODUCTS.filter(p => p.group === group);
-                
-                let html = '';
-                let totals = { sug: 0, totaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
-                
-                products.forEach(p => {
-                    const data = displayData[p.id];
-                    
-                    totals.sug += data.sug;
-                    totals.totaal += data.totaal;
-                    for (let i = 0; i < 5; i++) totals[`l${i+1}`] += data.batches[i];
-                    
-                    html += `<tr>
-                        <td>${p.short}</td>
-                        <td class="sug-value">${data.sug}</td>
-                        <td class="totaal-col"><input type="number" value="${data.totaal}" data-id="${p.id}" data-field="totaal" onchange="onInput(this)"></td>
-                        <td><input type="number" value="${data.batches[0]}" data-id="${p.id}" data-field="l1" onchange="onInput(this)"></td>
-                        <td><input type="number" value="${data.batches[1]}" data-id="${p.id}" data-field="l2" onchange="onInput(this)"></td>
-                        <td><input type="number" value="${data.batches[2]}" data-id="${p.id}" data-field="l3" onchange="onInput(this)"></td>
-                        <td><input type="number" value="${data.batches[3]}" data-id="${p.id}" data-field="l4" onchange="onInput(this)"></td>
-                        <td><input type="number" value="${data.batches[4]}" data-id="${p.id}" data-field="l5" onchange="onInput(this)"></td>
-                    </tr>`;
-                });
-                
-                html += `<tr class="total-row">
-                    <td>TOTAAL ${group}</td><td>${totals.sug}</td><td class="totaal-col" style="color: var(--accent-cyan);">${totals.totaal}</td>
-                    <td>${totals.l1}</td><td>${totals.l2}</td><td>${totals.l3}</td><td>${totals.l4}</td><td>${totals.l5}</td>
-                </tr>`;
-                body.innerHTML = html;
-            });
-            
-            // Update lading totals
+            // Lading totals
             for (let i = 1; i <= 5; i++) {
-                let total = 0;
-                document.querySelectorAll(`input[data-field="l${i}"]`).forEach(inp => {
-                    total += parseInt(inp.value) || 0;
-                });
+                const total = totalA[`l${i}`] + totalB[`l${i}`];
                 const el = document.getElementById(`lading-l${i}`);
                 el.textContent = total;
-                el.parentElement.className = 'lading-item' + (total > SETTINGS.batchMax ? ' danger' : total > 25 ? ' warning' : '');
+                el.parentElement.className = 'lading-item' + (total > SETTINGS.batchMax ? ' danger' : (total > 25 ? ' warning' : ''));
             }
             
-            // Update save button state based on whether viewing saved data
-            if (hasSavedData && !hasUnsavedChanges) {
-                markViewingSaved();
-            } else if (!hasSavedData && !hasUnsavedChanges) {
-                markDefault();
-            }
-            
+            // Reference section
             renderReference();
         }
         
-        // Simple distribution for single product
-        function distributeSimple(totaal, limits) {
-            const batches = [0, 0, 0, 0, 0];
-            let remaining = totaal;
-            for (let i = 0; i < 5 && remaining > 0; i++) {
-                batches[i] = Math.min(remaining, limits[i]);
-                remaining -= batches[i];
-            }
-            return batches;
-        }
-        
         function renderReference() {
+            const refBody = document.getElementById('reference-body');
             let html = '';
             
-            // Calculate totals for each week
-            const weekTotals = [0, 0, 0];
-            const weekBreuk = [0, 0, 0];
-            
-            // First add the weather row
-            html += '<tr style="background: var(--bg-card);"><td style="font-weight: 600;">Weer</td>';
-            for (let w = 1; w <= 3; w++) {
-                const weekData = getSameWeekdayData(currentDate, w);
-                const weather = weekData[0]?.weather || '--';
-                html += `<td colspan="2" style="text-align: center; font-size: 0.8rem;">${weather}</td>`;
-            }
-            html += '</tr>';
-            
-            // Add the event row
-            html += '<tr style="background: var(--bg-card);"><td style="font-weight: 600;">Event</td>';
-            for (let w = 1; w <= 3; w++) {
-                const weekData = getSameWeekdayData(currentDate, w);
-                const event = weekData[0]?.event || 'Normal';
-                const eventIcons = {
-                    'Normal': '',
-                    'Sneeuw': '❄️',
-                    'BBQ': '☀️',
-                    'Feestdag': '🎉',
-                    'Promo': '📢'
-                };
-                const icon = eventIcons[event] || '';
-                html += `<td colspan="2" style="text-align: center; font-size: 0.75rem; color: var(--text-secondary);">${icon} ${event}</td>`;
-            }
-            html += '</tr>';
-            
-            // Then product rows
             PRODUCTS.forEach(p => {
-                html += `<tr><td>${p.short}</td>`;
+                html += `<tr><td>${p.name}</td>`;
                 for (let w = 1; w <= 3; w++) {
-                    const data = getSameWeekdayData(currentDate, w).find(d => d.product === p.name);
-                    const totaal = data?.totaal || 0;
-                    const breuk = data?.breuk ?? '-';
-                    weekTotals[w-1] += totaal;
-                    if (typeof breuk === 'number') weekBreuk[w-1] += breuk;
-                    html += `<td>${totaal}</td><td class="breuk">${breuk}</td>`;
+                    const data = getSameWeekdayData(currentDate, w);
+                    const productData = data.find(d => d.product === p.name);
+                    html += `<td>${productData?.totaal || 0}</td>`;
+                    html += `<td class="breuk">${productData?.breuk || 0}</td>`;
                 }
                 html += '</tr>';
             });
             
-            // Add totals row with top border separator
-            html += '<tr style="border-top: 1px solid var(--text-muted);"><td style="font-weight: 600; color: var(--text-muted);">Totaal</td>';
-            for (let w = 0; w < 3; w++) {
-                html += `<td style="color: var(--accent-cyan); font-weight: 600;">${weekTotals[w]}</td><td class="breuk">${weekBreuk[w]}</td>`;
-            }
-            html += '</tr>';
-            
-            // Add note row
-            html += '<tr><td style="font-weight: 600; color: var(--text-muted);">Notitie</td>';
+            // Event row
+            html += '<tr class="event-row"><td>Event:</td>';
             for (let w = 1; w <= 3; w++) {
-                const weekData = getSameWeekdayData(currentDate, w);
-                const recordWithNote = weekData.find(d => d.note && d.note.length > 0);
-                const note = recordWithNote?.note || '';
-                const dateStr = weekData[0]?.datum;
-                const hasNote = note && note.length > 0;
-                const iconClass = hasNote ? 'note-icon has-note' : 'note-icon';
-                const onclick = hasNote && dateStr ? `onclick="openNotePopup('${dateStr}', true)"` : '';
-                html += `<td colspan="2" style="text-align: center;"><span class="${iconClass}" ${onclick}>📝</span></td>`;
+                const data = getSameWeekdayData(currentDate, w);
+                const event = data[0]?.event || '-';
+                html += `<td colspan="2">${event}</td>`;
             }
             html += '</tr>';
             
-            document.getElementById('reference-body').innerHTML = html;
-            
-            // Also update note button state
-            updateNoteButton();
+            refBody.innerHTML = html;
         }
         
-        function onInput(input) {
-            const id = input.dataset.id;
-            const field = input.dataset.field;
-            const value = parseInt(input.value) || 0;
-            const row = input.closest('tr');
-            
-            if (!planningData[id]) planningData[id] = {};
-            
-            if (field === 'totaal') {
-                // User changed total - store it, batches will be recalculated
-                planningData[id] = { totaal: value };
-                // Clear batch overrides so they get recalculated
-            } else {
-                // User changed a batch - update only totaal, keep all batches as user set them
-                const l1 = parseInt(row.querySelector('[data-field="l1"]').value) || 0;
-                const l2 = parseInt(row.querySelector('[data-field="l2"]').value) || 0;
-                const l3 = parseInt(row.querySelector('[data-field="l3"]').value) || 0;
-                const l4 = parseInt(row.querySelector('[data-field="l4"]').value) || 0;
-                const l5 = parseInt(row.querySelector('[data-field="l5"]').value) || 0;
-                
-                planningData[id] = {
-                    totaal: l1 + l2 + l3 + l4 + l5,
-                    l1, l2, l3, l4, l5
-                };
-                
-                // Update only the totaal display for this row, don't re-render everything
-                const totaalInput = row.querySelector('[data-field="totaal"]');
-                totaalInput.value = planningData[id].totaal;
-                
-                // Update group total row
-                updateGroupTotals();
-                
-                // Update lading totals
-                updateLadingTotals();
-                
-                // Mark as unsaved
-                markUnsaved();
-                return; // Don't call full renderPlanning
-            }
-            
-            // Mark as unsaved
-            markUnsaved();
-            
-            renderPlanning();
-        }
-        
-        function updateGroupTotals() {
-            ['A', 'B'].forEach(group => {
-                const body = document.getElementById(`group-${group.toLowerCase()}-body`);
-                const rows = body.querySelectorAll('tr:not(.total-row)');
-                let totals = { sug: 0, totaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0 };
-                
-                rows.forEach(row => {
-                    totals.sug += parseInt(row.querySelector('.sug-value')?.textContent) || 0;
-                    totals.totaal += parseInt(row.querySelector('[data-field="totaal"]')?.value) || 0;
-                    totals.l1 += parseInt(row.querySelector('[data-field="l1"]')?.value) || 0;
-                    totals.l2 += parseInt(row.querySelector('[data-field="l2"]')?.value) || 0;
-                    totals.l3 += parseInt(row.querySelector('[data-field="l3"]')?.value) || 0;
-                    totals.l4 += parseInt(row.querySelector('[data-field="l4"]')?.value) || 0;
-                    totals.l5 += parseInt(row.querySelector('[data-field="l5"]')?.value) || 0;
-                });
-                
-                const totalRow = body.querySelector('.total-row');
-                if (totalRow) {
-                    const cells = totalRow.querySelectorAll('td');
-                    cells[1].textContent = totals.sug;
-                    cells[2].textContent = totals.totaal;
-                    cells[3].textContent = totals.l1;
-                    cells[4].textContent = totals.l2;
-                    cells[5].textContent = totals.l3;
-                    cells[6].textContent = totals.l4;
-                    cells[7].textContent = totals.l5;
-                }
-            });
-        }
-        
-        function updateLadingTotals() {
-            for (let i = 1; i <= 5; i++) {
-                let total = 0;
-                document.querySelectorAll(`input[data-field="l${i}"]`).forEach(inp => {
-                    total += parseInt(inp.value) || 0;
-                });
-                const el = document.getElementById(`lading-l${i}`);
-                el.textContent = total;
-                el.parentElement.className = 'lading-item' + (total > SETTINGS.batchMax ? ' danger' : total > 25 ? ' warning' : '');
-            }
-        }
-        
-        // ===== COLLAPSIBLE & REFERENCE =====
-        function toggleCollapsible(header) {
-            header.classList.toggle('open');
-            const content = header.nextElementSibling;
-            content.style.display = content.style.display === 'none' ? 'block' : 'none';
-        }
-        
-        function loadReferencePlanning() {
-            const dateStr = document.getElementById('ref-date-picker').value;
-            if (!dateStr) {
-                document.getElementById('ref-planning-content').innerHTML = '<span style="color: var(--text-muted);">Selecteer een datum...</span>';
-                return;
-            }
-            
-            const dayData = historicalData.filter(d => d.datum === dateStr);
-            
-            if (dayData.length === 0) {
-                document.getElementById('ref-planning-content').innerHTML = '<span style="color: var(--text-muted);">Geen data voor deze datum</span>';
-                return;
-            }
-            
-            // Build table
-            let html = `<table class="ref-table">
-                <thead><tr><th>Product</th><th class="totaal-col">Totaal</th><th>L1</th><th>L2</th><th>L3</th><th>L4</th><th>L5</th></tr></thead>
-                <tbody>`;
-            
-            PRODUCTS.forEach(p => {
-                const data = dayData.find(d => d.product === p.name);
-                if (data) {
-                    html += `<tr>
-                        <td>${p.short}</td>
-                        <td class="totaal-col">${data.totaal || 0}</td>
-                        <td>${data.l1 || 0}</td>
-                        <td>${data.l2 || 0}</td>
-                        <td>${data.l3 || 0}</td>
-                        <td>${data.l4 || 0}</td>
-                        <td>${data.l5 || 0}</td>
-                    </tr>`;
-                }
-            });
-            
-            html += '</tbody></table>';
-            document.getElementById('ref-planning-content').innerHTML = html;
-        }
-        
-        function copyReferencePlanning() {
-            const dateStr = document.getElementById('ref-date-picker').value;
-            if (!dateStr) {
-                showToast('⚠️ Selecteer eerst een datum');
-                return;
-            }
-            
-            const dayData = historicalData.filter(d => d.datum === dateStr);
-            if (dayData.length === 0) {
-                showToast('⚠️ Geen data voor deze datum');
-                return;
-            }
-            
-            // Show custom modal
-            showModal('Deze planning gebruiken?', () => {
-                // Copy values to planningData and re-render
-                PRODUCTS.forEach(p => {
-                    const data = dayData.find(d => d.product === p.name);
-                    if (data) {
-                        planningData[p.id] = {
-                            totaal: data.totaal || 0,
-                            l1: data.l1 || 0,
-                            l2: data.l2 || 0,
-                            l3: data.l3 || 0,
-                            l4: data.l4 || 0,
-                            l5: data.l5 || 0
-                        };
-                    }
-                });
-                
-                markUnsaved();
-                renderPlanning();
-                showToast('✅ Planning gekopieerd!');
-            });
-        }
-        
-        // ===== MODAL =====
-        let modalCallback = null;
-        
-        function showModal(message, onConfirm) {
-            document.getElementById('modal-message').textContent = message;
-            document.getElementById('confirm-modal').style.display = 'flex';
-            modalCallback = onConfirm;
-        }
-        
-        function confirmModalAction() {
-            document.getElementById('confirm-modal').style.display = 'none';
-            if (modalCallback) modalCallback();
-            modalCallback = null;
-        }
-        
-        function closeModal() {
-            document.getElementById('confirm-modal').style.display = 'none';
-            modalCallback = null;
-        }
-        
-        // ===== NOTES =====
-        let currentNoteDate = null;
-        let noteReadOnly = false;
-        
-        function openNotePopup(dateStr, readOnly = false) {
-            currentNoteDate = dateStr || formatDateISO(currentDate);
-            noteReadOnly = readOnly;
-            
-            const textarea = document.getElementById('note-textarea');
-            const saveBtn = document.getElementById('note-save-btn');
-            const dateLabel = document.getElementById('note-modal-date');
-            
-            // Load existing note - check planningData first for current date, then find any record with note
-            let existingNote = '';
-            if (!dateStr && planningData._note) {
-                existingNote = planningData._note;
-            } else {
-                const dayData = historicalData.filter(d => d.datum === currentNoteDate);
-                const recordWithNote = dayData.find(d => d.note && d.note.length > 0);
-                existingNote = recordWithNote?.note || '';
-            }
-            
-            textarea.value = existingNote;
-            textarea.readOnly = readOnly;
-            textarea.style.opacity = readOnly ? '0.7' : '1';
-            saveBtn.style.display = readOnly ? 'none' : 'inline-block';
-            
-            // Format date for display
-            const d = new Date(currentNoteDate);
-            dateLabel.textContent = formatDate(d);
-            
-            document.getElementById('note-modal').style.display = 'flex';
-        }
-        
-        function saveNote() {
-            const note = document.getElementById('note-textarea').value.trim();
-            
-            // Save note to planningData for current session
-            planningData._note = note;
-            
-            // Update note button appearance
-            updateNoteButton();
-            
-            markUnsaved();
-            closeNoteModal();
-            showToast('📝 Notitie opgeslagen');
-        }
-        
-        function closeNoteModal() {
-            document.getElementById('note-modal').style.display = 'none';
-            currentNoteDate = null;
-        }
-        
-        function updateNoteButton() {
-            const btn = document.getElementById('note-btn');
-            const dateStr = formatDateISO(currentDate);
-            const dayData = historicalData.filter(d => d.datum === dateStr);
-            const recordWithNote = dayData.find(d => d.note && d.note.length > 0);
-            const hasNote = (planningData._note && planningData._note.length > 0) || recordWithNote;
-            
-            if (hasNote) {
-                btn.classList.add('has-note');
-            } else {
-                btn.classList.remove('has-note');
-            }
-        }
-        
-        // ===== SAVE STATE TRACKING =====
-        let hasUnsavedChanges = false;
-        
-        function onEventChange() {
-            planningData._eventEdited = true;
-            markUnsaved();
-        }
-        
-        function markUnsaved() {
-            hasUnsavedChanges = true;
-            const btn = document.getElementById('save-btn');
-            btn.classList.remove('saved', 'viewing-saved');
-            btn.classList.add('unsaved');
-            btn.querySelector('span').textContent = 'Niet opgeslagen!';
-        }
-        
-        function markSaved() {
-            hasUnsavedChanges = false;
-            const btn = document.getElementById('save-btn');
-            btn.classList.remove('unsaved');
-            btn.classList.add('saved');
-            btn.querySelector('span').textContent = 'Opgeslagen ✓';
-            
-            // Change to viewing-saved after 3 seconds
-            setTimeout(() => {
-                if (!hasUnsavedChanges) {
-                    btn.classList.remove('saved');
-                    btn.classList.add('viewing-saved');
-                    btn.querySelector('span').textContent = 'Opgeslagen';
-                }
-            }, 3000);
-        }
-        
-        function markViewingSaved() {
-            hasUnsavedChanges = false;
-            const btn = document.getElementById('save-btn');
-            btn.classList.remove('unsaved', 'saved');
-            btn.classList.add('viewing-saved');
-            btn.querySelector('span').textContent = 'Opgeslagen';
-        }
-        
-        function markDefault() {
-            hasUnsavedChanges = false;
-            const btn = document.getElementById('save-btn');
-            btn.classList.remove('unsaved', 'saved', 'viewing-saved');
-            btn.querySelector('span').textContent = 'Opslaan';
-        }
-        
-        // ===== BREUK =====
         function renderBreukPage() {
-            const select = document.getElementById('breuk-date-select');
-            const dates = [...new Set(historicalData.map(d => d.datum))].sort().reverse();
-            select.innerHTML = dates.slice(0, 14).map(d => {
-                const dt = new Date(d);
-                // Check if any product has breuk filled (not null) for this date
-                const dayData = historicalData.filter(rec => rec.datum === d);
-                const hasBreuk = dayData.some(rec => rec.breuk !== null && rec.breuk !== undefined);
-                const checkmark = hasBreuk ? ' ✅' : '';
-                return `<option value="${d}">${formatDate(dt)} (${getDayName(dt)})${checkmark}</option>`;
+            // Populate date selector with dates that have planning data
+            const dateSelect = document.getElementById('breuk-date-select');
+            const uniqueDates = [...new Set(historicalData.map(d => d.datum))].sort().reverse();
+            
+            dateSelect.innerHTML = uniqueDates.slice(0, 14).map(d => {
+                const date = new Date(d);
+                return `<option value="${d}">${formatDate(date)} (${getDayName(date)})</option>`;
             }).join('');
+            
             loadBreukData();
         }
         
@@ -1429,192 +1654,132 @@
             const dateStr = document.getElementById('breuk-date-select').value;
             const dayData = historicalData.filter(d => d.datum === dateStr);
             
-            document.getElementById('breuk-grid').innerHTML = PRODUCTS.map(p => {
+            const grid = document.getElementById('breuk-grid');
+            grid.innerHTML = PRODUCTS.map(p => {
                 const data = dayData.find(d => d.product === p.name);
-                return `<div class="breuk-item">
-                    <div><div class="product-name">${p.name}</div>
-                    <div class="product-baked">Gebakken: ${data?.totaal || 0} platen</div></div>
-                    <input type="number" value="${data?.breuk ?? ''}" data-product="${p.name}" placeholder="0">
-                </div>`;
+                const totaal = data?.totaal || 0;
+                const breuk = data?.breuk ?? '';
+                
+                return `
+                    <div class="breuk-item">
+                        <div class="product-info">
+                            <div class="product-name">${p.name}</div>
+                            <div class="product-baked">Gebakken: ${totaal} platen (${totaal * p.ppp} stuks)</div>
+                        </div>
+                        <input type="number" value="${breuk}" data-product="${p.name}" placeholder="0">
+                    </div>
+                `;
             }).join('');
         }
         
-        function saveBreuk() {
-            const dateStr = document.getElementById('breuk-date-select').value;
-            document.querySelectorAll('#breuk-grid input').forEach(inp => {
-                const rec = historicalData.find(d => d.datum === dateStr && d.product === inp.dataset.product);
-                if (rec) rec.breuk = parseInt(inp.value) || 0;
+        // ===== HISTORIEK DATE FILTER =====
+        let histDateMode = 'single'; // 'single' or 'range'
+        
+        function setDateMode(mode) {
+            histDateMode = mode;
+            document.querySelectorAll('.date-mode-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', (i === 0 && mode === 'single') || (i === 1 && mode === 'range'));
             });
-            localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
-            if (supabaseClient) syncToSupabase();
-            showToast('✅ Breuk opgeslagen!');
-            
-            // Refresh dropdown to show checkmark
-            const currentValue = document.getElementById('breuk-date-select').value;
-            renderBreukPage();
-            document.getElementById('breuk-date-select').value = currentValue;
+            document.getElementById('date-single-mode').style.display = mode === 'single' ? 'block' : 'none';
+            document.getElementById('date-range-mode').style.display = mode === 'range' ? 'flex' : 'none';
+            applyDateFilter();
         }
         
-        // ===== HISTORIEK =====
-        let historyRange = 7; // Default to 7 days
-        let customDateFrom = null;
-        let customDateTo = null;
-        
-        function setHistoryRange(range) {
-            historyRange = range;
-            // Update button states
-            document.querySelectorAll('.range-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.range == range);
-            });
-            
-            // Show/hide custom date inputs
-            const customDiv = document.getElementById('custom-date-range');
-            if (range === 'custom') {
-                customDiv.style.display = 'block';
-                // Set default dates if not set
-                if (!document.getElementById('history-date-from').value) {
-                    const fromDate = new Date();
-                    fromDate.setDate(fromDate.getDate() - 7);
-                    document.getElementById('history-date-from').value = formatDateISO(fromDate);
-                    document.getElementById('history-date-to').value = formatDateISO(new Date());
-                }
-                applyCustomDateRange();
-            } else {
-                customDiv.style.display = 'none';
-                renderHistoriek();
-            }
-        }
-        
-        function applyCustomDateRange() {
-            customDateFrom = document.getElementById('history-date-from').value;
-            customDateTo = document.getElementById('history-date-to').value;
+        function applyDateFilter() {
             renderHistoriek();
         }
         
         function getFilteredData() {
-            if (historyRange === 'all') return historicalData;
-            
-            if (historyRange === 'custom' && customDateFrom && customDateTo) {
-                return historicalData.filter(d => d.datum >= customDateFrom && d.datum <= customDateTo);
+            if (histDateMode === 'single') {
+                const val = document.getElementById('history-single-date').value;
+                if (!val) return historicalData; // no date selected = show all
+                return historicalData.filter(d => d.datum === val);
+            } else {
+                const from = document.getElementById('history-date-from').value;
+                const to = document.getElementById('history-date-to').value;
+                if (!from && !to) return historicalData;
+                return historicalData.filter(d => {
+                    if (from && d.datum < from) return false;
+                    if (to && d.datum > to) return false;
+                    return true;
+                });
             }
-            
-            const cutoff = new Date();
-            cutoff.setDate(cutoff.getDate() - historyRange);
-            const cutoffStr = formatDateISO(cutoff);
-            
-            return historicalData.filter(d => d.datum >= cutoffStr);
+        }
+        
+        function initHistoriekDates() {
+            // Set single date to today by default
+            const today = formatDateISO(new Date());
+            const singleInput = document.getElementById('history-single-date');
+            if (singleInput && !singleInput.value) {
+                singleInput.value = today;
+            }
         }
         
         function renderHistoriek() {
             const filteredData = getFilteredData();
             
-            let gebakken = 0, breuk = 0;
-            const stats = {};
-            PRODUCTS.forEach(p => stats[p.name] = { gebakken: 0, breuk: 0 });
+            // Calculate totals
+            let totalGebakken = 0;
+            let totalBreuk = 0;
+            
+            const productStats = {};
+            PRODUCTS.forEach(p => {
+                productStats[p.name] = { gebakken: 0, breuk: 0 };
+            });
             
             filteredData.forEach(d => {
-                const p = PRODUCTS.find(x => x.name === d.product);
-                if (p) {
-                    const stuks = d.totaal * p.ppp;
-                    stats[d.product].gebakken += stuks;
-                    stats[d.product].breuk += d.breuk || 0;
-                    gebakken += stuks;
-                    breuk += d.breuk || 0;
+                const product = PRODUCTS.find(p => p.name === d.product);
+                if (product) {
+                    const stuks = d.totaal * product.ppp;
+                    productStats[d.product].gebakken += stuks;
+                    productStats[d.product].breuk += d.breuk || 0;
+                    totalGebakken += stuks;
+                    totalBreuk += d.breuk || 0;
                 }
             });
             
-            // Calculate total omzet
-            let totalOmzet = 0;
-            PRODUCTS.forEach(p => {
-                const verkocht = stats[p.name].gebakken - stats[p.name].breuk;
-                const price = p.group === 'A' ? SETTINGS.priceA : SETTINGS.priceB;
-                stats[p.name].omzet = verkocht * price;
-                totalOmzet += stats[p.name].omzet;
-            });
+            document.getElementById('stat-gebakken').textContent = totalGebakken.toLocaleString();
+            document.getElementById('stat-breuk').textContent = totalBreuk.toLocaleString();
+            document.getElementById('stat-verkocht').textContent = (totalGebakken - totalBreuk).toLocaleString();
+            document.getElementById('stat-percentage').textContent = totalGebakken > 0 
+                ? (totalBreuk / totalGebakken * 100).toFixed(1) + '%' 
+                : '0%';
             
-            document.getElementById('stat-gebakken').textContent = gebakken.toLocaleString();
-            document.getElementById('stat-breuk').textContent = breuk.toLocaleString();
-            document.getElementById('stat-verkocht').textContent = (gebakken - breuk).toLocaleString();
-            document.getElementById('stat-percentage').textContent = gebakken > 0 ? (breuk / gebakken * 100).toFixed(1) + '%' : '0%';
-            document.getElementById('stat-omzet').textContent = '€' + totalOmzet.toFixed(2).replace('.', ',');
-            
-            // Week comparison - compare same weekdays
-            renderWeekComparison();
-            
-            document.getElementById('history-body').innerHTML = PRODUCTS.map(p => {
-                const s = stats[p.name];
-                const verkocht = s.gebakken - s.breuk;
-                const pct = s.gebakken > 0 ? (s.breuk / s.gebakken * 100).toFixed(1) : 0;
-                return `<tr><td>${p.name}</td><td>${s.gebakken}</td><td style="color:var(--accent-green)">${verkocht}</td><td style="color:var(--accent-green)">€${s.omzet.toFixed(2)}</td><td style="color:var(--accent-red)">${s.breuk}</td><td>${pct}%</td></tr>`;
-            }).join('');
-            
-            drawChart();
-        }
-        
-        function renderWeekComparison() {
-            const dayNames = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
-            const today = new Date();
+            // Table with group totals
+            const tbody = document.getElementById('history-body');
             let html = '';
             
-            // Helper function to get verkocht for a date
-            function getVerkocht(dateStr) {
-                const dayData = historicalData.filter(d => d.datum === dateStr);
-                let verkocht = 0;
-                dayData.forEach(d => {
-                    const p = PRODUCTS.find(x => x.name === d.product);
-                    if (p) {
-                        const stuks = d.totaal * p.ppp;
-                        verkocht += stuks - (d.breuk || 0);
-                    }
-                });
-                return verkocht;
-            }
+            // Group A - Pistolets
+            let groupAGebakken = 0, groupABreuk = 0;
+            PRODUCTS.filter(p => p.group === 'A').forEach(p => {
+                const stats = productStats[p.name];
+                groupAGebakken += stats.gebakken;
+                groupABreuk += stats.breuk;
+                const pct = stats.gebakken > 0 ? (stats.breuk / stats.gebakken * 100).toFixed(1) : 0;
+                html += '<tr><td>' + p.name + '</td><td>' + stats.gebakken + '</td><td style="color: var(--accent-red)">' + stats.breuk + '</td><td>' + pct + '%</td></tr>';
+            });
+            const groupAPct = groupAGebakken > 0 ? (groupABreuk / groupAGebakken * 100).toFixed(1) : 0;
+            html += '<tr class="group-total-row"><td>Totaal Pistolets</td><td>' + groupAGebakken + '</td><td style="color: var(--accent-red)">' + groupABreuk + '</td><td>' + groupAPct + '%</td></tr>';
             
-            // Show last 7 days and their week-over-week trends
-            for (let i = 6; i >= 0; i--) {
-                const baseDate = new Date(today);
-                baseDate.setDate(today.getDate() - i);
-                
-                const dayName = dayNames[baseDate.getDay()];
-                const dateLabel = `${dayName} ${baseDate.getDate()}/${baseDate.getMonth() + 1}`;
-                
-                html += `<tr><td>${dateLabel}</td>`;
-                
-                // W-1 = this week vs last week (week 0 vs week 1)
-                // W-2 = last week vs 2 weeks ago (week 1 vs week 2)
-                // W-3 = 2 weeks ago vs 3 weeks ago (week 2 vs week 3)
-                for (let w = 0; w < 3; w++) {
-                    const thisWeekDate = new Date(baseDate);
-                    thisWeekDate.setDate(baseDate.getDate() - (w * 7));
-                    const lastWeekDate = new Date(baseDate);
-                    lastWeekDate.setDate(baseDate.getDate() - ((w + 1) * 7));
-                    
-                    const thisVerkocht = getVerkocht(formatDateISO(thisWeekDate));
-                    const lastVerkocht = getVerkocht(formatDateISO(lastWeekDate));
-                    
-                    let diffStr = '-';
-                    let diffColor = 'var(--text-muted)';
-                    
-                    if (lastVerkocht > 0 && thisVerkocht > 0) {
-                        const diffPct = ((thisVerkocht - lastVerkocht) / lastVerkocht * 100);
-                        const arrow = diffPct > 0 ? '↑' : diffPct < 0 ? '↓' : '';
-                        diffStr = `${diffPct > 0 ? '+' : ''}${diffPct.toFixed(0)}%${arrow}`;
-                        diffColor = diffPct > 0 ? 'var(--accent-green)' : diffPct < 0 ? 'var(--accent-red)' : 'var(--text-secondary)';
-                    } else if (thisVerkocht > 0 && lastVerkocht === 0) {
-                        diffStr = 'nieuw';
-                        diffColor = 'var(--accent-blue)';
-                    }
-                    
-                    html += `<td style="color: ${diffColor}; font-weight: 500; font-size: 0.8rem;">${diffStr}</td>`;
-                }
-                
-                html += '</tr>';
-            }
+            // Group B - Stokbrood
+            let groupBGebakken = 0, groupBBreuk = 0;
+            PRODUCTS.filter(p => p.group === 'B').forEach(p => {
+                const stats = productStats[p.name];
+                groupBGebakken += stats.gebakken;
+                groupBBreuk += stats.breuk;
+                const pct = stats.gebakken > 0 ? (stats.breuk / stats.gebakken * 100).toFixed(1) : 0;
+                html += '<tr><td>' + p.name + '</td><td>' + stats.gebakken + '</td><td style="color: var(--accent-red)">' + stats.breuk + '</td><td>' + pct + '%</td></tr>';
+            });
+            const groupBPct = groupBGebakken > 0 ? (groupBBreuk / groupBGebakken * 100).toFixed(1) : 0;
+            html += '<tr class="group-total-row"><td>Totaal Stokbrood</td><td>' + groupBGebakken + '</td><td style="color: var(--accent-red)">' + groupBBreuk + '</td><td>' + groupBPct + '%</td></tr>';
             
-            document.getElementById('week-compare-body').innerHTML = html;
+            tbody.innerHTML = html;
+            
+            // Draw trend chart
+            drawTrendChart();
         }
         
-        function drawChart() {
+        function drawTrendChart() {
             const canvas = document.getElementById('chart-canvas');
             if (!canvas) return;
             
@@ -1624,445 +1789,514 @@
             canvas.height = rect.height * 2;
             ctx.scale(2, 2);
             
-            const width = rect.width, height = rect.height;
-            const pad = { top: 15, right: 10, bottom: 25, left: 35 };
+            const width = rect.width;
+            const height = rect.height;
+            const padding = { top: 20, right: 10, bottom: 30, left: 40 };
             
+            // Get filtered data grouped by date
             const filteredData = getFilteredData();
-            
-            // Get selected product filter
-            const selectedProduct = document.getElementById('chart-product-select')?.value || 'all';
-            const selectedProductName = selectedProduct !== 'all' 
-                ? PRODUCTS.find(p => p.id === selectedProduct)?.name 
-                : null;
-            
             const dates = [...new Set(filteredData.map(d => d.datum))].sort();
-            const daily = dates.map(date => {
-                const recs = filteredData.filter(d => d.datum === date);
-                let geb = 0, brk = 0;
-                recs.forEach(r => {
-                    // If a product is selected, only show that product
-                    if (selectedProductName && r.product !== selectedProductName) return;
-                    
-                    const p = PRODUCTS.find(x => x.name === r.product);
-                    if (p) { geb += r.totaal * p.ppp; brk += r.breuk || 0; }
+            
+            const dailyData = dates.map(date => {
+                const dayRecords = filteredData.filter(d => d.datum === date);
+                let gebakken = 0, breuk = 0;
+                dayRecords.forEach(r => {
+                    const product = PRODUCTS.find(p => p.name === r.product);
+                    if (product) {
+                        gebakken += r.totaal * product.ppp;
+                        breuk += r.breuk || 0;
+                    }
                 });
-                return { date, geb, brk };
+                return { date, gebakken, breuk };
             });
             
-            if (!daily.length) {
+            if (dailyData.length === 0) {
                 ctx.fillStyle = '#64748b';
-                ctx.font = '12px Plus Jakarta Sans';
+                ctx.font = '14px Plus Jakarta Sans';
                 ctx.textAlign = 'center';
-                ctx.fillText('Geen data', width/2, height/2);
+                ctx.fillText('Geen data beschikbaar', width/2, height/2);
                 return;
             }
             
-            const maxVal = Math.max(...daily.map(d => d.geb), 100);
+            const maxVal = Math.max(...dailyData.map(d => d.gebakken), 100);
+            
+            // Clear
             ctx.clearRect(0, 0, width, height);
             
-            // Grid
+            // Draw grid lines
             ctx.strokeStyle = '#334155';
             ctx.lineWidth = 1;
             for (let i = 0; i <= 4; i++) {
-                const y = pad.top + (height - pad.top - pad.bottom) * (i / 4);
-                ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(width - pad.right, y); ctx.stroke();
-                ctx.fillStyle = '#64748b';
-                ctx.font = '9px JetBrains Mono';
-                ctx.textAlign = 'right';
-                ctx.fillText(Math.round(maxVal * (1 - i/4)), pad.left - 4, y + 3);
-            }
-            
-            const chartW = width - pad.left - pad.right;
-            const chartH = height - pad.top - pad.bottom;
-            const spacing = chartW / Math.max(daily.length - 1, 1);
-            
-            // Lines
-            [[daily.map(d => d.geb), '#10b981'], [daily.map(d => d.brk), '#ef4444']].forEach(([vals, color]) => {
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 2;
+                const y = padding.top + (height - padding.top - padding.bottom) * (i / 4);
                 ctx.beginPath();
-                vals.forEach((v, i) => {
-                    const x = pad.left + i * spacing;
-                    const y = pad.top + chartH * (1 - v / maxVal);
-                    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-                });
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(width - padding.right, y);
                 ctx.stroke();
                 
-                ctx.fillStyle = color;
-                vals.forEach((v, i) => {
-                    const x = pad.left + i * spacing;
-                    const y = pad.top + chartH * (1 - v / maxVal);
-                    ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
-                });
+                // Y labels
+                ctx.fillStyle = '#64748b';
+                ctx.font = '10px JetBrains Mono';
+                ctx.textAlign = 'right';
+                ctx.fillText(Math.round(maxVal * (1 - i/4)), padding.left - 5, y + 3);
+            }
+            
+            // Draw lines
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+            const pointSpacing = chartWidth / Math.max(dailyData.length - 1, 1);
+            
+            // Gebakken line (green)
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            dailyData.forEach((d, i) => {
+                const x = padding.left + i * pointSpacing;
+                const y = padding.top + chartHeight * (1 - d.gebakken / maxVal);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            
+            // Gebakken dots
+            ctx.fillStyle = '#10b981';
+            dailyData.forEach((d, i) => {
+                const x = padding.left + i * pointSpacing;
+                const y = padding.top + chartHeight * (1 - d.gebakken / maxVal);
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.fill();
             });
             
-            // X labels
+            // Breuk line (red)
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            dailyData.forEach((d, i) => {
+                const x = padding.left + i * pointSpacing;
+                const y = padding.top + chartHeight * (1 - d.breuk / maxVal);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            
+            // Breuk dots
+            ctx.fillStyle = '#ef4444';
+            dailyData.forEach((d, i) => {
+                const x = padding.left + i * pointSpacing;
+                const y = padding.top + chartHeight * (1 - d.breuk / maxVal);
+                ctx.beginPath();
+                ctx.arc(x, y, 4, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            // X labels (dates)
             ctx.fillStyle = '#64748b';
-            ctx.font = '8px JetBrains Mono';
+            ctx.font = '9px JetBrains Mono';
             ctx.textAlign = 'center';
-            daily.forEach((d, i) => {
-                if (i % 2 === 0 || daily.length <= 7) {
-                    const x = pad.left + i * spacing;
-                    const dt = new Date(d.date);
-                    ctx.fillText(`${dt.getDate()}/${dt.getMonth()+1}`, x, height - 5);
+            dailyData.forEach((d, i) => {
+                if (i % 2 === 0 || dailyData.length <= 7) {
+                    const x = padding.left + i * pointSpacing;
+                    const dateObj = new Date(d.date);
+                    const label = `${dateObj.getDate()}/${dateObj.getMonth()+1}`;
+                    ctx.fillText(label, x, height - 8);
                 }
             });
         }
         
-        // ===== SETTINGS =====
         function renderSettings() {
-            // PPP settings
-            document.getElementById('ppp-settings').innerHTML = PRODUCTS.map(p => `
+            // Product drempels
+            const container = document.getElementById('product-settings-body');
+            container.innerHTML = PRODUCTS.map(p => `
+                <tr>
+                    <td style="font-size: 0.7rem;">${p.name}</td>
+                    <td><input type="number" style="max-width:40px" value="${p.bij0}" data-product="${p.id}" data-field="bij0" onchange="updateProductSetting(this)"></td>
+                    <td><input type="number" style="max-width:40px" value="${p.d1}" data-product="${p.id}" data-field="d1" onchange="updateProductSetting(this)"></td>
+                    <td><input type="number" style="max-width:40px" value="${p.d2}" data-product="${p.id}" data-field="d2" onchange="updateProductSetting(this)"></td>
+                    <td><input type="number" style="max-width:40px" value="${p.d3}" data-product="${p.id}" data-field="d3" onchange="updateProductSetting(this)"></td>
+                </tr>
+            `).join('');
+            
+            // Stuks per plaat (ppp)
+            const pppContainer = document.getElementById('ppp-settings-body');
+            pppContainer.innerHTML = PRODUCTS.map(p => `
                 <div class="setting-row">
                     <label style="font-size: 0.85rem;">${p.name}</label>
-                    <input type="number" value="${p.ppp}" data-id="${p.id}" data-field="ppp" onchange="updateProductSetting(this)" style="width: 50px;">
+                    <input type="number" style="width: 60px;" value="${p.ppp}" data-product="${p.id}" data-field="ppp" onchange="updateProductSetting(this)">
                 </div>
             `).join('');
             
-            // Drempel settings
-            document.getElementById('drempel-settings').innerHTML = PRODUCTS.map(p => `
-                <tr>
-                    <td style="font-size: 0.7rem;">${p.short}</td>
-                    <td><input type="number" value="${p.bij0}" data-id="${p.id}" data-field="bij0" onchange="updateProductSetting(this)" style="width: 32px;"></td>
-                    <td><input type="number" value="${p.d1}" data-id="${p.id}" data-field="d1" onchange="updateProductSetting(this)" style="width: 32px;"></td>
-                    <td><input type="number" value="${p.d2}" data-id="${p.id}" data-field="d2" onchange="updateProductSetting(this)" style="width: 32px;"></td>
-                    <td><input type="number" value="${p.d3}" data-id="${p.id}" data-field="d3" onchange="updateProductSetting(this)" style="width: 32px;"></td>
-                </tr>
-            `).join('');
+            // Load Supabase settings (show hardcoded or localStorage values)
+            const supabaseUrl = localStorage.getItem('supabase_url') || SUPABASE_URL;
+            const supabaseKey = localStorage.getItem('supabase_key') || SUPABASE_KEY;
+            document.getElementById('setting-supabase-url').value = supabaseUrl;
+            document.getElementById('setting-supabase-key').value = supabaseKey;
+            
+            updateDbStatusIndicator(supabase !== null);
         }
         
-        function updateProductSetting(input) {
-            const id = input.dataset.id;
-            const field = input.dataset.field;
-            const value = parseInt(input.value) || 0;
-            const product = PRODUCTS.find(p => p.id === id);
-            if (product) {
-                product[field] = value;
-                localStorage.setItem('bakkerij_products', JSON.stringify(PRODUCTS));
-                showToast('⚙️ Instelling opgeslagen');
+        function toggleDatabaseSettings() {
+            const settings = document.getElementById('database-settings');
+            const arrow = document.getElementById('db-toggle-arrow');
+            if (settings.style.display === 'none') {
+                settings.style.display = 'block';
+                arrow.textContent = 'â–²';
+            } else {
+                settings.style.display = 'none';
+                arrow.textContent = 'â–¼';
             }
         }
         
-        function saveCapacitySettings() {
+        function updateDbStatusIndicator(connected) {
+            const indicator = document.getElementById('db-status-indicator');
+            if (indicator) {
+                indicator.style.background = connected ? 'var(--accent-green)' : 'var(--accent-red)';
+            }
+        }
+        
+        function updateProductSetting(input) {
+            const productId = input.dataset.product;
+            const field = input.dataset.field;
+            const value = parseInt(input.value) || 0;
+            const product = PRODUCTS.find(p => p.id === productId);
+            if (product) {
+                product[field] = value;
+                localStorage.setItem('bakkerij_products', JSON.stringify(PRODUCTS));
+                showToast('âš™ï¸ Instelling opgeslagen');
+            }
+        }
+        
+        // ===== SUPABASE CONFIG (hardcoded for easy sharing) =====
+        const SUPABASE_URL = 'https://ukkvaewmnedznviqnotr.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVra3ZhZXdtbmVkem52aXFub3RyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyODY5NjMsImV4cCI6MjA4MDg2Mjk2M30.J_2OPImNOrrBlwjztqRmUS7Qs9Y3RF1qT6D9x4-C5UE';
+        let supabase = null;
+        
+        async function testSupabaseConnection() {
+            const url = document.getElementById('setting-supabase-url').value.trim();
+            const key = document.getElementById('setting-supabase-key').value.trim();
+            const statusEl = document.getElementById('supabase-status');
+            
+            if (!url || !key) {
+                statusEl.innerHTML = 'ðŸ”´ Vul URL en Key in';
+                statusEl.style.color = 'var(--accent-red)';
+                return;
+            }
+            
+            statusEl.innerHTML = 'ðŸ”„ Testen...';
+            statusEl.style.color = 'var(--accent-blue)';
+            
+            try {
+                // Initialize Supabase client
+                supabase = window.supabase.createClient(url, key);
+                
+                // Test connection by trying to select from planning_data
+                const { data, error } = await supabase.from('planning_data').select('id').limit(1);
+                
+                if (error) {
+                    // Table might not exist, try to give helpful error
+                    if (error.message.includes('does not exist')) {
+                        statusEl.innerHTML = 'ðŸ”´ Tabel niet gevonden - maak eerst de tabellen';
+                        statusEl.style.color = 'var(--accent-red)';
+                    } else {
+                        statusEl.innerHTML = 'ðŸ”´ Fout: ' + error.message.substring(0, 30);
+                        statusEl.style.color = 'var(--accent-red)';
+                    }
+                    return;
+                }
+                
+                // Success!
+                localStorage.setItem('supabase_url', url);
+                localStorage.setItem('supabase_key', key);
+                statusEl.innerHTML = 'ðŸŸ¢ Verbonden!';
+                statusEl.style.color = 'var(--accent-green)';
+                updateDbStatusIndicator(true);
+                showToast('âœ… Supabase verbonden!');
+                
+                // Sync data
+                await syncToSupabase();
+                
+            } catch (err) {
+                statusEl.innerHTML = 'ðŸ”´ Connectie mislukt';
+                statusEl.style.color = 'var(--accent-red)';
+                console.error(err);
+            }
+        }
+        
+        async function syncToSupabase() {
+            if (!supabase) return;
+            
+            try {
+                // Upload local data to Supabase
+                for (const record of historicalData) {
+                    const { error } = await supabase.from('planning_data').upsert({
+                        datum: record.datum,
+                        product: record.product,
+                        totaal: record.totaal,
+                        l1: record.l1,
+                        l2: record.l2,
+                        l3: record.l3,
+                        l4: record.l4,
+                        l5: record.l5,
+                        breuk: record.breuk,
+                        event: record.event
+                    }, { onConflict: 'datum,product' });
+                    
+                    if (error) console.error('Sync error:', error);
+                }
+                
+                showToast('â˜ï¸ Data gesynchroniseerd');
+            } catch (err) {
+                console.error('Sync failed:', err);
+            }
+        }
+        
+        async function loadFromSupabase() {
+            if (!supabase) return false;
+            
+            try {
+                const { data, error } = await supabase
+                    .from('planning_data')
+                    .select('*')
+                    .order('datum', { ascending: false });
+                
+                if (error) throw error;
+                
+                if (data && data.length > 0) {
+                    historicalData = data;
+                    localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
+                    return true;
+                }
+            } catch (err) {
+                console.error('Load from Supabase failed:', err);
+            }
+            return false;
+        }
+        
+        async function initSupabase() {
+            // Use hardcoded credentials (or override from localStorage if set)
+            const url = localStorage.getItem('supabase_url') || SUPABASE_URL;
+            const key = localStorage.getItem('supabase_key') || SUPABASE_KEY;
+            
+            if (url && key && window.supabase) {
+                try {
+                    supabase = window.supabase.createClient(url, key);
+                    
+                    // Test connection
+                    const { error } = await supabase.from('planning_data').select('id').limit(1);
+                    if (!error) {
+                        updateDbStatusIndicator(true);
+                        // Load fresh data from cloud
+                        await loadFromSupabase();
+                    }
+                } catch (err) {
+                    console.error('Supabase init failed:', err);
+                }
+            }
+        }
+        
+        function saveSettings() {
             SETTINGS.oven1Max = parseInt(document.getElementById('setting-oven1').value) || 16;
             SETTINGS.oven2Max = parseInt(document.getElementById('setting-oven2').value) || 15;
             SETTINGS.batchMax = parseInt(document.getElementById('setting-batch-max').value) || 31;
             SETTINGS.skipBInL2 = document.getElementById('setting-skip-b').checked;
             localStorage.setItem('bakkerij_settings', JSON.stringify(SETTINGS));
-            planningData = {}; // Reset manual overrides so new settings apply
             renderPlanning();
-            showToast('⚙️ Capaciteit opgeslagen');
+            showToast('âš™ï¸ Instellingen opgeslagen');
         }
         
-        function savePriceSettings() {
-            SETTINGS.priceA = parseFloat(document.getElementById('setting-price-a').value) || 0.69;
-            SETTINGS.priceB = parseFloat(document.getElementById('setting-price-b').value) || 1.59;
-            // Update product prices
-            PRODUCTS.forEach(p => {
-                p.price = p.group === 'A' ? SETTINGS.priceA : SETTINGS.priceB;
-            });
-            localStorage.setItem('bakkerij_settings', JSON.stringify(SETTINGS));
-            showToast('💰 Prijzen opgeslagen');
+        // ===== EVENT HANDLERS =====
+        function changeDate(delta) {
+            currentDate.setDate(currentDate.getDate() + delta);
+            planningData = {}; // Reset manual changes
+            updateHeader();
+            renderPlanning();
         }
         
-        // ===== SAVE =====
+        function updatePlanning(input) {
+            const productId = input.dataset.product;
+            const field = input.dataset.field;
+            const value = parseInt(input.value) || 0;
+            
+            if (!planningData[productId]) {
+                planningData[productId] = {};
+            }
+            planningData[productId][field] = value;
+            
+            // Recalculate totals display
+            renderPlanning();
+        }
+        
         function savePlanning() {
             const dateStr = formatDateISO(currentDate);
             const event = document.getElementById('event-select').value;
-            const weather = document.getElementById('weather-badge').innerHTML;
-            const note = planningData._note || '';
             
+            // Remove existing data for this date
             historicalData = historicalData.filter(d => d.datum !== dateStr);
             
+            // Add new data
+            const newRecords = [];
             PRODUCTS.forEach(p => {
-                const row = document.querySelector(`input[data-id="${p.id}"]`).closest('tr');
+                const inputs = document.querySelectorAll(`input[data-product="${p.id}"]`);
                 const data = {
-                    datum: dateStr, product: p.name, event, weather, note,
-                    totaal: parseInt(row.querySelector('[data-field="totaal"]').value) || 0,
-                    l1: parseInt(row.querySelector('[data-field="l1"]').value) || 0,
-                    l2: parseInt(row.querySelector('[data-field="l2"]').value) || 0,
-                    l3: parseInt(row.querySelector('[data-field="l3"]').value) || 0,
-                    l4: parseInt(row.querySelector('[data-field="l4"]').value) || 0,
-                    l5: parseInt(row.querySelector('[data-field="l5"]').value) || 0,
-                    breuk: null
+                    datum: dateStr,
+                    product: p.name,
+                    totaal: 0,
+                    l1: 0, l2: 0, l3: 0, l4: 0, l5: 0,
+                    breuk: null,
+                    event: event
                 };
+                
+                inputs.forEach(input => {
+                    const field = input.dataset.field;
+                    data[field] = parseInt(input.value) || 0;
+                });
+                data.totaal = data.finaal || data.l1 + data.l2 + data.l3 + data.l4 + data.l5;
+                
                 historicalData.push(data);
+                newRecords.push(data);
             });
             
+            // Sort by date
             historicalData.sort((a, b) => b.datum.localeCompare(a.datum));
+            
+            // Save to localStorage
             localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
-            if (supabaseClient) syncToSupabase();
-            markSaved();
-            showToast(`✅ Planning voor ${formatDate(currentDate)} opgeslagen!`);
+            
+            // Sync to Supabase if connected
+            if (supabase) {
+                newRecords.forEach(async (record) => {
+                    await supabase.from('planning_data').upsert({
+                        datum: record.datum,
+                        product: record.product,
+                        totaal: record.totaal,
+                        l1: record.l1,
+                        l2: record.l2,
+                        l3: record.l3,
+                        l4: record.l4,
+                        l5: record.l5,
+                        breuk: record.breuk,
+                        event: record.event
+                    }, { onConflict: 'datum,product' });
+                });
+            }
+            
+            showToast(`âœ… Planning voor ${formatDate(currentDate)} opgeslagen!`);
+            
+            // Update breuk page
             renderBreukPage();
         }
         
-        function changeDate(delta) {
-            // Warn if unsaved changes
-            if (hasUnsavedChanges) {
-                if (!confirm('⚠️ Je hebt niet-opgeslagen wijzigingen!\n\nWil je toch doorgaan?')) {
-                    return;
-                }
-            }
+        function saveBreuk() {
+            const dateStr = document.getElementById('breuk-date-select').value;
+            const inputs = document.querySelectorAll('#breuk-grid input');
             
-            currentDate.setDate(currentDate.getDate() + delta);
-            planningData = {};
-            hasUnsavedChanges = false;
-            updateHeader();
-            renderPlanning();
-            updateWeather();
-        }
-        
-        // ===== WEATHER =====
-        // Herent/Leuven, Belgium coordinates
-        const WEATHER_LAT = 50.9069;
-        const WEATHER_LON = 4.6725;
-        let weatherCache = {};
-        
-        async function updateWeather() {
-            const dateStr = formatDateISO(currentDate);
-            const badge = document.getElementById('weather-badge');
-            
-            // Reset snow warning
-            badge.classList.remove('snow-warning');
-            
-            // Check if we have saved weather for this date
-            const savedDayData = historicalData.filter(d => d.datum === dateStr);
-            if (savedDayData.length > 0 && savedDayData[0].weather) {
-                badge.innerHTML = savedDayData[0].weather;
-                checkSnowWarning(savedDayData[0].weather);
-                return;
-            }
-            
-            // Check cache
-            if (weatherCache[dateStr]) {
-                badge.innerHTML = weatherCache[dateStr];
-                checkSnowWarning(weatherCache[dateStr]);
-                return;
-            }
-            
-            // Only fetch for dates within forecast range (16 days)
-            const today = new Date();
-            const diffDays = Math.ceil((currentDate - today) / (1000 * 60 * 60 * 24));
-            
-            if (diffDays < -1 || diffDays > 14) {
-                badge.innerHTML = '📅 --';
-                badge.title = 'Geen weerdata beschikbaar';
-                return;
-            }
-            
-            badge.innerHTML = '⏳';
-            
-            try {
-                const response = await fetch(
-                    `https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_LAT}&longitude=${WEATHER_LON}&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe/Brussels&start_date=${dateStr}&end_date=${dateStr}`
-                );
-                const data = await response.json();
+            inputs.forEach(input => {
+                const productName = input.dataset.product;
+                const breuk = parseInt(input.value) || 0;
                 
-                if (data.daily && data.daily.weather_code) {
-                    const code = data.daily.weather_code[0];
-                    const maxTemp = Math.round(data.daily.temperature_2m_max[0]);
-                    const minTemp = Math.round(data.daily.temperature_2m_min[0]);
-                    const icon = getWeatherIcon(code);
-                    const weatherStr = `${icon} ${maxTemp}°`;
+                const record = historicalData.find(d => d.datum === dateStr && d.product === productName);
+                if (record) {
+                    record.breuk = breuk;
                     
-                    badge.innerHTML = weatherStr;
-                    badge.title = `${getWeatherDescription(code)} (${minTemp}°-${maxTemp}°)`;
-                    weatherCache[dateStr] = weatherStr;
-                    
-                    // Check for snow (codes 71-77, 85-86)
-                    if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) {
-                        checkSnowWarning(weatherStr);
+                    // Sync to Supabase if connected
+                    if (supabase) {
+                        supabase.from('planning_data').upsert({
+                            datum: record.datum,
+                            product: record.product,
+                            totaal: record.totaal,
+                            l1: record.l1,
+                            l2: record.l2,
+                            l3: record.l3,
+                            l4: record.l4,
+                            l5: record.l5,
+                            breuk: record.breuk,
+                            event: record.event
+                        }, { onConflict: 'datum,product' });
                     }
-                } else {
-                    badge.innerHTML = '❓';
                 }
-            } catch (e) {
-                badge.innerHTML = '❌';
-                badge.title = 'Weer ophalen mislukt';
-            }
-        }
-        
-        let snowDismissed = {};
-        
-        function checkSnowWarning(weatherStr) {
-            const dateStr = formatDateISO(currentDate);
-            const badge = document.getElementById('weather-badge');
+            });
             
-            // Check if contains snow emoji
-            if (weatherStr.includes('❄️') || weatherStr.includes('🌨️')) {
-                if (!snowDismissed[dateStr]) {
-                    badge.classList.add('snow-warning');
-                }
-            }
-        }
-        
-        function dismissSnowWarning() {
-            const dateStr = formatDateISO(currentDate);
-            const badge = document.getElementById('weather-badge');
+            // Save to localStorage
+            localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
             
-            if (badge.classList.contains('snow-warning')) {
-                badge.classList.remove('snow-warning');
-                snowDismissed[dateStr] = true;
-                showToast('❄️ Sneeuw waarschuwing gezien');
-            }
-        }
-        
-        function getWeatherIcon(code) {
-            // WMO Weather codes: https://open-meteo.com/en/docs
-            if (code === 0) return '☀️'; // Clear
-            if (code <= 3) return '⛅'; // Partly cloudy
-            if (code <= 49) return '🌫️'; // Fog
-            if (code <= 59) return '🌧️'; // Drizzle
-            if (code <= 69) return '🌧️'; // Rain
-            if (code <= 79) return '❄️'; // Snow
-            if (code <= 84) return '🌧️'; // Rain showers
-            if (code <= 86) return '🌨️'; // Snow showers
-            if (code >= 95) return '⛈️'; // Thunderstorm
-            return '🌥️';
-        }
-        
-        function getWeatherDescription(code) {
-            if (code === 0) return 'Helder';
-            if (code <= 3) return 'Gedeeltelijk bewolkt';
-            if (code <= 49) return 'Mist';
-            if (code <= 59) return 'Motregen';
-            if (code <= 69) return 'Regen';
-            if (code <= 79) return 'Sneeuw';
-            if (code <= 84) return 'Regenbuien';
-            if (code <= 86) return 'Sneeuwbuien';
-            if (code >= 95) return 'Onweer';
-            return 'Bewolkt';
-        }
-        
-        // ===== SUPABASE =====
-        async function initSupabase() {
-            if (!window.supabase) {
-                document.getElementById('db-status').textContent = '🔴 Supabase library niet geladen';
-                return;
-            }
+            showToast(`âœ… Breuk opgeslagen!`);
             
-            try {
-                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                const { error } = await supabaseClient.from('planning_data').select('id').limit(1);
-                
-                if (error) {
-                    document.getElementById('db-status').textContent = '🔴 ' + error.message.substring(0, 40);
-                } else {
-                    document.getElementById('db-status').textContent = '🟢 Verbonden met cloud';
-                    await loadFromSupabase();
-                }
-            } catch (e) {
-                document.getElementById('db-status').textContent = '🔴 Connectie mislukt';
-            }
+            // Refresh historiek
+            renderHistoriek();
         }
         
-        async function loadFromSupabase() {
-            if (!supabaseClient) return;
-            const { data } = await supabaseClient.from('planning_data').select('*').order('datum', { ascending: false });
-            if (data?.length) {
-                // Merge with localStorage to preserve fields that might not be in Supabase
-                const localData = JSON.parse(localStorage.getItem('bakkerij_data') || '[]');
-                
-                // Create a map of local data for quick lookup
-                const localMap = {};
-                localData.forEach(rec => {
-                    localMap[`${rec.datum}-${rec.product}`] = rec;
-                });
-                
-                // Merge: use Supabase data but preserve local weather/note if Supabase doesn't have them
-                historicalData = data.map(rec => {
-                    const localRec = localMap[`${rec.datum}-${rec.product}`];
-                    return {
-                        ...rec,
-                        weather: rec.weather || localRec?.weather,
-                        note: rec.note || localRec?.note
-                    };
-                });
-                
-                localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
-                renderPlanning();
-            }
-        }
-        
-        async function syncToSupabase() {
-            if (!supabaseClient) return;
-            for (const rec of historicalData) {
-                await supabaseClient.from('planning_data').upsert({
-                    datum: rec.datum, product: rec.product, totaal: rec.totaal,
-                    l1: rec.l1, l2: rec.l2, l3: rec.l3, l4: rec.l4, l5: rec.l5,
-                    breuk: rec.breuk, event: rec.event, weather: rec.weather, note: rec.note
-                }, { onConflict: 'datum,product' });
-            }
-        }
-        
-        // ===== TABS =====
+        // ===== TAB NAVIGATION =====
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', () => {
                 document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
                 document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                
                 tab.classList.add('active');
                 document.getElementById(`page-${tab.dataset.page}`).classList.add('active');
                 
+                // Render page content
                 if (tab.dataset.page === 'breuk') renderBreukPage();
                 if (tab.dataset.page === 'historiek') renderHistoriek();
                 if (tab.dataset.page === 'instellingen') renderSettings();
             });
         });
         
-        // ===== INIT =====
+        // ===== SETTINGS HANDLERS =====
+        document.getElementById('setting-skip-b').addEventListener('change', (e) => {
+            SETTINGS.skipBInL2 = e.target.checked;
+            renderPlanning();
+        });
+        
+        // ===== INITIALIZATION =====
         async function init() {
-            // Load historical data
+            // Load from localStorage if available
             const saved = localStorage.getItem('bakkerij_data');
-            historicalData = saved ? JSON.parse(saved) : [...INITIAL_DATA];
+            if (saved) {
+                try {
+                    historicalData = JSON.parse(saved);
+                } catch (e) {
+                    console.error('Failed to load saved data');
+                }
+            }
             
-            // Load settings
+            // Load saved settings
             const savedSettings = localStorage.getItem('bakkerij_settings');
-            if (savedSettings) SETTINGS = { ...SETTINGS, ...JSON.parse(savedSettings) };
+            if (savedSettings) {
+                try {
+                    const s = JSON.parse(savedSettings);
+                    SETTINGS = { ...SETTINGS, ...s };
+                } catch (e) {}
+            }
             
-            // Load product settings (ppp, drempels)
+            // Load saved product drempels and ppp
             const savedProducts = localStorage.getItem('bakkerij_products');
             if (savedProducts) {
-                const prods = JSON.parse(savedProducts);
-                prods.forEach(saved => {
-                    const p = PRODUCTS.find(x => x.id === saved.id);
-                    if (p) {
-                        p.ppp = saved.ppp ?? p.ppp;
-                        p.bij0 = saved.bij0 ?? p.bij0;
-                        p.d1 = saved.d1 ?? p.d1;
-                        p.d2 = saved.d2 ?? p.d2;
-                        p.d3 = saved.d3 ?? p.d3;
-                    }
-                });
+                try {
+                    const p = JSON.parse(savedProducts);
+                    p.forEach(saved => {
+                        const prod = PRODUCTS.find(x => x.id === saved.id);
+                        if (prod) {
+                            prod.bij0 = saved.bij0 ?? prod.bij0;
+                            prod.d1 = saved.d1 ?? prod.d1;
+                            prod.d2 = saved.d2 ?? prod.d2;
+                            prod.d3 = saved.d3 ?? prod.d3;
+                            prod.ppp = saved.ppp ?? prod.ppp;
+                        }
+                    });
+                } catch (e) {}
             }
             
-            // Auto-set date to next unsaved date
-            const savedDates = [...new Set(historicalData.map(d => d.datum))].sort();
-            if (savedDates.length > 0) {
-                // Find the last saved date and go to next day
-                const lastSaved = new Date(savedDates[savedDates.length - 1]);
-                lastSaved.setDate(lastSaved.getDate() + 1);
-                currentDate = lastSaved;
-            } else {
-                currentDate = new Date();
-            }
-            
+            // Apply settings to UI
             document.getElementById('setting-oven1').value = SETTINGS.oven1Max;
             document.getElementById('setting-oven2').value = SETTINGS.oven2Max;
             document.getElementById('setting-batch-max').value = SETTINGS.batchMax;
             document.getElementById('setting-skip-b').checked = SETTINGS.skipBInL2;
-            document.getElementById('setting-price-a').value = SETTINGS.priceA || 0.69;
-            document.getElementById('setting-price-b').value = SETTINGS.priceB || 1.59;
             
-            // Update product prices from settings
-            PRODUCTS.forEach(p => {
-                p.price = p.group === 'A' ? SETTINGS.priceA : SETTINGS.priceB;
-            });
+            // Initialize Supabase if configured
+            await initSupabase();
             
             updateHeader();
             renderPlanning();
-            updateWeather();
-            await initSupabase();
+            initHistoriekDates();
         }
         
         init();
