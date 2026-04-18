@@ -236,6 +236,11 @@
         }
         
         .planning-table .total-row { background: var(--bg-card); font-weight: 600; }
+        .planning-table .total-row td.cell-over-capacity {
+            background: var(--accent-red);
+            color: white;
+            font-weight: 700;
+        }
         
         .planning-table input {
             width: 34px; padding: 5px 2px;
@@ -1010,14 +1015,16 @@
                 el.textContent = total;
                 el.parentElement.className = 'lading-item' + (total > SETTINGS.batchMax ? ' danger' : total > 25 ? ' warning' : '');
             }
-            
+
+            applyGroupTotalWarnings();
+
             // Update save button state based on whether viewing saved data
             if (hasSavedData && !hasUnsavedChanges) {
                 markViewingSaved();
             } else if (!hasSavedData && !hasUnsavedChanges) {
                 markDefault();
             }
-            
+
             renderReference();
         }
         
@@ -1180,6 +1187,7 @@
                     cells[7].textContent = totals.l5;
                 }
             });
+            applyGroupTotalWarnings();
         }
         
         function updateLadingTotals() {
@@ -1192,6 +1200,40 @@
                 el.textContent = total;
                 el.parentElement.className = 'lading-item' + (total > SETTINGS.batchMax ? ' danger' : total > 25 ? ' warning' : '');
             }
+        }
+
+        function applyGroupTotalWarnings() {
+            // Read each group's batch totals from the total row cells.
+            // Cell layout: [0]label [1]sug [2]totaal [3]L1 [4]L2 [5]L3 [6]L4 [7]L5
+            const groupTotals = { A: [0,0,0,0,0], B: [0,0,0,0,0] };
+            ['A','B'].forEach(g => {
+                const body = document.getElementById(`group-${g.toLowerCase()}-body`);
+                const totalRow = body?.querySelector('.total-row');
+                if (!totalRow) return;
+                const cells = totalRow.querySelectorAll('td');
+                for (let i = 0; i < 5; i++) {
+                    groupTotals[g][i] = parseInt(cells[3 + i]?.textContent) || 0;
+                }
+            });
+
+            // A group sharing a batch with the other group is limited to its own oven.
+            // A group alone in a batch can use both ovens (batchMax).
+            ['A','B'].forEach(g => {
+                const other = g === 'A' ? 'B' : 'A';
+                const ownOven = g === 'A' ? SETTINGS.oven1Max : SETTINGS.oven2Max;
+                const body = document.getElementById(`group-${g.toLowerCase()}-body`);
+                const totalRow = body?.querySelector('.total-row');
+                if (!totalRow) return;
+                const cells = totalRow.querySelectorAll('td');
+                for (let i = 0; i < 5; i++) {
+                    const thisVal = groupTotals[g][i];
+                    const otherVal = groupTotals[other][i];
+                    const max = otherVal > 0 ? ownOven : SETTINGS.batchMax;
+                    const cell = cells[3 + i];
+                    if (thisVal > max) cell.classList.add('cell-over-capacity');
+                    else cell.classList.remove('cell-over-capacity');
+                }
+            });
         }
         
         // ===== COLLAPSIBLE & REFERENCE =====
@@ -1414,7 +1456,8 @@
         function renderBreukPage() {
             const select = document.getElementById('breuk-date-select');
             const dates = [...new Set(historicalData.map(d => d.datum))].sort().reverse();
-            select.innerHTML = dates.slice(0, 14).map(d => {
+            const last14 = dates.slice(0, 14);
+            select.innerHTML = last14.map(d => {
                 const dt = new Date(d);
                 // Check if any product has breuk filled (not null) for this date
                 const dayData = historicalData.filter(rec => rec.datum === d);
@@ -1422,6 +1465,16 @@
                 const checkmark = hasBreuk ? ' ✅' : '';
                 return `<option value="${d}">${formatDate(dt)} (${getDayName(dt)})${checkmark}</option>`;
             }).join('');
+
+            // Auto-select oldest unfilled day in last 14 (catch up missed days first)
+            const unfilled = last14.filter(d => {
+                const dayData = historicalData.filter(rec => rec.datum === d);
+                return !dayData.some(rec => rec.breuk !== null && rec.breuk !== undefined);
+            });
+            if (unfilled.length > 0) {
+                select.value = unfilled[unfilled.length - 1];
+            }
+
             loadBreukData();
         }
         
@@ -1447,12 +1500,22 @@
             });
             localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
             if (supabaseClient) syncToSupabase();
-            showToast('✅ Breuk opgeslagen!');
-            
-            // Refresh dropdown to show checkmark
-            const currentValue = document.getElementById('breuk-date-select').value;
+
+            // Rebuild dropdown (updates ✅ checkmarks), then try to advance to next calendar day
             renderBreukPage();
-            document.getElementById('breuk-date-select').value = currentValue;
+            const select = document.getElementById('breuk-date-select');
+            const nextDay = new Date(dateStr);
+            nextDay.setDate(nextDay.getDate() + 1);
+            const nextDayStr = formatDateISO(nextDay);
+            const optionValues = [...select.options].map(o => o.value);
+            if (optionValues.includes(nextDayStr)) {
+                select.value = nextDayStr;
+                loadBreukData();
+                const nd = new Date(nextDayStr);
+                showToast(`✅ Opgeslagen — nu ${formatDate(nd)} (${getDayName(nd)})`);
+            } else {
+                showToast('✅ Breuk opgeslagen!');
+            }
         }
         
         // ===== HISTORIEK =====
