@@ -942,30 +942,51 @@
                 }
             });
             
-            // Weekend optimization: move small remainders from late batches
+            // Weekend optimization: move small remainders from late batches.
+            // Must respect single-oven limit per group when both groups share a batch.
             if (weekend) {
+                const batchGroupTotals = (idx) => {
+                    let a = 0, b = 0;
+                    PRODUCTS.forEach(p => {
+                        if (p.group === 'A') a += displayData[p.id].batches[idx];
+                        else b += displayData[p.id].batches[idx];
+                    });
+                    return { a, b };
+                };
+
                 const combinedTotals = [0, 0, 0, 0, 0];
                 PRODUCTS.forEach(p => {
                     for (let i = 0; i < 5; i++) {
                         combinedTotals[i] += displayData[p.id].batches[i];
                     }
                 });
-                
+
                 for (let late = 4; late >= 2; late--) {
                     if (combinedTotals[late] > 0 && combinedTotals[late] <= 3) {
+                        const lateG = batchGroupTotals(late);
                         for (let early = 0; early < late; early++) {
+                            const earlyG = batchGroupTotals(early);
                             const room = batchMax - combinedTotals[early];
-                            if (room >= combinedTotals[late]) {
-                                PRODUCTS.forEach(p => {
-                                    if (displayData[p.id].batches[late] > 0) {
-                                        displayData[p.id].batches[early] += displayData[p.id].batches[late];
-                                        displayData[p.id].batches[late] = 0;
-                                    }
-                                });
-                                combinedTotals[early] += combinedTotals[late];
-                                combinedTotals[late] = 0;
-                                break;
+                            if (room < combinedTotals[late]) continue;
+
+                            // If both groups would share this batch, neither group may
+                            // exceed its own oven capacity.
+                            const newA = earlyG.a + lateG.a;
+                            const newB = earlyG.b + lateG.b;
+                            if (newA > 0 && newB > 0) {
+                                if (newA > SETTINGS.oven1Max) continue;
+                                if (newB > SETTINGS.oven2Max) continue;
                             }
+
+                            PRODUCTS.forEach(p => {
+                                if (displayData[p.id].batches[late] > 0) {
+                                    displayData[p.id].batches[early] += displayData[p.id].batches[late];
+                                    displayData[p.id].batches[late] = 0;
+                                }
+                            });
+                            combinedTotals[early] += combinedTotals[late];
+                            combinedTotals[late] = 0;
+                            break;
                         }
                     }
                 }
@@ -1013,7 +1034,7 @@
                 });
                 const el = document.getElementById(`lading-l${i}`);
                 el.textContent = total;
-                el.parentElement.className = 'lading-item' + (total > SETTINGS.batchMax ? ' danger' : total > 25 ? ' warning' : '');
+                el.parentElement.className = 'lading-item' + (total > SETTINGS.batchMax ? ' danger' : total > SETTINGS.batchMax * 0.8 ? ' warning' : '');
             }
 
             applyGroupTotalWarnings();
@@ -1198,7 +1219,7 @@
                 });
                 const el = document.getElementById(`lading-l${i}`);
                 el.textContent = total;
-                el.parentElement.className = 'lading-item' + (total > SETTINGS.batchMax ? ' danger' : total > 25 ? ' warning' : '');
+                el.parentElement.className = 'lading-item' + (total > SETTINGS.batchMax ? ' danger' : total > SETTINGS.batchMax * 0.8 ? ' warning' : '');
             }
         }
 
@@ -1868,19 +1889,20 @@
         }
         
         function changeDate(delta) {
-            // Warn if unsaved changes
+            const doChange = () => {
+                currentDate.setDate(currentDate.getDate() + delta);
+                planningData = {};
+                hasUnsavedChanges = false;
+                updateHeader();
+                renderPlanning();
+                updateWeather();
+            };
+
             if (hasUnsavedChanges) {
-                if (!confirm('⚠️ Je hebt niet-opgeslagen wijzigingen!\n\nWil je toch doorgaan?')) {
-                    return;
-                }
+                showModal('⚠️ Niet-opgeslagen wijzigingen. Toch doorgaan?', doChange);
+            } else {
+                doChange();
             }
-            
-            currentDate.setDate(currentDate.getDate() + delta);
-            planningData = {};
-            hasUnsavedChanges = false;
-            updateHeader();
-            renderPlanning();
-            updateWeather();
         }
         
         // ===== WEATHER =====
