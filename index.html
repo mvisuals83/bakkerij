@@ -402,6 +402,7 @@
     <nav class="tabs">
         <button class="tab active" data-page="planning">Planning</button>
         <button class="tab" data-page="breuk">Breuk</button>
+        <button class="tab" data-page="bestelling">Bestelling</button>
         <button class="tab" data-page="historiek">Historiek</button>
         <button class="tab" data-page="instellingen">Instelling</button>
     </nav>
@@ -499,7 +500,34 @@
             <div class="breuk-grid" id="breuk-grid"></div>
             <button class="breuk-save-btn" onclick="saveBreuk()">✅ Breuk Opslaan</button>
         </div>
-        
+
+        <div class="page" id="page-bestelling">
+            <div class="settings-section">
+                <h3>📦 Bestelling Berekening</h3>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Aanbevolen minimum per doos om tot volgende levering te geraken.</p>
+                <div class="setting-row">
+                    <label>Basis</label>
+                    <select id="bestelling-basis" onchange="saveOrderSettings()" style="flex:1; max-width: 180px;">
+                        <option value="last7">Laatste 7 dagen</option>
+                        <option value="avg4weeks">Gemiddelde 4 weken</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <label>Buffer %</label>
+                    <input type="number" id="bestelling-buffer" value="10" onchange="saveOrderSettings()" style="width: 70px;">
+                </div>
+            </div>
+            <div class="settings-section">
+                <h3>Aanbevolen order</h3>
+                <div class="table-wrapper">
+                    <table class="planning-table" style="min-width: 300px;">
+                        <thead><tr><th>Product</th><th>Stuks/week</th><th>+ Buffer</th><th>Per doos</th><th>Dozen</th></tr></thead>
+                        <tbody id="bestelling-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <div class="page" id="page-historiek">
             <div class="settings-section" style="margin-bottom: 12px;">
                 <div style="display: flex; gap: 4px; margin-bottom: 10px;">
@@ -604,6 +632,11 @@
                         <tbody id="drempel-settings"></tbody>
                     </table>
                 </div>
+            </div>
+            <div class="settings-section">
+                <h3>📦 Dozen (stuks per doos)</h3>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Aantal stuks per leveringsdoos — gebruikt in Bestelling berekening.</p>
+                <div id="box-size-settings"></div>
             </div>
             <div class="settings-section" style="margin-top: 20px; opacity: 0.7;">
                 <h3>☁️ Database Status</h3>
@@ -1879,6 +1912,17 @@
                 </div>
             `).join('');
             
+            // Box size settings
+            const boxEl = document.getElementById('box-size-settings');
+            if (boxEl) {
+                boxEl.innerHTML = PRODUCTS.map(p => `
+                    <div class="setting-row">
+                        <label style="font-size: 0.85rem;">${p.name}</label>
+                        <input type="number" value="${p.boxSize || 0}" data-id="${p.id}" data-field="boxSize" onchange="updateBoxSize(this)" style="width: 60px;">
+                    </div>
+                `).join('');
+            }
+
             // Drempel settings
             document.getElementById('drempel-settings').innerHTML = PRODUCTS.map(p => `
                 <tr>
@@ -1914,6 +1958,77 @@
             planningData = {}; // Reset manual overrides so new settings apply
             renderPlanning();
             showToast('⚙️ Capaciteit opgeslagen');
+        }
+
+        function updateBoxSize(input) {
+            const id = input.dataset.id;
+            const value = parseInt(input.value) || 0;
+            const product = PRODUCTS.find(p => p.id === id);
+            if (product) {
+                product.boxSize = value;
+                localStorage.setItem('bakkerij_products', JSON.stringify(PRODUCTS));
+                saveCloudSetting('products', productsToCloudConfig());
+                showToast('📦 Doos opgeslagen');
+            }
+        }
+
+        function saveOrderSettings() {
+            const basis = document.getElementById('bestelling-basis').value;
+            const buffer = parseInt(document.getElementById('bestelling-buffer').value);
+            SETTINGS.orderBasis = basis;
+            SETTINGS.orderBufferPct = isNaN(buffer) ? 10 : Math.max(0, buffer);
+            localStorage.setItem('bakkerij_settings', JSON.stringify(SETTINGS));
+            saveCloudSetting('app', SETTINGS);
+            renderBestelling();
+        }
+
+        function renderBestelling() {
+            const basisEl  = document.getElementById('bestelling-basis');
+            const bufferEl = document.getElementById('bestelling-buffer');
+            if (!basisEl || !bufferEl) return;
+
+            // Reflect current settings in the inputs
+            basisEl.value  = SETTINGS.orderBasis || 'last7';
+            bufferEl.value = SETTINGS.orderBufferPct ?? 10;
+
+            const basis = basisEl.value;
+            const bufferPct = parseInt(bufferEl.value) || 0;
+            const bufferMult = 1 + bufferPct / 100;
+
+            // Collect records in the chosen window
+            const days = basis === 'last7' ? 7 : 28;
+            const cutoff = new Date();
+            cutoff.setHours(0, 0, 0, 0);
+            cutoff.setDate(cutoff.getDate() - days);
+            const todayStr = formatDateISO(new Date());
+
+            let html = '';
+            PRODUCTS.forEach(p => {
+                // Sum gebakken stuks in window, skipping out-of-stock days
+                const myRecs = historicalData.filter(r =>
+                    r.product === p.name &&
+                    !r.out_of_stock &&
+                    r.datum <= todayStr &&
+                    new Date(r.datum) >= cutoff
+                );
+                const stuksInWindow = myRecs.reduce((s, r) => s + (r.totaal || 0) * p.ppp, 0);
+                // Normalize to per-week (7 days)
+                const weeklyStuks = basis === 'last7' ? stuksInWindow : stuksInWindow / 4;
+                const withBuffer = Math.ceil(weeklyStuks * bufferMult);
+                const boxSize = p.boxSize || 0;
+                const boxes = boxSize > 0 ? Math.ceil(withBuffer / boxSize) : '—';
+                const boxesHtml = boxSize > 0
+                    ? `<td style="color: var(--accent-cyan); font-weight: 700; font-size: 1.1rem;">${boxes}</td>`
+                    : `<td style="color: var(--text-muted); font-size: 0.75rem;" title="Stel eerst dooshoeveelheid in via Instelling">—</td>`;
+                html += `<tr>
+                    <td>${p.short}</td>
+                    <td>${Math.round(weeklyStuks)}</td>
+                    <td>${withBuffer}</td>
+                    <td style="color: var(--text-muted);">${boxSize || '—'}</td>
+                    ${boxesHtml}
+                </tr>`;
+            });
+            document.getElementById('bestelling-body').innerHTML = html;
         }
 
         function savePriceSettings() {
@@ -2231,6 +2346,7 @@
                 document.getElementById(`page-${tab.dataset.page}`).classList.add('active');
                 
                 if (tab.dataset.page === 'breuk') renderBreukPage();
+                if (tab.dataset.page === 'bestelling') renderBestelling();
                 if (tab.dataset.page === 'historiek') renderHistoriek();
                 if (tab.dataset.page === 'instellingen') renderSettings();
             });
