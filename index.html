@@ -236,6 +236,14 @@
         }
         
         .planning-table .total-row { background: var(--bg-card); font-weight: 600; }
+        .planning-table tr.product-row-oos td { opacity: 0.4; }
+        .planning-table tr.product-row-oos td.product-name-cell { opacity: 0.7; text-decoration: line-through; }
+        .planning-table tr.product-row-oos input { background: transparent; color: var(--text-muted); }
+        .planning-table td.product-name-cell { cursor: pointer; user-select: none; }
+        .planning-table td.product-name-cell:hover { color: var(--accent-cyan); }
+        .oos-badge { display: inline-block; font-size: 0.6rem; padding: 1px 5px; margin-left: 4px; background: var(--accent-red); color: white; border-radius: 3px; vertical-align: middle; font-weight: 600; letter-spacing: 0.3px; opacity: 1 !important; }
+        .breuk-item.oos { opacity: 0.45; }
+        .breuk-item.oos input { color: var(--text-muted); }
         .planning-table .total-row td.cell-over-capacity {
             background: var(--accent-red);
             color: white;
@@ -691,18 +699,22 @@
         }
         
         function calculateSuggestion(product) {
-            const lastWeek = getSameWeekdayData(currentDate, 1).find(d => d.product === product.name);
-            if (!lastWeek) return 1;
-            
-            let sug = lastWeek.totaal;
-            const breuk = lastWeek.breuk || 0;
-            
-            if (breuk === 0) sug += product.bij0;
-            else if (breuk > product.d3) sug -= 3;
-            else if (breuk > product.d2) sug -= 2;
-            else if (breuk > product.d1) sug -= 1;
-            
-            return Math.max(1, sug);
+            // Walk back up to 4 weeks, skipping days this product was out of stock
+            // (those days' breuk=0 is meaningless — there was nothing to sell).
+            for (let weeks = 1; weeks <= 4; weeks++) {
+                const rec = getSameWeekdayData(currentDate, weeks).find(d => d.product === product.name);
+                if (!rec) continue;
+                if (rec.out_of_stock) continue;
+
+                let sug = rec.totaal;
+                const breuk = rec.breuk || 0;
+                if (breuk === 0) sug += product.bij0;
+                else if (breuk > product.d3) sug -= 3;
+                else if (breuk > product.d2) sug -= 2;
+                else if (breuk > product.d1) sug -= 1;
+                return Math.max(1, sug);
+            }
+            return 1;
         }
         
         function getGroupBatchLimits(isGroupA, isWeekendDay, skipL2) {
@@ -842,7 +854,26 @@
                 const sug = calculateSuggestion(p);
                 const savedRecord = savedDayData.find(d => d.product === p.name);
                 const sessionEdit = planningData[p.id];
-                
+
+                // Determine out-of-stock state: session edit wins over saved data
+                let outOfStock = false;
+                if (sessionEdit && sessionEdit.outOfStock !== undefined) {
+                    outOfStock = !!sessionEdit.outOfStock;
+                } else if (savedRecord?.out_of_stock) {
+                    outOfStock = true;
+                }
+
+                // Out-of-stock pins totaal + all batches to 0
+                if (outOfStock) {
+                    displayData[p.id] = {
+                        sug,
+                        totaal: 0,
+                        batches: [0, 0, 0, 0, 0],
+                        outOfStock: true
+                    };
+                    return;
+                }
+
                 // Priority: 1) Current session edits, 2) Saved data, 3) Suggestion
                 if (sessionEdit && sessionEdit.totaal !== undefined) {
                     // User edited in this session
@@ -1002,20 +1033,24 @@
                 
                 products.forEach(p => {
                     const data = displayData[p.id];
-                    
+                    const oos = !!data.outOfStock;
+                    const ro = oos ? 'readonly' : '';
+
                     totals.sug += data.sug;
                     totals.totaal += data.totaal;
                     for (let i = 0; i < 5; i++) totals[`l${i+1}`] += data.batches[i];
-                    
-                    html += `<tr>
-                        <td>${p.short}</td>
+
+                    const nameCell = `<td class="product-name-cell" onclick="toggleOutOfStock('${p.id}')" title="Klik om uit/in voorraad te zetten">${p.short}${oos ? '<span class="oos-badge">UIT</span>' : ''}</td>`;
+
+                    html += `<tr class="${oos ? 'product-row-oos' : ''}">
+                        ${nameCell}
                         <td class="sug-value">${data.sug}</td>
-                        <td class="totaal-col"><input type="number" value="${data.totaal}" data-id="${p.id}" data-field="totaal" onchange="onInput(this)"></td>
-                        <td><input type="number" value="${data.batches[0]}" data-id="${p.id}" data-field="l1" onchange="onInput(this)"></td>
-                        <td><input type="number" value="${data.batches[1]}" data-id="${p.id}" data-field="l2" onchange="onInput(this)"></td>
-                        <td><input type="number" value="${data.batches[2]}" data-id="${p.id}" data-field="l3" onchange="onInput(this)"></td>
-                        <td><input type="number" value="${data.batches[3]}" data-id="${p.id}" data-field="l4" onchange="onInput(this)"></td>
-                        <td><input type="number" value="${data.batches[4]}" data-id="${p.id}" data-field="l5" onchange="onInput(this)"></td>
+                        <td class="totaal-col"><input type="number" value="${data.totaal}" data-id="${p.id}" data-field="totaal" onchange="onInput(this)" ${ro}></td>
+                        <td><input type="number" value="${data.batches[0]}" data-id="${p.id}" data-field="l1" onchange="onInput(this)" ${ro}></td>
+                        <td><input type="number" value="${data.batches[1]}" data-id="${p.id}" data-field="l2" onchange="onInput(this)" ${ro}></td>
+                        <td><input type="number" value="${data.batches[2]}" data-id="${p.id}" data-field="l3" onchange="onInput(this)" ${ro}></td>
+                        <td><input type="number" value="${data.batches[3]}" data-id="${p.id}" data-field="l4" onchange="onInput(this)" ${ro}></td>
+                        <td><input type="number" value="${data.batches[4]}" data-id="${p.id}" data-field="l5" onchange="onInput(this)" ${ro}></td>
                     </tr>`;
                 });
                 
@@ -1098,11 +1133,16 @@
                 html += `<tr><td>${p.short}</td>`;
                 for (let w = 1; w <= 3; w++) {
                     const data = getSameWeekdayData(currentDate, w).find(d => d.product === p.name);
-                    const totaal = data?.totaal || 0;
-                    const breuk = data?.breuk ?? '-';
-                    weekTotals[w-1] += totaal;
-                    if (typeof breuk === 'number') weekBreuk[w-1] += breuk;
-                    html += `<td>${totaal}</td><td class="breuk">${breuk}</td>`;
+                    if (data?.out_of_stock) {
+                        // Out of stock that day — don't count in totals, show clear marker
+                        html += `<td colspan="2" style="text-align:center; color: var(--accent-red); font-size: 0.75rem;" title="Uit voorraad">UIT</td>`;
+                    } else {
+                        const totaal = data?.totaal || 0;
+                        const breuk = data?.breuk ?? '-';
+                        weekTotals[w-1] += totaal;
+                        if (typeof breuk === 'number') weekBreuk[w-1] += breuk;
+                        html += `<td>${totaal}</td><td class="breuk">${breuk}</td>`;
+                    }
                 }
                 html += '</tr>';
             });
@@ -1134,6 +1174,28 @@
             updateNoteButton();
         }
         
+        function toggleOutOfStock(productId) {
+            const product = PRODUCTS.find(p => p.id === productId);
+            if (!product) return;
+            const dateStr = formatDateISO(currentDate);
+            const savedRecord = historicalData.find(d => d.datum === dateStr && d.product === product.name);
+
+            // Resolve current state: session edit wins over saved data
+            const sessionVal = planningData[productId]?.outOfStock;
+            const currentlyOos = (sessionVal !== undefined) ? !!sessionVal : !!savedRecord?.out_of_stock;
+            const newState = !currentlyOos;
+
+            if (newState) {
+                // Going out of stock — pin to 0, remember via session override
+                planningData[productId] = { totaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0, outOfStock: true };
+            } else {
+                // Coming back in stock — clear any pinning; suggestion will fill in
+                delete planningData[productId];
+            }
+            markUnsaved();
+            renderPlanning();
+        }
+
         function onInput(input) {
             const id = input.dataset.id;
             const field = input.dataset.field;
@@ -1505,6 +1567,13 @@
             
             document.getElementById('breuk-grid').innerHTML = PRODUCTS.map(p => {
                 const data = dayData.find(d => d.product === p.name);
+                if (data?.out_of_stock) {
+                    return `<div class="breuk-item oos">
+                        <div><div class="product-name">${p.name}</div>
+                        <div class="product-baked">Uit voorraad — geen breuk</div></div>
+                        <input type="number" value="0" data-product="${p.name}" data-oos="1" disabled>
+                    </div>`;
+                }
                 return `<div class="breuk-item">
                     <div><div class="product-name">${p.name}</div>
                     <div class="product-baked">Gebakken: ${data?.totaal || 0} platen</div></div>
@@ -1515,7 +1584,7 @@
         
         function saveBreuk() {
             const dateStr = document.getElementById('breuk-date-select').value;
-            document.querySelectorAll('#breuk-grid input').forEach(inp => {
+            document.querySelectorAll('#breuk-grid input:not([data-oos])').forEach(inp => {
                 const rec = historicalData.find(d => d.datum === dateStr && d.product === inp.dataset.product);
                 if (rec) rec.breuk = parseInt(inp.value) || 0;
             });
@@ -1871,6 +1940,7 @@
             
             PRODUCTS.forEach(p => {
                 const row = document.querySelector(`input[data-id="${p.id}"]`).closest('tr');
+                const oos = row.classList.contains('product-row-oos');
                 const data = {
                     datum: dateStr, product: p.name, event, weather, note,
                     totaal: parseInt(row.querySelector('[data-field="totaal"]').value) || 0,
@@ -1879,7 +1949,8 @@
                     l3: parseInt(row.querySelector('[data-field="l3"]').value) || 0,
                     l4: parseInt(row.querySelector('[data-field="l4"]').value) || 0,
                     l5: parseInt(row.querySelector('[data-field="l5"]').value) || 0,
-                    breuk: null
+                    breuk: null,
+                    out_of_stock: oos
                 };
                 historicalData.push(data);
             });
@@ -2088,7 +2159,8 @@
                 await supabaseClient.from('planning_data').upsert({
                     datum: rec.datum, product: rec.product, totaal: rec.totaal,
                     l1: rec.l1, l2: rec.l2, l3: rec.l3, l4: rec.l4, l5: rec.l5,
-                    breuk: rec.breuk, event: rec.event, weather: rec.weather, note: rec.note
+                    breuk: rec.breuk, event: rec.event, weather: rec.weather, note: rec.note,
+                    out_of_stock: !!rec.out_of_stock
                 }, { onConflict: 'datum,product' });
             }
         }
