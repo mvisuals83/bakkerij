@@ -608,10 +608,19 @@
                 <div class="setting-row"><label>Batch max</label><input type="number" id="setting-batch-max" value="31" onchange="saveCapacitySettings()"></div>
             </div>
             <div class="settings-section">
-                <h3>🔥 Weekend Strategie</h3>
-                <div class="setting-row">
-                    <label>Skip Groep B in L2</label>
-                    <label class="toggle"><input type="checkbox" id="setting-skip-b" checked onchange="saveCapacitySettings()"><span class="toggle-slider"></span></label>
+                <h3>🔥 Weekend Strategie — Skip Groep B</h3>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Wanneer Groep B wordt geskipt in een batch, krijgt Groep A daar ~2× volume. Volume van Groep B verschuift naar de niet-geskipte batches.</p>
+                <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 130px;">
+                        <div style="font-weight: 600; margin-bottom: 6px;">Zaterdag</div>
+                        <div class="setting-row"><label>Skip L2</label><label class="toggle"><input type="checkbox" id="skip-sat-l2" onchange="saveSkipBSettings()"><span class="toggle-slider"></span></label></div>
+                        <div class="setting-row"><label>Skip L3</label><label class="toggle"><input type="checkbox" id="skip-sat-l3" onchange="saveSkipBSettings()"><span class="toggle-slider"></span></label></div>
+                    </div>
+                    <div style="flex: 1; min-width: 130px;">
+                        <div style="font-weight: 600; margin-bottom: 6px;">Zondag</div>
+                        <div class="setting-row"><label>Skip L2</label><label class="toggle"><input type="checkbox" id="skip-sun-l2" onchange="saveSkipBSettings()"><span class="toggle-slider"></span></label></div>
+                        <div class="setting-row"><label>Skip L3</label><label class="toggle"><input type="checkbox" id="skip-sun-l3" onchange="saveSkipBSettings()"><span class="toggle-slider"></span></label></div>
+                    </div>
                 </div>
             </div>
             <div class="settings-section">
@@ -689,7 +698,14 @@
             { id: 'stokbrood_bruin', name: 'stokbrood bruin', short: 'Stok. bruin', group: 'B', ppp: 4, bij0: 1, d1: 12, d2: 24, d3: 36, price: 1.59 }
         ];
         
-        let SETTINGS = { oven1Max: 16, oven2Max: 15, batchMax: 31, skipBInL2: true, priceA: 0.69, priceB: 1.59 };
+        let SETTINGS = {
+            oven1Max: 16, oven2Max: 15, batchMax: 31,
+            // skipB: per-day list of batch numbers (1-5) where Group B is skipped.
+            // Flexible by design — adding new batches or weekday entries needs no code changes
+            // beyond the UI. e.g. { sat:[2,3], sun:[2,3,4], mon:[] } would all just work.
+            skipB: { sat: [2], sun: [2] },
+            priceA: 0.69, priceB: 1.59
+        };
         let currentDate = new Date();
         let planningData = {};
         let historicalData = [];
@@ -750,19 +766,33 @@
             return 1;
         }
         
-        function getGroupBatchLimits(isGroupA, isWeekendDay, skipL2) {
-            // Returns max plates per batch for a group
+        // Returns array of batch numbers (1-based) where Group B is skipped on the given date.
+        // Reads SETTINGS.skipB by weekday key. Empty array on weekdays.
+        function getSkipBBatches(date) {
+            if (!isWeekend(date)) return [];
+            const day = date.getDay(); // 0=Sun, 6=Sat
+            const key = day === 6 ? 'sat' : day === 0 ? 'sun' : null;
+            if (!key) return [];
+            const arr = SETTINGS.skipB?.[key];
+            return Array.isArray(arr) ? arr : [];
+        }
+
+        function getGroupBatchLimits(isGroupA, isWeekendDay, skipBatches) {
+            // Returns max plates per batch for a group on a weekend day.
+            // skipBatches = list of 1-based batch numbers where Group B is skipped.
             if (!isWeekendDay) {
                 // Weekday: 2 batches only, split evenly
                 return [50, 50, 0, 0, 0]; // High limits, will be constrained by totaal
             }
-            
+            const skip = (b) => skipBatches.includes(b);
             if (isGroupA) {
-                // Group A weekend: L1=14, L2=26 (extra when B skips), L3-L5=14
-                return [14, skipL2 ? 26 : 14, 14, 14, 14];
+                // When B is skipped in a batch, A gets ~2× volume there (uses both ovens).
+                return [1,2,3,4,5].map(b => skip(b) ? 26 : 14);
             } else {
-                // Group B weekend: L1=12, L2=0 (skip), L3-L5=13
-                return [12, 0, 13, 13, 10];
+                // Group B base targets per batch: spread across the day.
+                // Skipped batch → 0 (volume falls into adjacent non-skipped batches).
+                const base = [12, 13, 13, 13, 10];
+                return base.map((cap, i) => skip(i + 1) ? 0 : cap);
             }
         }
         
@@ -856,7 +886,7 @@
         
         function renderPlanning() {
             const weekend = isWeekend(currentDate);
-            const skipL2 = SETTINGS.skipBInL2;
+            const skipBatches = getSkipBBatches(currentDate);
             const batchMax = SETTINGS.batchMax;
             const dateStr = formatDateISO(currentDate);
             
@@ -957,7 +987,7 @@
                     needsCalc.forEach(p => {
                         const tot = displayData[p.id].totaal;
                         if (weekend) {
-                            const limits = isGroupA ? [14, 26, 14, 14, 14] : [12, 0, 13, 13, 10];
+                            const limits = getGroupBatchLimits(isGroupA, true, skipBatches);
                             displayData[p.id].batches = distributeSimple(tot, limits);
                         } else {
                             const l1 = Math.ceil(tot / 2);
@@ -974,7 +1004,7 @@
                     });
                     
                     if (weekend) {
-                        const limits = getGroupBatchLimits(isGroupA, weekend, skipL2);
+                        const limits = getGroupBatchLimits(isGroupA, weekend, skipBatches);
                         const groupBatches = distributeGroupToBatches(groupTotaal, limits);
                         const productBatches = distributeProductsInBatches(products, groupBatches, productTotals, groupTotaal);
                         products.forEach(p => {
@@ -1375,15 +1405,21 @@
             
             // Build table
             let html = `<table class="ref-table">
-                <thead><tr><th>Product</th><th class="totaal-col">Totaal</th><th>L1</th><th>L2</th><th>L3</th><th>L4</th><th>L5</th></tr></thead>
+                <thead><tr><th>Product</th><th class="totaal-col">Totaal</th><th>Breuk</th><th>L1</th><th>L2</th><th>L3</th><th>L4</th><th>L5</th></tr></thead>
                 <tbody>`;
-            
+
             PRODUCTS.forEach(p => {
                 const data = dayData.find(d => d.product === p.name);
                 if (data) {
+                    if (data.out_of_stock) {
+                        html += `<tr><td>${p.short}</td><td colspan="7" style="text-align:center; color: var(--accent-red); font-size: 0.75rem;">UIT VOORRAAD</td></tr>`;
+                        return;
+                    }
+                    const breuk = (data.breuk === null || data.breuk === undefined) ? '-' : data.breuk;
                     html += `<tr>
                         <td>${p.short}</td>
                         <td class="totaal-col">${data.totaal || 0}</td>
+                        <td class="breuk">${breuk}</td>
                         <td>${data.l1 || 0}</td>
                         <td>${data.l2 || 0}</td>
                         <td>${data.l3 || 0}</td>
@@ -1952,12 +1988,61 @@
             SETTINGS.oven1Max = parseInt(document.getElementById('setting-oven1').value) || 16;
             SETTINGS.oven2Max = parseInt(document.getElementById('setting-oven2').value) || 15;
             SETTINGS.batchMax = parseInt(document.getElementById('setting-batch-max').value) || 31;
-            SETTINGS.skipBInL2 = document.getElementById('setting-skip-b').checked;
             localStorage.setItem('bakkerij_settings', JSON.stringify(SETTINGS));
             saveCloudSetting('app', SETTINGS);
             planningData = {}; // Reset manual overrides so new settings apply
             renderPlanning();
             showToast('⚙️ Capaciteit opgeslagen');
+        }
+
+        // Brings older SETTINGS shapes up to current. Idempotent — safe to call repeatedly.
+        function migrateSettings() {
+            // Legacy: skipBInL2 boolean → skipB { sat:[2], sun:[2] } (or empty when off)
+            if (!SETTINGS.skipB || typeof SETTINGS.skipB !== 'object') {
+                const legacyOn = SETTINGS.skipBInL2 !== false; // default true if unset
+                SETTINGS.skipB = {
+                    sat: legacyOn ? [2] : [],
+                    sun: legacyOn ? [2] : []
+                };
+            }
+            if (!Array.isArray(SETTINGS.skipB.sat)) SETTINGS.skipB.sat = [];
+            if (!Array.isArray(SETTINGS.skipB.sun)) SETTINGS.skipB.sun = [];
+            // Legacy field is no longer authoritative
+            if ('skipBInL2' in SETTINGS) delete SETTINGS.skipBInL2;
+        }
+
+        function saveSkipBSettings() {
+            // Read every skip-<day>-l<batch> checkbox in the DOM and rebuild SETTINGS.skipB.
+            // Generic over days and batches, so adding more in the HTML auto-flows here.
+            const newSkipB = {};
+            document.querySelectorAll('input[id^="skip-"][type="checkbox"]').forEach(cb => {
+                const m = cb.id.match(/^skip-([a-z]+)-l(\d+)$/);
+                if (!m) return;
+                const day = m[1];
+                const batch = parseInt(m[2]);
+                if (!newSkipB[day]) newSkipB[day] = [];
+                if (cb.checked) newSkipB[day].push(batch);
+            });
+            // Sort each list ascending for deterministic output
+            Object.values(newSkipB).forEach(arr => arr.sort((a, b) => a - b));
+            SETTINGS.skipB = newSkipB;
+            delete SETTINGS.skipBInL2; // legacy field, no longer used
+            localStorage.setItem('bakkerij_settings', JSON.stringify(SETTINGS));
+            saveCloudSetting('app', SETTINGS);
+            planningData = {};
+            renderPlanning();
+            showToast('🔥 Skip Groep B opgeslagen');
+        }
+
+        // Sets all skip-<day>-l<batch> checkboxes from current SETTINGS.skipB.
+        function applySkipBToInputs() {
+            document.querySelectorAll('input[id^="skip-"][type="checkbox"]').forEach(cb => {
+                const m = cb.id.match(/^skip-([a-z]+)-l(\d+)$/);
+                if (!m) return;
+                const day = m[1];
+                const batch = parseInt(m[2]);
+                cb.checked = !!SETTINGS.skipB?.[day]?.includes(batch);
+            });
         }
 
         function updateBoxSize(input) {
@@ -2051,8 +2136,15 @@
             const weather = document.getElementById('weather-badge').innerHTML;
             const note = planningData._note || '';
             
+            // Snapshot existing breuk per product so a re-save of past planning
+            // doesn't wipe breuk that was filled in afterwards.
+            const existingBreuk = {};
+            historicalData.filter(d => d.datum === dateStr).forEach(rec => {
+                existingBreuk[rec.product] = rec.breuk;
+            });
+
             historicalData = historicalData.filter(d => d.datum !== dateStr);
-            
+
             PRODUCTS.forEach(p => {
                 const row = document.querySelector(`input[data-id="${p.id}"]`).closest('tr');
                 const oos = row.classList.contains('product-row-oos');
@@ -2064,7 +2156,7 @@
                     l3: parseInt(row.querySelector('[data-field="l3"]').value) || 0,
                     l4: parseInt(row.querySelector('[data-field="l4"]').value) || 0,
                     l5: parseInt(row.querySelector('[data-field="l5"]').value) || 0,
-                    breuk: null,
+                    breuk: oos ? null : (existingBreuk[p.name] ?? null),
                     out_of_stock: oos
                 };
                 historicalData.push(data);
@@ -2307,12 +2399,13 @@
                 }
                 // Reflect new values in Instellingen inputs if they're already in the DOM
                 const el = id => document.getElementById(id);
+                migrateSettings();
                 if (el('setting-oven1'))     el('setting-oven1').value   = SETTINGS.oven1Max;
                 if (el('setting-oven2'))     el('setting-oven2').value   = SETTINGS.oven2Max;
                 if (el('setting-batch-max')) el('setting-batch-max').value = SETTINGS.batchMax;
-                if (el('setting-skip-b'))    el('setting-skip-b').checked  = !!SETTINGS.skipBInL2;
                 if (el('setting-price-a'))   el('setting-price-a').value = SETTINGS.priceA ?? 0.69;
                 if (el('setting-price-b'))   el('setting-price-b').value = SETTINGS.priceB ?? 1.59;
+                applySkipBToInputs();
             } catch (e) {
                 console.warn('Cloud settings load failed — using local', e);
             }
@@ -2378,23 +2471,25 @@
                 });
             }
             
-            // Auto-set date to next unsaved date
-            const savedDates = [...new Set(historicalData.map(d => d.datum))].sort();
-            if (savedDates.length > 0) {
-                // Find the last saved date and go to next day
-                const lastSaved = new Date(savedDates[savedDates.length - 1]);
-                lastSaved.setDate(lastSaved.getDate() + 1);
-                currentDate = lastSaved;
-            } else {
-                currentDate = new Date();
+            // Auto-set date to first unsaved day starting from today.
+            // Walks forward (never backward) so a forgotten old gap or a
+            // future date saved-in-advance by a colleague can't pull the
+            // app to the wrong day. Capped at 60 days as a safety stop.
+            const savedSet = new Set(historicalData.map(d => d.datum));
+            const probe = new Date();
+            probe.setHours(0, 0, 0, 0);
+            for (let i = 0; i < 60 && savedSet.has(formatDateISO(probe)); i++) {
+                probe.setDate(probe.getDate() + 1);
             }
+            currentDate = probe;
             
+            migrateSettings();
             document.getElementById('setting-oven1').value = SETTINGS.oven1Max;
             document.getElementById('setting-oven2').value = SETTINGS.oven2Max;
             document.getElementById('setting-batch-max').value = SETTINGS.batchMax;
-            document.getElementById('setting-skip-b').checked = SETTINGS.skipBInL2;
             document.getElementById('setting-price-a').value = SETTINGS.priceA || 0.69;
             document.getElementById('setting-price-b').value = SETTINGS.priceB || 1.59;
+            applySkipBToInputs();
             
             // Update product prices from settings
             PRODUCTS.forEach(p => {
