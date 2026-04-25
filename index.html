@@ -312,6 +312,7 @@
         .ref-table td { padding: 6px 4px; text-align: center; border-bottom: 1px solid var(--border-light); font-family: var(--font-mono); color: var(--text-primary); }
         .ref-table td:first-child { text-align: left; font-family: var(--font-sans); }
         .ref-table td.totaal-col { color: var(--accent-cyan); font-weight: 600; }
+        .ref-table td.breuk { color: var(--accent-red); font-weight: 600; }
         
         .modal-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -779,20 +780,18 @@
 
         function getGroupBatchLimits(isGroupA, isWeekendDay, skipBatches) {
             // Returns max plates per batch for a group on a weekend day.
-            // skipBatches = list of 1-based batch numbers where Group B is skipped.
+            // Caps are driven by SETTINGS so changing oven sizes flows through automatically.
+            //   - Skipped batch: that group is alone, can use both ovens → batchMax
+            //   - Shared batch (both groups present): each group capped to its own oven
+            //   - For B in a skipped batch: 0 (B is the one being skipped)
             if (!isWeekendDay) {
-                // Weekday: 2 batches only, split evenly
-                return [50, 50, 0, 0, 0]; // High limits, will be constrained by totaal
+                return [50, 50, 0, 0, 0]; // Weekday: per-product split, no group cap needed
             }
             const skip = (b) => skipBatches.includes(b);
             if (isGroupA) {
-                // When B is skipped in a batch, A gets ~2× volume there (uses both ovens).
-                return [1,2,3,4,5].map(b => skip(b) ? 26 : 14);
+                return [1,2,3,4,5].map(b => skip(b) ? SETTINGS.batchMax : SETTINGS.oven1Max);
             } else {
-                // Group B base targets per batch: spread across the day.
-                // Skipped batch → 0 (volume falls into adjacent non-skipped batches).
-                const base = [12, 13, 13, 13, 10];
-                return base.map((cap, i) => skip(i + 1) ? 0 : cap);
+                return [1,2,3,4,5].map(b => skip(b) ? 0 : SETTINGS.oven2Max);
             }
         }
         
@@ -1020,6 +1019,41 @@
                 }
             });
             
+            // Weekday: rebalance group L1 if per-product Math.ceil pushed it past the
+            // group's own oven cap. Multiple odd-totaal products each contribute a +1
+            // ceiling, so 4 odd products in Group A yields L1 sum that can exceed
+            // oven1Max. Shift L1 → L2 from non-priority products until the sum fits.
+            // Constraints:
+            //   - Pistolet wit is the best-seller and stays in L1 (priority skip).
+            //   - Never reduce a product's L1 to 0 — that empties it for the morning;
+            //     L2 only bakes for noon. So require L1 > 1 before a shift.
+            //   - If only the priority product has slack, shift from it as a last resort.
+            if (!weekend) {
+                ['A', 'B'].forEach(group => {
+                    const products = PRODUCTS.filter(p => p.group === group);
+                    const cap = group === 'A' ? SETTINGS.oven1Max : SETTINGS.oven2Max;
+                    let sumL1 = products.reduce((s, p) => s + (displayData[p.id].batches[0] || 0), 0);
+                    let safety = 50; // can't realistically need more shifts than this
+                    while (sumL1 > cap && safety-- > 0) {
+                        // Prefer non-priority candidates with L1 > 1
+                        let candidates = products.filter(p =>
+                            p.id !== 'pistolet_wit' && displayData[p.id].batches[0] > 1
+                        );
+                        // Fallback: priority itself, if everything else is at minimum
+                        if (candidates.length === 0) {
+                            candidates = products.filter(p => displayData[p.id].batches[0] > 1);
+                        }
+                        if (candidates.length === 0) break; // nothing left to shift
+                        // Pick the product with the largest L1 (most room to give)
+                        candidates.sort((a, b) => displayData[b.id].batches[0] - displayData[a.id].batches[0]);
+                        const pick = candidates[0];
+                        displayData[pick.id].batches[0]--;
+                        displayData[pick.id].batches[1]++;
+                        sumL1--;
+                    }
+                });
+            }
+
             // Fix rounding errors: ensure batches sum to totaal
             PRODUCTS.forEach(p => {
                 const data = displayData[p.id];
