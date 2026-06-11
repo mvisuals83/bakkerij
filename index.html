@@ -262,8 +262,6 @@
         .planning-table .sug-value {
             color: var(--text-secondary); font-family: var(--font-mono); font-size: 0.85rem;
         }
-        .sug-badge { font-size: 0.6rem; margin-left: 2px; vertical-align: super; }
-
         /* Breuk invoer: waarschuwing als breuk > gebakken (typfout-vanger, blokkeert niet) */
         #breuk-grid input.breuk-warn { border-color: var(--accent-red); color: var(--accent-red); }
         .breuk-warn-text { font-size: 0.65rem; color: var(--accent-red); font-weight: 600; margin-top: 2px; }
@@ -895,15 +893,6 @@
             return f;
         }
 
-        function contextBadge(ctx) {
-            let b = '';
-            if (ctx.feestdag) b += '🎉';
-            if (ctx.promo) b += '📢';
-            if (ctx.snow) b += '❄️';
-            else if (ctx.bbq) b += '☀️';
-            return b;
-        }
-
         // Laatste n datums (ISO) met dezelfde weekdag als `dow`, strikt vóór fromDate.
         function lastDatesOfDow(fromDate, dow, n) {
             const dates = [];
@@ -941,7 +930,7 @@
             return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
         }
 
-        // Hoofdberekening. Geeft { plates, badge } of null (→ terugvallen op klassiek).
+        // Hoofdberekening. Geeft aantal platen, of null (→ terugvallen op klassiek).
         function calculateSuggestionAdvanced(p) {
             const promoSet = buildPromoDateSet();
             const ctx = getPlanDayContext(promoSet);
@@ -984,7 +973,7 @@
                 plates = Math.min(hi, Math.max(lo, plates));
             }
 
-            return { plates, badge: contextBadge(ctx) };
+            return plates;
         }
 
         // Returns array of batch numbers (1-based) where Group B is skipped on the given date.
@@ -1118,10 +1107,17 @@
             const eventSelect = document.getElementById('event-select');
             if (eventSelect && !planningData._eventEdited) {
                 eventSelect.value = savedEvent;
-                // Belgische feestdag zonder opgeslagen event → vooraf op Feestdag zetten
-                // (zondag uitgezonderd: dan gelden toch al zondag-uren). Blijft aanpasbaar.
-                if (!hasSavedData && savedEvent === 'Normal' && currentDate.getDay() !== 0 && isBelgianHoliday(currentDate)) {
-                    eventSelect.value = 'Feestdag';
+                if (!hasSavedData && savedEvent === 'Normal') {
+                    // Belgische feestdag → vooraf op Feestdag (zondag uitgezonderd: dan
+                    // gelden toch al zondag-uren). Feestdag wint van promo (zie 25 mei '26).
+                    if (currentDate.getDay() !== 0 && isBelgianHoliday(currentDate)) {
+                        eventSelect.value = 'Feestdag';
+                    // Dag valt in een herkend promo-venster (wo→di, één gelabelde dag is
+                    // genoeg) → vooraf op Promo. Zo is de dropdown zelf de indicator én
+                    // wordt het label bij opslaan automatisch aangevuld. Blijft aanpasbaar.
+                    } else if (buildPromoDateSet().has(dateStr)) {
+                        eventSelect.value = 'Promo';
+                    }
                 }
             }
             
@@ -1136,13 +1132,12 @@
             
             // Build display data for each product
             const displayData = {};
-            const sugBadges = {};
 
             PRODUCTS.forEach(p => {
                 let sug = calculateSuggestion(p);
                 if (SETTINGS.advancedMode) {
                     const adv = calculateSuggestionAdvanced(p);
-                    if (adv) { sug = adv.plates; sugBadges[p.id] = adv.badge; }
+                    if (adv !== null) sug = adv;
                 }
                 const savedRecord = savedDayData.find(d => d.product === p.name);
                 const sessionEdit = planningData[p.id];
@@ -1371,7 +1366,7 @@
 
                     html += `<tr class="${oos ? 'product-row-oos' : ''}">
                         ${nameCell}
-                        <td class="sug-value">${data.sug}${sugBadges[p.id] ? `<span class="sug-badge">${sugBadges[p.id]}</span>` : ''}</td>
+                        <td class="sug-value">${data.sug}</td>
                         <td class="totaal-col"><input type="number" value="${data.totaal}" data-id="${p.id}" data-field="totaal" onchange="onInput(this)" ${ro}></td>
                         <td><input type="number" value="${data.batches[0]}" data-id="${p.id}" data-field="l1" onchange="onInput(this)" ${ro}></td>
                         <td><input type="number" value="${data.batches[1]}" data-id="${p.id}" data-field="l2" onchange="onInput(this)" ${ro}></td>
