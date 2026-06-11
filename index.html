@@ -623,6 +623,7 @@
                 <div class="setting-row"><label>🌤️ Warm weer: Groep B +%</label><input type="number" id="setting-p-warm-b" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                 <div class="setting-row"><label>❄️ Sneeuw: verlaging %</label><input type="number" id="setting-p-snow" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                 <div class="setting-row"><label>🎉 Feestdag: % van zondag</label><input type="number" id="setting-p-feestdag" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                <div class="setting-row"><label>🎉 Dag vóór/na feestdag +%</label><input type="number" id="setting-p-rond-feestdag" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                 <div class="setting-row"><label>☀️ BBQ vanaf °C</label><input type="number" id="setting-temp-bbq" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                 <div class="setting-row"><label>🌤️ Warm vanaf °C</label><input type="number" id="setting-temp-warm" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                 <div class="setting-row"><label>🔥 Uitverkocht: +%</label><input type="number" id="setting-p-sellout" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
@@ -740,6 +741,8 @@
             pWarmB: 20,              // warm weer verhoging % (alleen B)
             pSnow: 38,               // sneeuw verlaging %
             pFeestdag: 80,           // feestdag = % van zondag-baseline
+            pRondFeestdag: 20,       // weekdag vóór/na een feestdag: verhoging %
+                                     // (gemeten +20..62%, brugdag-effect; weekend ~0%)
             tempBbq: 23, tempWarm: 18, // °C drempels
             pSellout: 10,            // bijtelling % als referentiedag uitverkocht was
             pSelloutStreak: 15       // extra % bovenop als 2 recentste referenties uitverkocht waren
@@ -833,6 +836,17 @@
             return iso === plus(1) || iso === plus(39) || iso === plus(50);
         }
 
+        // Weekdag direct vóór of na een Belgische feestdag: mensen hamsteren vooraf,
+        // vullen aan achteraf, en nemen brugdagen (do-feestdag → vrijdag vrij).
+        // Gemeten: +20..62% op zulke weekdagen; weekenddagen ernaast ~0% (al piek).
+        function isRondFeestdag(date) {
+            const dow = date.getDay();
+            if (dow === 0 || dow === 6) return false;
+            const prev = new Date(date); prev.setDate(prev.getDate() - 1);
+            const next = new Date(date); next.setDate(next.getDate() + 1);
+            return isBelgianHoliday(prev) || isBelgianHoliday(next);
+        }
+
         // Promo loopt altijd woensdag t/m dinsdag. Eén gelabelde dag in zo'n week is
         // genoeg om de hele week als promo te herkennen — vangt vergeten labels op.
         function buildPromoDateSet() {
@@ -859,8 +873,10 @@
             const row = historicalData.find(r => r.datum === dateISO);
             const event = row?.event || 'Normal';
             const w = weatherInfoForDate(dateISO);
+            const feestdag = event === 'Feestdag';
             return {
-                feestdag: event === 'Feestdag',
+                feestdag,
+                rondFeestdag: !feestdag && isRondFeestdag(new Date(dateISO + 'T00:00:00')),
                 promo: event === 'Promo' || promoSet.has(dateISO),
                 snow: event === 'Sneeuw' || w.snow,
                 bbq: event === 'BBQ' || (w.temp !== null && w.temp >= SETTINGS.tempBbq),
@@ -874,8 +890,10 @@
             const dateISO = formatDateISO(currentDate);
             const sel = document.getElementById('event-select')?.value || 'Normal';
             const w = weatherInfoForDate(dateISO);
+            const feestdag = sel === 'Feestdag';
             return {
-                feestdag: sel === 'Feestdag',
+                feestdag,
+                rondFeestdag: !feestdag && isRondFeestdag(currentDate),
                 promo: sel === 'Promo' || promoSet.has(dateISO),
                 snow: sel === 'Sneeuw' || w.snow,
                 bbq: sel === 'BBQ' || (w.temp !== null && w.temp >= SETTINGS.tempBbq),
@@ -887,6 +905,7 @@
         function contextFactor(ctx, group) {
             let f = 1;
             if (ctx.promo) f *= 1 + (group === 'B' ? SETTINGS.pPromoB : SETTINGS.pPromoA) / 100;
+            if (ctx.rondFeestdag) f *= 1 + SETTINGS.pRondFeestdag / 100;
             if (ctx.snow) f *= 1 - SETTINGS.pSnow / 100;
             else if (ctx.bbq) f *= 1 + (group === 'B' ? SETTINGS.pBbqB : SETTINGS.pBbqA) / 100;
             else if (ctx.warm && group === 'B') f *= 1 + SETTINGS.pWarmB / 100;
@@ -902,12 +921,39 @@
             return dates;
         }
 
+        // Groeps-bewuste uitverkocht-bijtelling. Klanten pakken de "volgende favoriet"
+        // als een product op is (gemeten: buurproduct +10..20% verkoop op zulke dagen).
+        // Kijk dus naar de rest van de groep op die referentiedag:
+        //   - rest óók droog (breuk 0)       → echte gemiste vraag, niemand kon wisselen → dubbel
+        //   - rest had nog ruim over (≥doel%) → mix fout, niet volume; buren vingen het op → half
+        //   - ertussenin                      → normale bijtelling
+        function selloutBumpPct(p, dateISO) {
+            let restBreuk = 0, restGebakken = 0;
+            PRODUCTS.forEach(o => {
+                if (o.id === p.id || o.group !== p.group) return;
+                const rec = historicalData.find(r => r.datum === dateISO && r.product === o.name);
+                if (!rec || rec.out_of_stock || rec.breuk === null || rec.breuk === undefined) return;
+                if ((rec.totaal || 0) <= 0) return;
+                restBreuk += rec.breuk;
+                restGebakken += (rec.totaal || 0) * o.ppp;
+            });
+            if (restGebakken === 0) return SETTINGS.pSellout; // geen bruikbare buren-data
+            if (restBreuk === 0) return SETTINGS.pSellout * 2;
+            if (restBreuk >= restGebakken * SETTINGS.targetBreuk / 100) return SETTINGS.pSellout / 2;
+            return SETTINGS.pSellout;
+        }
+
         // Verkoop-schattingen (stuks) van referentiedagen, genormaliseerd naar "normale dag".
-        // Uitverkocht (breuk=0) = vraag onbekend, minimaal wat gebakken was → +pSellout%.
-        // Slaat over: uit voorraad, feestdagen, dagen zonder ingevulde breuk.
+        // Uitverkocht (breuk=0) = vraag onbekend, minimaal wat gebakken was → +bijtelling
+        // (groeps-bewust, zie selloutBumpPct). Slaat over: uit voorraad, feestdagen,
+        // dagen zonder ingevulde breuk.
+        // Weging (eigenaar-idee 2026-06-11): de 2 recentste weken tellen DUBBEL in de
+        // mediaan — 5 weken stabiliteit tegen anomalie-dagen, maar past zich sneller
+        // aan als de verkoop seizoensgebonden stijgt of daalt.
         function refDemands(p, dates, promoSet) {
             const out = [];
-            for (const iso of dates) {
+            for (let i = 0; i < dates.length; i++) {
+                const iso = dates[i];
                 const rec = historicalData.find(r => r.datum === iso && r.product === p.name);
                 if (!rec || rec.out_of_stock || rec.breuk === null || rec.breuk === undefined) continue;
                 const ctx = getDayContext(iso, promoSet);
@@ -915,11 +961,10 @@
                 const gebakken = (rec.totaal || 0) * p.ppp;
                 if (gebakken <= 0) continue;
                 const soldout = rec.breuk === 0;
-                let demand = soldout ? gebakken * (1 + SETTINGS.pSellout / 100)
+                let demand = soldout ? gebakken * (1 + selloutBumpPct(p, iso) / 100)
                                      : Math.max(0, gebakken - rec.breuk);
                 demand /= contextFactor(ctx, p.group);
-                out.push({ demand, soldout });
-                if (out.length >= 4) break;
+                out.push({ demand, soldout, weight: i < 2 ? 2 : 1 });
             }
             return out;
         }
@@ -936,6 +981,8 @@
             const ctx = getPlanDayContext(promoSet);
 
             // Feestdag gedraagt zich als een (kleinere) zondag, niet als vorige week dinsdag.
+            // Venster: 5 weken, maar de 2 recentste tellen dubbel (zie refDemands) —
+            // het seizoen verschuift, dus oude weken mogen de koers niet domineren.
             const dow = ctx.feestdag ? 0 : currentDate.getDay();
             let refs = refDemands(p, lastDatesOfDow(currentDate, dow, 5), promoSet);
             if (!refs.length && ctx.feestdag) {
@@ -944,8 +991,11 @@
             }
             if (!refs.length) return null;
 
-            // Mediaan van max 4 weken: ongevoelig voor één teltfout of gekke uitschieter.
-            let demand = median(refs.map(r => r.demand));
+            // Gewogen mediaan: ongevoelig voor één teltfout of gekke uitschieter,
+            // recente weken wegen zwaarder.
+            const weighted = [];
+            refs.forEach(r => { for (let k = 0; k < r.weight; k++) weighted.push(r.demand); });
+            let demand = median(weighted);
 
             // Escalatie: 2 recentste referenties allebei uitverkocht → vraag is structureel
             // hoger dan we weten. De klassieke +1 plaat is te traag op grote dagen.
@@ -2288,6 +2338,7 @@
             SETTINGS.pWarmB = num('setting-p-warm-b', 20);
             SETTINGS.pSnow = Math.min(90, Math.max(0, num('setting-p-snow', 38)));
             SETTINGS.pFeestdag = num('setting-p-feestdag', 80);
+            SETTINGS.pRondFeestdag = num('setting-p-rond-feestdag', 20);
             SETTINGS.tempBbq = num('setting-temp-bbq', 23);
             SETTINGS.tempWarm = num('setting-temp-warm', 18);
             SETTINGS.pSellout = num('setting-p-sellout', 10);
@@ -2312,6 +2363,7 @@
             el('setting-p-warm-b').value = SETTINGS.pWarmB;
             el('setting-p-snow').value = SETTINGS.pSnow;
             el('setting-p-feestdag').value = SETTINGS.pFeestdag;
+            el('setting-p-rond-feestdag').value = SETTINGS.pRondFeestdag;
             el('setting-temp-bbq').value = SETTINGS.tempBbq;
             el('setting-temp-warm').value = SETTINGS.tempWarm;
             el('setting-p-sellout').value = SETTINGS.pSellout;
@@ -2335,7 +2387,7 @@
 
             // Slimme-suggestie keys: oudere cloud 'app' rijen missen ze → defaults aanvullen
             const advDefaults = { advancedMode: true, targetBreuk: 5, pPromoB: 50, pPromoA: 5,
-                pBbqB: 50, pBbqA: 5, pWarmB: 20, pSnow: 38, pFeestdag: 80,
+                pBbqB: 50, pBbqA: 5, pWarmB: 20, pSnow: 38, pFeestdag: 80, pRondFeestdag: 20,
                 tempBbq: 23, tempWarm: 18, pSellout: 10, pSelloutStreak: 15 };
             Object.entries(advDefaults).forEach(([k, v]) => {
                 if (SETTINGS[k] === undefined || SETTINGS[k] === null) SETTINGS[k] = v;
