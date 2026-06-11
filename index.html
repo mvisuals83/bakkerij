@@ -612,24 +612,6 @@
                 <div class="setting-row"><label>Batch max</label><input type="number" id="setting-batch-max" value="31" onchange="saveCapacitySettings()"></div>
             </div>
             <div class="settings-section">
-                <h3>🧠 Slimme Suggesties</h3>
-                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">AAN = suggesties op basis van de mediaan van 4 weken verkoop, met automatische promo/weer/feestdag-correcties, richting het doel-breuk %. UIT = klassieke drempel-berekening. Promo wordt automatisch herkend voor de hele week (wo→di) zodra één dag het label Promo heeft.</p>
-                <div class="setting-row"><label>Slimme suggesties actief</label><label class="toggle"><input type="checkbox" id="setting-advanced" onchange="saveAdvancedSettings()"><span class="toggle-slider"></span></label></div>
-                <div class="setting-row"><label>Doel breuk %</label><input type="number" id="setting-target-breuk" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
-                <div class="setting-row"><label>📢 Promo: Groep B +%</label><input type="number" id="setting-p-promo-b" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
-                <div class="setting-row"><label>📢 Promo: Groep A +%</label><input type="number" id="setting-p-promo-a" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
-                <div class="setting-row"><label>☀️ BBQ-weer: Groep B +%</label><input type="number" id="setting-p-bbq-b" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
-                <div class="setting-row"><label>☀️ BBQ-weer: Groep A +%</label><input type="number" id="setting-p-bbq-a" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
-                <div class="setting-row"><label>🌤️ Warm weer: Groep B +%</label><input type="number" id="setting-p-warm-b" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
-                <div class="setting-row"><label>❄️ Sneeuw: verlaging %</label><input type="number" id="setting-p-snow" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
-                <div class="setting-row"><label>🎉 Feestdag: % van zondag</label><input type="number" id="setting-p-feestdag" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
-                <div class="setting-row"><label>🎉 Dag vóór/na feestdag +%</label><input type="number" id="setting-p-rond-feestdag" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
-                <div class="setting-row"><label>☀️ BBQ vanaf °C</label><input type="number" id="setting-temp-bbq" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
-                <div class="setting-row"><label>🌤️ Warm vanaf °C</label><input type="number" id="setting-temp-warm" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
-                <div class="setting-row"><label>🔥 Uitverkocht: +%</label><input type="number" id="setting-p-sellout" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
-                <div class="setting-row"><label>🔥 2× uitverkocht: extra +%</label><input type="number" id="setting-p-sellout-streak" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
-            </div>
-            <div class="settings-section">
                 <h3>🔥 Weekend Strategie — Skip Groep B</h3>
                 <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Wanneer Groep B wordt geskipt in een batch, krijgt Groep A daar ~2× volume. Volume van Groep B verschuift naar de niet-geskipte batches.</p>
                 <div style="display: flex; gap: 16px; flex-wrap: wrap;">
@@ -653,6 +635,32 @@
             <div class="settings-section">
                 <h3>🥖 Stuks per Plaat</h3>
                 <div id="ppp-settings"></div>
+            </div>
+            <div class="settings-section">
+                <h3>🧠 Slimme Suggesties</h3>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">AAN = suggesties op basis van de mediaan van 5 weken verkoop (recentste 2 tellen dubbel), met automatische promo/weer/feestdag-correcties, richting het doel-breuk %. UIT = klassieke drempel-berekening hieronder. Promo wordt automatisch herkend voor de hele week (wo→di) zodra één dag het label Promo heeft.</p>
+                <div class="setting-row"><label>Slimme suggesties actief</label><label class="toggle"><input type="checkbox" id="setting-advanced" onchange="saveAdvancedSettings()"><span class="toggle-slider"></span></label></div>
+                <div class="collapsible-section">
+                    <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                        <span>🔧 Fijnafstelling</span>
+                        <span class="collapse-icon">▶</span>
+                    </div>
+                    <div class="collapsible-content" style="display: none;">
+                        <div class="setting-row"><label>Doel breuk %</label><input type="number" id="setting-target-breuk" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>📢 Promo: Groep B +%</label><input type="number" id="setting-p-promo-b" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>📢 Promo: Groep A +%</label><input type="number" id="setting-p-promo-a" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>☀️ BBQ-weer: Groep B +%</label><input type="number" id="setting-p-bbq-b" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>☀️ BBQ-weer: Groep A +%</label><input type="number" id="setting-p-bbq-a" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>🌤️ Warm weer: Groep B +%</label><input type="number" id="setting-p-warm-b" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>❄️ Sneeuw: verlaging %</label><input type="number" id="setting-p-snow" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>🎉 Feestdag: % van zondag</label><input type="number" id="setting-p-feestdag" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>🎉 Dag vóór/na feestdag +%</label><input type="number" id="setting-p-rond-feestdag" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>☀️ BBQ vanaf °C</label><input type="number" id="setting-temp-bbq" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>🌤️ Warm vanaf °C</label><input type="number" id="setting-temp-warm" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>🔥 Uitverkocht: +%</label><input type="number" id="setting-p-sellout" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>🔥 2× uitverkocht: extra +%</label><input type="number" id="setting-p-sellout-streak" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                    </div>
+                </div>
             </div>
             <div class="settings-section">
                 <h3>📊 Breuk Drempels</h3>
