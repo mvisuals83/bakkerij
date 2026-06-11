@@ -262,6 +262,11 @@
         .planning-table .sug-value {
             color: var(--text-secondary); font-family: var(--font-mono); font-size: 0.85rem;
         }
+        .sug-badge { font-size: 0.6rem; margin-left: 2px; vertical-align: super; }
+
+        /* Breuk invoer: waarschuwing als breuk > gebakken (typfout-vanger, blokkeert niet) */
+        #breuk-grid input.breuk-warn { border-color: var(--accent-red); color: var(--accent-red); }
+        .breuk-warn-text { font-size: 0.65rem; color: var(--accent-red); font-weight: 600; margin-top: 2px; }
         
         .lading-card {
             background: var(--bg-card); border-radius: var(--radius);
@@ -609,6 +614,23 @@
                 <div class="setting-row"><label>Batch max</label><input type="number" id="setting-batch-max" value="31" onchange="saveCapacitySettings()"></div>
             </div>
             <div class="settings-section">
+                <h3>🧠 Slimme Suggesties</h3>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">AAN = suggesties op basis van de mediaan van 4 weken verkoop, met automatische promo/weer/feestdag-correcties, richting het doel-breuk %. UIT = klassieke drempel-berekening. Promo wordt automatisch herkend voor de hele week (wo→di) zodra één dag het label Promo heeft.</p>
+                <div class="setting-row"><label>Slimme suggesties actief</label><label class="toggle"><input type="checkbox" id="setting-advanced" onchange="saveAdvancedSettings()"><span class="toggle-slider"></span></label></div>
+                <div class="setting-row"><label>Doel breuk %</label><input type="number" id="setting-target-breuk" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                <div class="setting-row"><label>📢 Promo: Groep B +%</label><input type="number" id="setting-p-promo-b" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                <div class="setting-row"><label>📢 Promo: Groep A +%</label><input type="number" id="setting-p-promo-a" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                <div class="setting-row"><label>☀️ BBQ-weer: Groep B +%</label><input type="number" id="setting-p-bbq-b" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                <div class="setting-row"><label>☀️ BBQ-weer: Groep A +%</label><input type="number" id="setting-p-bbq-a" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                <div class="setting-row"><label>🌤️ Warm weer: Groep B +%</label><input type="number" id="setting-p-warm-b" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                <div class="setting-row"><label>❄️ Sneeuw: verlaging %</label><input type="number" id="setting-p-snow" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                <div class="setting-row"><label>🎉 Feestdag: % van zondag</label><input type="number" id="setting-p-feestdag" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                <div class="setting-row"><label>☀️ BBQ vanaf °C</label><input type="number" id="setting-temp-bbq" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                <div class="setting-row"><label>🌤️ Warm vanaf °C</label><input type="number" id="setting-temp-warm" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                <div class="setting-row"><label>🔥 Uitverkocht: +%</label><input type="number" id="setting-p-sellout" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                <div class="setting-row"><label>🔥 2× uitverkocht: extra +%</label><input type="number" id="setting-p-sellout-streak" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+            </div>
+            <div class="settings-section">
                 <h3>🔥 Weekend Strategie — Skip Groep B</h3>
                 <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Wanneer Groep B wordt geskipt in een batch, krijgt Groep A daar ~2× volume. Volume van Groep B verschuift naar de niet-geskipte batches.</p>
                 <div style="display: flex; gap: 16px; flex-wrap: wrap;">
@@ -705,7 +727,24 @@
             // Flexible by design — adding new batches or weekday entries needs no code changes
             // beyond the UI. e.g. { sat:[2,3], sun:[2,3,4], mon:[] } would all just work.
             skipB: { sat: [2], sun: [2] },
-            priceA: 0.69, priceB: 1.59
+            priceA: 0.69, priceB: 1.59,
+            // ===== Slimme suggesties (advanced mode) =====
+            // advancedMode OFF = klassieke drempel-berekening (calculateSuggestion), ongewijzigd.
+            // Percentages zijn afgeleid uit 6 maanden eigen verkoopdata (analyse 2026-06-11):
+            //   promo  → Groep B +52% weekdagen / +45% weekend; Groep A ~+5%
+            //   BBQ    → Groep B +50..77% boven 23°C; warm 18-22° → B +13..29%
+            //   sneeuw → beide groepen ~-35..39%
+            //   feestdag → ~65-80% van een zondag
+            advancedMode: true,
+            targetBreuk: 5,          // doel breuk % — plan = verwachte verkoop / (1 - doel)
+            pPromoB: 50, pPromoA: 5, // promo verhoging %
+            pBbqB: 50, pBbqA: 5,     // BBQ-weer verhoging %
+            pWarmB: 20,              // warm weer verhoging % (alleen B)
+            pSnow: 38,               // sneeuw verlaging %
+            pFeestdag: 80,           // feestdag = % van zondag-baseline
+            tempBbq: 23, tempWarm: 18, // °C drempels
+            pSellout: 10,            // bijtelling % als referentiedag uitverkocht was
+            pSelloutStreak: 15       // extra % bovenop als 2 recentste referenties uitverkocht waren
         };
         let currentDate = new Date();
         let planningData = {};
@@ -766,7 +805,188 @@
             }
             return 1;
         }
-        
+
+        // ===== SLIMME SUGGESTIES (advanced mode) =====
+        // Laag bovenop de klassieke berekening. Verandert ALLEEN het suggestie-getal;
+        // batchverdeling, ovens, opslaan etc. blijven identiek. Bij twijfel of te
+        // weinig data valt alles terug op calculateSuggestion().
+
+        // Belgische feestdagen (vast + Pasen-gebonden). Paaszondag zelf is gewoon zondag.
+        function easterSunday(year) {
+            const a = year % 19, b = Math.floor(year / 100), c = year % 100;
+            const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+            const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+            const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+            const m = Math.floor((a + 11 * h + 22 * l) / 451);
+            const month = Math.floor((h + l - 7 * m + 114) / 31);
+            const day = ((h + l - 7 * m + 114) % 31) + 1;
+            return new Date(year, month - 1, day);
+        }
+
+        function isBelgianHoliday(date) {
+            const y = date.getFullYear();
+            const iso = formatDateISO(date);
+            const fixed = [`${y}-01-01`, `${y}-05-01`, `${y}-07-21`, `${y}-08-15`,
+                           `${y}-11-01`, `${y}-11-11`, `${y}-12-25`];
+            if (fixed.includes(iso)) return true;
+            const easter = easterSunday(y);
+            const plus = n => { const d = new Date(easter); d.setDate(d.getDate() + n); return formatDateISO(d); };
+            // Paasmaandag, O.L.H. Hemelvaart, Pinkstermaandag
+            return iso === plus(1) || iso === plus(39) || iso === plus(50);
+        }
+
+        // Promo loopt altijd woensdag t/m dinsdag. Eén gelabelde dag in zo'n week is
+        // genoeg om de hele week als promo te herkennen — vangt vergeten labels op.
+        function buildPromoDateSet() {
+            const set = new Set();
+            historicalData.forEach(r => {
+                if (r.event !== 'Promo') return;
+                const d = new Date(r.datum + 'T00:00:00');
+                d.setDate(d.getDate() - ((d.getDay() + 4) % 7)); // terug naar woensdag
+                for (let i = 0; i < 7; i++) { set.add(formatDateISO(d)); d.setDate(d.getDate() + 1); }
+            });
+            return set;
+        }
+
+        // Weer voor een datum: opgeslagen rij-string ("⛅ 21°"), anders de forecast-cache.
+        function weatherInfoForDate(dateISO) {
+            const row = historicalData.find(r => r.datum === dateISO && r.weather && /\d/.test(r.weather));
+            const str = row?.weather || weatherCache[dateISO] || '';
+            const m = str.match(/(-?\d+)\s*°/);
+            return { temp: m ? parseInt(m[1]) : null, snow: /❄|🌨/.test(str) };
+        }
+
+        // Context van een (opgeslagen) referentiedag.
+        function getDayContext(dateISO, promoSet) {
+            const row = historicalData.find(r => r.datum === dateISO);
+            const event = row?.event || 'Normal';
+            const w = weatherInfoForDate(dateISO);
+            return {
+                feestdag: event === 'Feestdag',
+                promo: event === 'Promo' || promoSet.has(dateISO),
+                snow: event === 'Sneeuw' || w.snow,
+                bbq: event === 'BBQ' || (w.temp !== null && w.temp >= SETTINGS.tempBbq),
+                warm: w.temp !== null && w.temp >= SETTINGS.tempWarm && w.temp < SETTINGS.tempBbq
+            };
+        }
+
+        // Context van de dag die nu gepland wordt: de event-dropdown is leidend
+        // (kan nog niet opgeslagen zijn), promo-venster en weer vullen aan.
+        function getPlanDayContext(promoSet) {
+            const dateISO = formatDateISO(currentDate);
+            const sel = document.getElementById('event-select')?.value || 'Normal';
+            const w = weatherInfoForDate(dateISO);
+            return {
+                feestdag: sel === 'Feestdag',
+                promo: sel === 'Promo' || promoSet.has(dateISO),
+                snow: sel === 'Sneeuw' || w.snow,
+                bbq: sel === 'BBQ' || (w.temp !== null && w.temp >= SETTINGS.tempBbq),
+                warm: w.temp !== null && w.temp >= SETTINGS.tempWarm && w.temp < SETTINGS.tempBbq
+            };
+        }
+
+        // Vermenigvuldigingsfactor voor een dagcontext (feestdag apart afgehandeld).
+        function contextFactor(ctx, group) {
+            let f = 1;
+            if (ctx.promo) f *= 1 + (group === 'B' ? SETTINGS.pPromoB : SETTINGS.pPromoA) / 100;
+            if (ctx.snow) f *= 1 - SETTINGS.pSnow / 100;
+            else if (ctx.bbq) f *= 1 + (group === 'B' ? SETTINGS.pBbqB : SETTINGS.pBbqA) / 100;
+            else if (ctx.warm && group === 'B') f *= 1 + SETTINGS.pWarmB / 100;
+            return f;
+        }
+
+        function contextBadge(ctx) {
+            let b = '';
+            if (ctx.feestdag) b += '🎉';
+            if (ctx.promo) b += '📢';
+            if (ctx.snow) b += '❄️';
+            else if (ctx.bbq) b += '☀️';
+            return b;
+        }
+
+        // Laatste n datums (ISO) met dezelfde weekdag als `dow`, strikt vóór fromDate.
+        function lastDatesOfDow(fromDate, dow, n) {
+            const dates = [];
+            const d = new Date(fromDate);
+            do { d.setDate(d.getDate() - 1); } while (d.getDay() !== dow);
+            for (let i = 0; i < n; i++) { dates.push(formatDateISO(d)); d.setDate(d.getDate() - 7); }
+            return dates;
+        }
+
+        // Verkoop-schattingen (stuks) van referentiedagen, genormaliseerd naar "normale dag".
+        // Uitverkocht (breuk=0) = vraag onbekend, minimaal wat gebakken was → +pSellout%.
+        // Slaat over: uit voorraad, feestdagen, dagen zonder ingevulde breuk.
+        function refDemands(p, dates, promoSet) {
+            const out = [];
+            for (const iso of dates) {
+                const rec = historicalData.find(r => r.datum === iso && r.product === p.name);
+                if (!rec || rec.out_of_stock || rec.breuk === null || rec.breuk === undefined) continue;
+                const ctx = getDayContext(iso, promoSet);
+                if (ctx.feestdag) continue;
+                const gebakken = (rec.totaal || 0) * p.ppp;
+                if (gebakken <= 0) continue;
+                const soldout = rec.breuk === 0;
+                let demand = soldout ? gebakken * (1 + SETTINGS.pSellout / 100)
+                                     : Math.max(0, gebakken - rec.breuk);
+                demand /= contextFactor(ctx, p.group);
+                out.push({ demand, soldout });
+                if (out.length >= 4) break;
+            }
+            return out;
+        }
+
+        function median(values) {
+            const s = [...values].sort((a, b) => a - b);
+            const mid = Math.floor(s.length / 2);
+            return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+        }
+
+        // Hoofdberekening. Geeft { plates, badge } of null (→ terugvallen op klassiek).
+        function calculateSuggestionAdvanced(p) {
+            const promoSet = buildPromoDateSet();
+            const ctx = getPlanDayContext(promoSet);
+
+            // Feestdag gedraagt zich als een (kleinere) zondag, niet als vorige week dinsdag.
+            const dow = ctx.feestdag ? 0 : currentDate.getDay();
+            let refs = refDemands(p, lastDatesOfDow(currentDate, dow, 5), promoSet);
+            if (!refs.length && ctx.feestdag) {
+                // Geen zondag-data → val terug op eigen weekdag
+                refs = refDemands(p, lastDatesOfDow(currentDate, currentDate.getDay(), 5), promoSet);
+            }
+            if (!refs.length) return null;
+
+            // Mediaan van max 4 weken: ongevoelig voor één teltfout of gekke uitschieter.
+            let demand = median(refs.map(r => r.demand));
+
+            // Escalatie: 2 recentste referenties allebei uitverkocht → vraag is structureel
+            // hoger dan we weten. De klassieke +1 plaat is te traag op grote dagen.
+            if (refs.length >= 2 && refs[0].soldout && refs[1].soldout) {
+                demand *= 1 + SETTINGS.pSelloutStreak / 100;
+            }
+
+            if (ctx.feestdag) demand *= SETTINGS.pFeestdag / 100;
+            demand *= contextFactor(ctx, p.group);
+
+            // Plan met buffer richting doel-breuk, afgerond naar platen,
+            // maar nooit onder de verwachte vraag zelf.
+            const planStuks = demand / (1 - SETTINGS.targetBreuk / 100);
+            let plates = Math.round(planStuks / p.ppp);
+            if (plates * p.ppp < demand) plates++;
+            plates = Math.max(1, plates);
+
+            // Vangrail: blijf in de buurt van de klassieke suggestie × dagfactor.
+            // Feestdagen uitgezonderd (daar is de klassieke referentie per definitie fout).
+            const simple = calculateSuggestion(p);
+            if (!ctx.feestdag && simple > 1) {
+                const f = contextFactor(ctx, p.group);
+                const lo = Math.max(1, Math.floor(simple * f * 0.5));
+                const hi = Math.max(lo, Math.ceil(simple * f * 2));
+                plates = Math.min(hi, Math.max(lo, plates));
+            }
+
+            return { plates, badge: contextBadge(ctx) };
+        }
+
         // Returns array of batch numbers (1-based) where Group B is skipped on the given date.
         // Reads SETTINGS.skipB by weekday key. Empty array on weekdays.
         function getSkipBBatches(date) {
@@ -898,6 +1118,11 @@
             const eventSelect = document.getElementById('event-select');
             if (eventSelect && !planningData._eventEdited) {
                 eventSelect.value = savedEvent;
+                // Belgische feestdag zonder opgeslagen event → vooraf op Feestdag zetten
+                // (zondag uitgezonderd: dan gelden toch al zondag-uren). Blijft aanpasbaar.
+                if (!hasSavedData && savedEvent === 'Normal' && currentDate.getDay() !== 0 && isBelgianHoliday(currentDate)) {
+                    eventSelect.value = 'Feestdag';
+                }
             }
             
             // Load saved note if exists (find any record that has a note for this date)
@@ -911,9 +1136,14 @@
             
             // Build display data for each product
             const displayData = {};
-            
+            const sugBadges = {};
+
             PRODUCTS.forEach(p => {
-                const sug = calculateSuggestion(p);
+                let sug = calculateSuggestion(p);
+                if (SETTINGS.advancedMode) {
+                    const adv = calculateSuggestionAdvanced(p);
+                    if (adv) { sug = adv.plates; sugBadges[p.id] = adv.badge; }
+                }
                 const savedRecord = savedDayData.find(d => d.product === p.name);
                 const sessionEdit = planningData[p.id];
 
@@ -1141,7 +1371,7 @@
 
                     html += `<tr class="${oos ? 'product-row-oos' : ''}">
                         ${nameCell}
-                        <td class="sug-value">${data.sug}</td>
+                        <td class="sug-value">${data.sug}${sugBadges[p.id] ? `<span class="sug-badge">${sugBadges[p.id]}</span>` : ''}</td>
                         <td class="totaal-col"><input type="number" value="${data.totaal}" data-id="${p.id}" data-field="totaal" onchange="onInput(this)" ${ro}></td>
                         <td><input type="number" value="${data.batches[0]}" data-id="${p.id}" data-field="l1" onchange="onInput(this)" ${ro}></td>
                         <td><input type="number" value="${data.batches[1]}" data-id="${p.id}" data-field="l2" onchange="onInput(this)" ${ro}></td>
@@ -1596,6 +1826,10 @@
         function onEventChange() {
             planningData._eventEdited = true;
             markUnsaved();
+            // Advanced mode: event (promo/sneeuw/BBQ/feestdag) beïnvloedt de suggesties
+            // direct — herbereken zodat de planner het effect meteen ziet.
+            // Handmatige invoer in planningData blijft bewaard door renderPlanning.
+            if (SETTINGS.advancedMode) renderPlanning();
         }
         
         function markUnsaved() {
@@ -1677,12 +1911,28 @@
                         <input type="number" value="0" data-product="${p.name}" data-oos="1" disabled>
                     </div>`;
                 }
+                const gebakkenStuks = (data?.totaal || 0) * p.ppp;
                 return `<div class="breuk-item">
                     <div><div class="product-name">${p.name}</div>
-                    <div class="product-baked">Gebakken: ${data?.totaal || 0} platen</div></div>
-                    <input type="number" value="${data?.breuk ?? ''}" data-product="${p.name}" placeholder="0">
+                    <div class="product-baked">Gebakken: ${data?.totaal || 0} platen (${gebakkenStuks} st)</div>
+                    <div class="breuk-warn-text" style="display:none;">⚠️ Meer breuk dan gebakken!</div></div>
+                    <input type="number" value="${data?.breuk ?? ''}" data-product="${p.name}" data-max="${gebakkenStuks}" placeholder="0" oninput="checkBreukSanity(this)">
                 </div>`;
             }).join('');
+
+            // Bestaande waarden ook meteen controleren
+            document.querySelectorAll('#breuk-grid input:not([data-oos])').forEach(inp => checkBreukSanity(inp));
+        }
+
+        // Waarschuwt (rood) als ingevulde breuk hoger is dan wat gebakken werd.
+        // Alleen visueel — opslaan blijft mogelijk, waarden worden nooit auto-gecorrigeerd.
+        function checkBreukSanity(input) {
+            const max = parseInt(input.dataset.max) || 0;
+            const val = parseInt(input.value);
+            const over = !isNaN(val) && val > max;
+            input.classList.toggle('breuk-warn', over);
+            const warnEl = input.closest('.breuk-item')?.querySelector('.breuk-warn-text');
+            if (warnEl) warnEl.style.display = over ? 'block' : 'none';
         }
         
         function saveBreuk() {
@@ -1692,7 +1942,7 @@
                 if (rec) rec.breuk = parseInt(inp.value) || 0;
             });
             localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
-            if (supabaseClient) syncToSupabase();
+            if (supabaseClient) syncToSupabase(dateStr);
 
             // Rebuild dropdown (updates ✅ checkmarks), then try to advance to next calendar day
             renderBreukPage();
@@ -2029,6 +2279,50 @@
             showToast('⚙️ Capaciteit opgeslagen');
         }
 
+        function saveAdvancedSettings() {
+            const num = (id, fallback) => {
+                const v = parseFloat(document.getElementById(id)?.value);
+                return isNaN(v) ? fallback : v;
+            };
+            SETTINGS.advancedMode = document.getElementById('setting-advanced').checked;
+            SETTINGS.targetBreuk = Math.min(30, Math.max(0, num('setting-target-breuk', 5)));
+            SETTINGS.pPromoB = num('setting-p-promo-b', 50);
+            SETTINGS.pPromoA = num('setting-p-promo-a', 5);
+            SETTINGS.pBbqB = num('setting-p-bbq-b', 50);
+            SETTINGS.pBbqA = num('setting-p-bbq-a', 5);
+            SETTINGS.pWarmB = num('setting-p-warm-b', 20);
+            SETTINGS.pSnow = Math.min(90, Math.max(0, num('setting-p-snow', 38)));
+            SETTINGS.pFeestdag = num('setting-p-feestdag', 80);
+            SETTINGS.tempBbq = num('setting-temp-bbq', 23);
+            SETTINGS.tempWarm = num('setting-temp-warm', 18);
+            SETTINGS.pSellout = num('setting-p-sellout', 10);
+            SETTINGS.pSelloutStreak = num('setting-p-sellout-streak', 15);
+            localStorage.setItem('bakkerij_settings', JSON.stringify(SETTINGS));
+            saveCloudSetting('app', SETTINGS);
+            planningData = {}; // Reset manual overrides so new settings apply
+            renderPlanning();
+            showToast('🧠 Slimme suggesties opgeslagen');
+        }
+
+        // Sets the Slimme Suggesties inputs from current SETTINGS.
+        function applyAdvancedToInputs() {
+            const el = id => document.getElementById(id);
+            if (!el('setting-advanced')) return;
+            el('setting-advanced').checked = !!SETTINGS.advancedMode;
+            el('setting-target-breuk').value = SETTINGS.targetBreuk;
+            el('setting-p-promo-b').value = SETTINGS.pPromoB;
+            el('setting-p-promo-a').value = SETTINGS.pPromoA;
+            el('setting-p-bbq-b').value = SETTINGS.pBbqB;
+            el('setting-p-bbq-a').value = SETTINGS.pBbqA;
+            el('setting-p-warm-b').value = SETTINGS.pWarmB;
+            el('setting-p-snow').value = SETTINGS.pSnow;
+            el('setting-p-feestdag').value = SETTINGS.pFeestdag;
+            el('setting-temp-bbq').value = SETTINGS.tempBbq;
+            el('setting-temp-warm').value = SETTINGS.tempWarm;
+            el('setting-p-sellout').value = SETTINGS.pSellout;
+            el('setting-p-sellout-streak').value = SETTINGS.pSelloutStreak;
+        }
+
         // Brings older SETTINGS shapes up to current. Idempotent — safe to call repeatedly.
         function migrateSettings() {
             // Legacy: skipBInL2 boolean → skipB { sat:[2], sun:[2] } (or empty when off)
@@ -2043,6 +2337,14 @@
             if (!Array.isArray(SETTINGS.skipB.sun)) SETTINGS.skipB.sun = [];
             // Legacy field is no longer authoritative
             if ('skipBInL2' in SETTINGS) delete SETTINGS.skipBInL2;
+
+            // Slimme-suggestie keys: oudere cloud 'app' rijen missen ze → defaults aanvullen
+            const advDefaults = { advancedMode: true, targetBreuk: 5, pPromoB: 50, pPromoA: 5,
+                pBbqB: 50, pBbqA: 5, pWarmB: 20, pSnow: 38, pFeestdag: 80,
+                tempBbq: 23, tempWarm: 18, pSellout: 10, pSelloutStreak: 15 };
+            Object.entries(advDefaults).forEach(([k, v]) => {
+                if (SETTINGS[k] === undefined || SETTINGS[k] === null) SETTINGS[k] = v;
+            });
         }
 
         function saveSkipBSettings() {
@@ -2198,7 +2500,7 @@
             
             historicalData.sort((a, b) => b.datum.localeCompare(a.datum));
             localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
-            if (supabaseClient) syncToSupabase();
+            if (supabaseClient) syncToSupabase(dateStr);
             markSaved();
             showToast(`✅ Planning voor ${formatDate(currentDate)} opgeslagen!`);
             renderBreukPage();
@@ -2277,10 +2579,16 @@
                     badge.innerHTML = weatherStr;
                     badge.title = `${getWeatherDescription(code)} (${minTemp}°-${maxTemp}°)`;
                     weatherCache[dateStr] = weatherStr;
-                    
+
                     // Check for snow (codes 71-77, 85-86)
                     if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) {
                         checkSnowWarning(weatherStr);
+                    }
+
+                    // Advanced mode: verse forecast kan de suggesties wijzigen (BBQ/sneeuw).
+                    // Re-render is veilig: handmatige invoer zit in planningData en blijft staan.
+                    if (SETTINGS.advancedMode && dateStr === formatDateISO(currentDate)) {
+                        renderPlanning();
                     }
                 } else {
                     badge.innerHTML = '❓';
@@ -2368,7 +2676,16 @@
         
         async function loadFromSupabase() {
             if (!supabaseClient) return;
-            const { data } = await supabaseClient.from('planning_data').select('*').order('datum', { ascending: false });
+            // Supabase geeft max 1000 rijen per request — pagineer tot alles binnen is,
+            // anders verdwijnt de oudste historiek stilletjes zodra de tabel groeit.
+            const data = [];
+            for (let from = 0; ; from += 1000) {
+                const { data: page, error } = await supabaseClient.from('planning_data')
+                    .select('*').order('datum', { ascending: false }).range(from, from + 999);
+                if (error || !page?.length) break;
+                data.push(...page);
+                if (page.length < 1000) break;
+            }
             if (data?.length) {
                 // Merge with localStorage to preserve fields that might not be in Supabase
                 const localData = JSON.parse(localStorage.getItem('bakkerij_data') || '[]');
@@ -2394,16 +2711,22 @@
             }
         }
         
-        async function syncToSupabase() {
-            if (!supabaseClient) return;
-            for (const rec of historicalData) {
-                await supabaseClient.from('planning_data').upsert({
+        // Synct ALLEEN de rijen van de opgegeven datum, in één gebatchte upsert.
+        // Vroeger werd de volledige historiek (1200+ rijen) één voor één geüpload bij
+        // elke save — traag, en een toestel met verouderde lokale data kon daarmee
+        // nieuwere saves van de collega overschrijven. Daarom: nooit meer full-sync.
+        async function syncToSupabase(dateStr) {
+            if (!supabaseClient || !dateStr) return;
+            const payload = historicalData
+                .filter(rec => rec.datum === dateStr)
+                .map(rec => ({
                     datum: rec.datum, product: rec.product, totaal: rec.totaal,
                     l1: rec.l1, l2: rec.l2, l3: rec.l3, l4: rec.l4, l5: rec.l5,
                     breuk: rec.breuk, event: rec.event, weather: rec.weather, note: rec.note,
                     out_of_stock: !!rec.out_of_stock
-                }, { onConflict: 'datum,product' });
-            }
+                }));
+            if (!payload.length) return;
+            await supabaseClient.from('planning_data').upsert(payload, { onConflict: 'datum,product' });
         }
 
         // ===== CLOUD SETTINGS (app + product config stored in `settings` table) =====
@@ -2440,6 +2763,8 @@
                 if (el('setting-price-a'))   el('setting-price-a').value = SETTINGS.priceA ?? 0.69;
                 if (el('setting-price-b'))   el('setting-price-b').value = SETTINGS.priceB ?? 1.59;
                 applySkipBToInputs();
+                applyAdvancedToInputs();
+                renderPlanning(); // suggesties kunnen wijzigen door cloud-instellingen
             } catch (e) {
                 console.warn('Cloud settings load failed — using local', e);
             }
@@ -2524,6 +2849,7 @@
             document.getElementById('setting-price-a').value = SETTINGS.priceA || 0.69;
             document.getElementById('setting-price-b').value = SETTINGS.priceB || 1.59;
             applySkipBToInputs();
+            applyAdvancedToInputs();
             
             // Update product prices from settings
             PRODUCTS.forEach(p => {
