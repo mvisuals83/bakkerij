@@ -659,6 +659,7 @@
                         <div class="setting-row"><label>🌤️ Warm vanaf °C</label><input type="number" id="setting-temp-warm" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                         <div class="setting-row"><label>🔥 Uitverkocht: +%</label><input type="number" id="setting-p-sellout" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                         <div class="setting-row"><label>🔥 2× uitverkocht: extra +%</label><input type="number" id="setting-p-sellout-streak" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>📈 Max stijging per week %</label><input type="number" id="setting-p-max-groei" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                     </div>
                 </div>
             </div>
@@ -753,7 +754,9 @@
                                      // (gemeten +20..62%, brugdag-effect; weekend ~0%)
             tempBbq: 23, tempWarm: 18, // °C drempels
             pSellout: 10,            // bijtelling % als referentiedag uitverkocht was
-            pSelloutStreak: 15       // extra % bovenop als 2 recentste referenties uitverkocht waren
+            pSelloutStreak: 15,      // extra % bovenop als 2 recentste referenties uitverkocht waren
+            pMaxGroei: 25            // groeirem: suggestie max +% per week t.o.v. vorige
+                                     // referentieweek gebakken (context-gecorrigeerd)
         };
         let currentDate = new Date();
         let planningData = {};
@@ -969,10 +972,13 @@
                 const gebakken = (rec.totaal || 0) * p.ppp;
                 if (gebakken <= 0) continue;
                 const soldout = rec.breuk === 0;
+                const f = contextFactor(ctx, p.group);
                 let demand = soldout ? gebakken * (1 + selloutBumpPct(p, iso) / 100)
                                      : Math.max(0, gebakken - rec.breuk);
-                demand /= contextFactor(ctx, p.group);
-                out.push({ demand, soldout, weight: i < 2 ? 2 : 1 });
+                demand /= f;
+                // gebNorm = wat er die dag écht gebakken werd, context-gecorrigeerd —
+                // gebruikt door de groeirem in calculateSuggestionAdvanced.
+                out.push({ demand, soldout, gebNorm: gebakken / f, weight: i < 2 ? 2 : 1 });
             }
             return out;
         }
@@ -998,6 +1004,16 @@
                 refs = refDemands(p, lastDatesOfDow(currentDate, currentDate.getDay(), 5), promoSet);
             }
             if (!refs.length) return null;
+
+            // Uitverkochte dagen zijn een ONDERGRENS van de vraag, geen meting. Op
+            // promo/BBQ-dagen deelt de normalisatie die ondergrens fors omlaag (bv.
+            // 225 gebakken ÷ 2.25 = "minstens 100") — zo'n zwakke ondergrens mag de
+            // mediaan van échte metingen (dagen mét breuk) nooit naar BENEDEN trekken.
+            const exact = refs.filter(r => !r.soldout).map(r => r.demand);
+            if (exact.length) {
+                const m0 = median(exact);
+                refs.forEach(r => { if (r.soldout && r.demand < m0) r.demand = m0; });
+            }
 
             // Gewogen mediaan: ongevoelig voor één teltfout of gekke uitschieter,
             // recente weken wegen zwaarder.
@@ -1031,15 +1047,31 @@
                 plates = Math.min(hi, Math.max(lo, plates));
             }
 
+            // Groeirem (eigenaar-regel 2026-06-12): max +pMaxGroei% per week t.o.v. wat
+            // de recentste referentieweek écht gebakken heeft (context-gecorrigeerd, dus
+            // promo/weer-sprongen blijven gewoon mogelijk). Na uitverkochte weken blijft
+            // de suggestie stijgen, maar in vertrouwde stappen i.p.v. schokken — volgende
+            // week schuift de lat vanzelf mee omhoog.
+            if (SETTINGS.pMaxGroei > 0 && refs[0].gebNorm > 0) {
+                const fToday = contextFactor(ctx, p.group) * (ctx.feestdag ? SETTINGS.pFeestdag / 100 : 1);
+                const capStuks = refs[0].gebNorm * fToday * (1 + SETTINGS.pMaxGroei / 100);
+                const capPlates = Math.max(1, Math.round(capStuks / p.ppp));
+                if (plates > capPlates) plates = capPlates;
+            }
+
             return plates;
         }
 
         // Returns array of batch numbers (1-based) where Group B is skipped on the given date.
         // Reads SETTINGS.skipB by weekday key. Empty array on weekdays.
-        function getSkipBBatches(date) {
-            if (!isWeekend(date)) return [];
+        // Een feestdag op een weekdag gedraagt zich als ZONDAG (open tot 13u, zelfde
+        // batchpatroon) — eigenaars planden feestdagen al handmatig volgens het
+        // zondag-skip-patroon (zie bv. 14 mei '26: B in L1+L3, niet L2).
+        function getSkipBBatches(date, feestdag) {
             const day = date.getDay(); // 0=Sun, 6=Sat
-            const key = day === 6 ? 'sat' : day === 0 ? 'sun' : null;
+            const key = day === 6 ? 'sat'
+                      : (day === 0 || feestdag) ? 'sun'
+                      : null;
             if (!key) return [];
             const arr = SETTINGS.skipB?.[key];
             return Array.isArray(arr) ? arr : [];
@@ -1151,8 +1183,6 @@
         }
         
         function renderPlanning() {
-            const weekend = isWeekend(currentDate);
-            const skipBatches = getSkipBBatches(currentDate);
             const batchMax = SETTINGS.batchMax;
             const dateStr = formatDateISO(currentDate);
             
@@ -1187,7 +1217,16 @@
                 }
             }
             updateNoteButton();
-            
+
+            // Dagtype NA het zetten van de event-dropdown bepalen: een feestdag op een
+            // weekdag verdeelt als een ZONDAG (weekend-algoritme, zondag-skips) — de
+            // 2-batch weekdagsplit past niet bij een dag met zondag-volume.
+            const feestdag = eventSelect?.value === 'Feestdag';
+            const weekend = isWeekend(currentDate) || feestdag;
+            const skipBatches = getSkipBBatches(currentDate, feestdag);
+            // Zondag + feestdag sluiten om 13u: maximaal 4 batches haalbaar (L5 = 0).
+            const fourBatch = feestdag || currentDate.getDay() === 0;
+
             // Build display data for each product
             const displayData = {};
 
@@ -1249,10 +1288,37 @@
                     displayData[p.id] = {
                         sug,
                         totaal: sug,
-                        batches: null // Will be calculated below
+                        batches: null, // Will be calculated below
+                        auto: true     // automatisch ingevuld — mag door capaciteits-trim krimpen
                     };
                 }
             });
+
+            // Zondag/feestdag capaciteits-trim: past de AUTO-ingevulde totalen in 4 batches?
+            // Zo niet, knijp terug — niet-prioriteitsproducten eerst, grootste eerst.
+            // Handmatige of opgeslagen totalen worden NOOIT aangepast (waarschuwingen
+            // blijven die afvangen). De Sug-kolom blijft de échte vraag-suggestie tonen,
+            // zodat zichtbaar is wat er extra verkocht had kunnen worden (3e rijskast?).
+            if (fourBatch) {
+                ['A', 'B'].forEach(group => {
+                    const products = PRODUCTS.filter(p => p.group === group);
+                    const limits = getGroupBatchLimits(group === 'A', true, skipBatches);
+                    limits[4] = 0;
+                    const cap = limits.reduce((a, b) => a + b, 0);
+                    let total = products.reduce((s, p) => s + displayData[p.id].totaal, 0);
+                    const shrinkable = products.filter(p => displayData[p.id].auto && !displayData[p.id].outOfStock);
+                    const prioId = group === 'A' ? 'pistolet_wit' : 'stokbrood_wit';
+                    let safety = 300;
+                    while (total > cap && safety-- > 0) {
+                        let cands = shrinkable.filter(p => p.id !== prioId && displayData[p.id].totaal > 1);
+                        if (!cands.length) cands = shrinkable.filter(p => displayData[p.id].totaal > 1);
+                        if (!cands.length) break;
+                        cands.sort((a, b) => displayData[b.id].totaal - displayData[a.id].totaal);
+                        displayData[cands[0].id].totaal--;
+                        total--;
+                    }
+                });
+            }
             
             // Calculate batches for products that need it (where batches is null)
             ['A', 'B'].forEach(group => {
@@ -1270,6 +1336,7 @@
                         const tot = displayData[p.id].totaal;
                         if (weekend) {
                             const limits = getGroupBatchLimits(isGroupA, true, skipBatches);
+                            if (fourBatch) limits[4] = 0;
                             displayData[p.id].batches = distributeSimple(tot, limits);
                         } else {
                             const l1 = Math.ceil(tot / 2);
@@ -1287,6 +1354,7 @@
                     
                     if (weekend) {
                         const limits = getGroupBatchLimits(isGroupA, weekend, skipBatches);
+                        if (fourBatch) limits[4] = 0;
                         const groupBatches = distributeGroupToBatches(groupTotaal, limits);
                         const productBatches = distributeProductsInBatches(products, groupBatches, productTotals, groupTotaal);
                         products.forEach(p => {
@@ -2351,6 +2419,7 @@
             SETTINGS.tempWarm = num('setting-temp-warm', 18);
             SETTINGS.pSellout = num('setting-p-sellout', 10);
             SETTINGS.pSelloutStreak = num('setting-p-sellout-streak', 15);
+            SETTINGS.pMaxGroei = Math.max(0, num('setting-p-max-groei', 25));
             localStorage.setItem('bakkerij_settings', JSON.stringify(SETTINGS));
             saveCloudSetting('app', SETTINGS);
             planningData = {}; // Reset manual overrides so new settings apply
@@ -2376,6 +2445,7 @@
             el('setting-temp-warm').value = SETTINGS.tempWarm;
             el('setting-p-sellout').value = SETTINGS.pSellout;
             el('setting-p-sellout-streak').value = SETTINGS.pSelloutStreak;
+            el('setting-p-max-groei').value = SETTINGS.pMaxGroei;
         }
 
         // Brings older SETTINGS shapes up to current. Idempotent — safe to call repeatedly.
@@ -2396,7 +2466,7 @@
             // Slimme-suggestie keys: oudere cloud 'app' rijen missen ze → defaults aanvullen
             const advDefaults = { advancedMode: true, targetBreuk: 5, pPromoB: 50, pPromoA: 5,
                 pBbqB: 50, pBbqA: 5, pWarmB: 20, pSnow: 38, pFeestdag: 80, pRondFeestdag: 20,
-                tempBbq: 23, tempWarm: 18, pSellout: 10, pSelloutStreak: 15 };
+                tempBbq: 23, tempWarm: 18, pSellout: 10, pSelloutStreak: 15, pMaxGroei: 25 };
             Object.entries(advDefaults).forEach(([k, v]) => {
                 if (SETTINGS[k] === undefined || SETTINGS[k] === null) SETTINGS[k] = v;
             });
@@ -2541,6 +2611,9 @@
                 const oos = row.classList.contains('product-row-oos');
                 const data = {
                     datum: dateStr, product: p.name, event, weather, note,
+                    // Suggestie mee opslaan: maakt achteraf "suggestie vs gebakken vs
+                    // breuk" vergelijkbaar — de basis voor het natuningen van de motor.
+                    suggestie: parseInt(row.querySelector('.sug-value')?.textContent) || null,
                     totaal: parseInt(row.querySelector('[data-field="totaal"]').value) || 0,
                     l1: parseInt(row.querySelector('[data-field="l1"]').value) || 0,
                     l2: parseInt(row.querySelector('[data-field="l2"]').value) || 0,
@@ -2778,7 +2851,8 @@
                     datum: rec.datum, product: rec.product, totaal: rec.totaal,
                     l1: rec.l1, l2: rec.l2, l3: rec.l3, l4: rec.l4, l5: rec.l5,
                     breuk: rec.breuk, event: rec.event, weather: rec.weather, note: rec.note,
-                    out_of_stock: !!rec.out_of_stock
+                    out_of_stock: !!rec.out_of_stock,
+                    suggestie: rec.suggestie ?? null
                 }));
             if (!payload.length) return;
             await supabaseClient.from('planning_data').upsert(payload, { onConflict: 'datum,product' });
