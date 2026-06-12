@@ -660,6 +660,7 @@
                         <div class="setting-row"><label>🔥 Uitverkocht: +%</label><input type="number" id="setting-p-sellout" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                         <div class="setting-row"><label>🔥 2× uitverkocht: extra +%</label><input type="number" id="setting-p-sellout-streak" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                         <div class="setting-row"><label>📈 Max stijging per week %</label><input type="number" id="setting-p-max-groei" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>🔄 Substitutie-correctie %</label><input type="number" id="setting-p-substitutie" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                     </div>
                 </div>
             </div>
@@ -755,8 +756,10 @@
             tempBbq: 23, tempWarm: 18, // °C drempels
             pSellout: 10,            // bijtelling % als referentiedag uitverkocht was
             pSelloutStreak: 15,      // extra % bovenop als 2 recentste referenties uitverkocht waren
-            pMaxGroei: 25            // groeirem: suggestie max +% per week t.o.v. vorige
+            pMaxGroei: 25,           // groeirem: suggestie max +% per week t.o.v. vorige
                                      // referentieweek gebakken (context-gecorrigeerd)
+            pSubstitutie: 15         // correctie % voor referentiedagen waarop een groeps-
+                                     // genoot uit voorraad was (kunstmatig hogere verkoop)
         };
         let currentDate = new Date();
         let planningData = {};
@@ -954,21 +957,33 @@
             return SETTINGS.pSellout;
         }
 
-        // Verkoop-schattingen (stuks) van referentiedagen, genormaliseerd naar "normale dag".
+        // Is een product VANDAAG (de geplande dag) uit voorraad?
+        // Sessie-keuze gaat boven opgeslagen staat; onbekende toekomst = op voorraad.
+        function isProductOOSToday(prod) {
+            const sess = planningData[prod.id];
+            if (sess && sess.outOfStock !== undefined) return !!sess.outOfStock;
+            const rec = historicalData.find(r => r.datum === formatDateISO(currentDate) && r.product === prod.name);
+            return !!rec?.out_of_stock;
+        }
+
+        // Verkoop-schattingen (stuks) van referentiedagen.
+        // Referenties zijn alleen NORMALE dagen (eigenaar-regel 2026-06-12): promo-,
+        // feestdag- en sneeuwdagen doen niet mee — normaliseren van zo'n dag is gokwerk,
+        // zeker als hij ook uitverkocht was (mei '26: 3 feestdagen + 2 promoweken maakten
+        // de baseline troebel). We zoeken liever een week verder terug: venster tot 9
+        // weken, stop bij 4 bruikbare dagen. Weer (warm/BBQ) blijft WEL genormaliseerd —
+        // in de zomer is bijna elke dag warm; die uitsluiten = zomer zonder referenties.
         // Uitverkocht (breuk=0) = vraag onbekend, minimaal wat gebakken was → +bijtelling
-        // (groeps-bewust, zie selloutBumpPct). Slaat over: uit voorraad, feestdagen,
-        // dagen zonder ingevulde breuk.
-        // Weging (eigenaar-idee 2026-06-11): de 2 recentste weken tellen DUBBEL in de
-        // mediaan — 5 weken stabiliteit tegen anomalie-dagen, maar past zich sneller
-        // aan als de verkoop seizoensgebonden stijgt of daalt.
+        // (groeps-bewust, zie selloutBumpPct). Slaat ook over: uit voorraad, dagen zonder breuk.
+        // Weging (eigenaar-idee 2026-06-11): de 2 recentste bruikbare dagen tellen DUBBEL.
         function refDemands(p, dates, promoSet) {
             const out = [];
-            for (let i = 0; i < dates.length; i++) {
+            for (let i = 0; i < dates.length && out.length < 4; i++) {
                 const iso = dates[i];
                 const rec = historicalData.find(r => r.datum === iso && r.product === p.name);
                 if (!rec || rec.out_of_stock || rec.breuk === null || rec.breuk === undefined) continue;
                 const ctx = getDayContext(iso, promoSet);
-                if (ctx.feestdag) continue;
+                if (ctx.feestdag || ctx.promo || ctx.snow) continue;
                 const gebakken = (rec.totaal || 0) * p.ppp;
                 if (gebakken <= 0) continue;
                 const soldout = rec.breuk === 0;
@@ -976,9 +991,24 @@
                 let demand = soldout ? gebakken * (1 + selloutBumpPct(p, iso) / 100)
                                      : Math.max(0, gebakken - rec.breuk);
                 demand /= f;
-                // gebNorm = wat er die dag écht gebakken werd, context-gecorrigeerd —
-                // gebruikt door de groeirem in calculateSuggestionAdvanced.
-                out.push({ demand, soldout, gebNorm: gebakken / f, weight: i < 2 ? 2 : 1 });
+                let gebNorm = gebakken / f; // écht gebakken, context-gecorrigeerd (groeirem-basis)
+
+                // Substitutie-correctie (eigenaar 2026-06-12): was een groepsgenoot die dag
+                // UIT VOORRAAD, dan verkocht dit product kunstmatig meer (klanten pakken de
+                // volgende favoriet) en werd er vaak bewust extra gebakken ter compensatie.
+                // Is die groepsgenoot vandaag terug op voorraad → corrigeer omlaag.
+                // Is hij vandaag óók uit voorraad → het hogere niveau klopt juist, laat staan.
+                const neighborWasOOS = PRODUCTS.some(o =>
+                    o.group === p.group && o.id !== p.id &&
+                    historicalData.find(r => r.datum === iso && r.product === o.name)?.out_of_stock &&
+                    !isProductOOSToday(o)
+                );
+                if (neighborWasOOS) {
+                    demand /= 1 + SETTINGS.pSubstitutie / 100;
+                    gebNorm /= 1 + SETTINGS.pSubstitutie / 100;
+                }
+
+                out.push({ demand, soldout, gebNorm, weight: out.length < 2 ? 2 : 1 });
             }
             return out;
         }
@@ -995,13 +1025,14 @@
             const ctx = getPlanDayContext(promoSet);
 
             // Feestdag gedraagt zich als een (kleinere) zondag, niet als vorige week dinsdag.
-            // Venster: 5 weken, maar de 2 recentste tellen dubbel (zie refDemands) —
-            // het seizoen verschuift, dus oude weken mogen de koers niet domineren.
+            // Venster: tot 9 weken terug, maar refDemands stopt bij de eerste 4 bruikbare
+            // NORMALE dagen (promo/feestdag/sneeuw uitgesloten) en de 2 recentste tellen
+            // dubbel — verder terug gebeurt dus alleen als specials het venster vervuilen.
             const dow = ctx.feestdag ? 0 : currentDate.getDay();
-            let refs = refDemands(p, lastDatesOfDow(currentDate, dow, 5), promoSet);
+            let refs = refDemands(p, lastDatesOfDow(currentDate, dow, 9), promoSet);
             if (!refs.length && ctx.feestdag) {
                 // Geen zondag-data → val terug op eigen weekdag
-                refs = refDemands(p, lastDatesOfDow(currentDate, currentDate.getDay(), 5), promoSet);
+                refs = refDemands(p, lastDatesOfDow(currentDate, currentDate.getDay(), 9), promoSet);
             }
             if (!refs.length) return null;
 
@@ -2420,6 +2451,7 @@
             SETTINGS.pSellout = num('setting-p-sellout', 10);
             SETTINGS.pSelloutStreak = num('setting-p-sellout-streak', 15);
             SETTINGS.pMaxGroei = Math.max(0, num('setting-p-max-groei', 25));
+            SETTINGS.pSubstitutie = Math.max(0, num('setting-p-substitutie', 15));
             localStorage.setItem('bakkerij_settings', JSON.stringify(SETTINGS));
             saveCloudSetting('app', SETTINGS);
             planningData = {}; // Reset manual overrides so new settings apply
@@ -2446,6 +2478,7 @@
             el('setting-p-sellout').value = SETTINGS.pSellout;
             el('setting-p-sellout-streak').value = SETTINGS.pSelloutStreak;
             el('setting-p-max-groei').value = SETTINGS.pMaxGroei;
+            el('setting-p-substitutie').value = SETTINGS.pSubstitutie;
         }
 
         // Brings older SETTINGS shapes up to current. Idempotent — safe to call repeatedly.
@@ -2466,7 +2499,8 @@
             // Slimme-suggestie keys: oudere cloud 'app' rijen missen ze → defaults aanvullen
             const advDefaults = { advancedMode: true, targetBreuk: 5, pPromoB: 50, pPromoA: 5,
                 pBbqB: 50, pBbqA: 5, pWarmB: 20, pSnow: 38, pFeestdag: 80, pRondFeestdag: 20,
-                tempBbq: 23, tempWarm: 18, pSellout: 10, pSelloutStreak: 15, pMaxGroei: 25 };
+                tempBbq: 23, tempWarm: 18, pSellout: 10, pSelloutStreak: 15, pMaxGroei: 25,
+                pSubstitutie: 15 };
             Object.entries(advDefaults).forEach(([k, v]) => {
                 if (SETTINGS[k] === undefined || SETTINGS[k] === null) SETTINGS[k] = v;
             });
