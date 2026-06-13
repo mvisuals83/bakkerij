@@ -665,6 +665,15 @@
                 </div>
             </div>
             <div class="settings-section">
+                <h3>🔍 Suggestie-diagnose</h3>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Kies een dag en zie wat de Slimme Suggesties-motor erover concludeert: de suggestie, wat er gebakken is, de breuk, en welke buffs/multipliers meespeelden. Read-only — verandert niets aan je planning. Opgeslagen dagen tonen gebakken + breuk uit de database; een toekomstige dag toont de berekening (breuk is dan nog leeg). Handig om te zien waaróm een suggestie uitschoot en of een multiplier bijgesteld moet worden.</p>
+                <div class="setting-row">
+                    <label>Referentiedatum</label>
+                    <input type="date" id="diag-date" onchange="renderSuggestionDiagnose()" style="width: 150px;">
+                </div>
+                <div id="diag-output" style="margin-top: 10px;"></div>
+            </div>
+            <div class="settings-section">
                 <h3>📊 Breuk Drempels</h3>
                 <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">+Bij0 = extra als breuk=0 | -1/-2/-3 = verlagen bij breuk boven drempel</p>
                 <div class="table-wrapper">
@@ -1091,6 +1100,252 @@
             }
 
             return plates;
+        }
+
+        // ===== SUGGESTIE-DIAGNOSE (read-only) =====
+        // Spiegelt de math van calculateSuggestionAdvanced, maar voor een WILLEKEURIGE
+        // datum en met alle tussenstappen bewaard, zodat de eigenaar kan zien waaróm een
+        // suggestie uitschoot en welke multiplier eventueel bijgesteld moet worden.
+        // BELANGRIJK: raakt de motor NIET aan — gebruikt geen currentDate / event-dropdown
+        // en muteert niets. Context van de gekozen dag komt uit de opgeslagen rij
+        // (getDayContext); een toekomstige dag valt terug op 'Normal' + weer-forecast.
+
+        function isProductOOSOnDate(prod, dateISO) {
+            return !!historicalData.find(r => r.datum === dateISO && r.product === prod.name)?.out_of_stock;
+        }
+
+        // Klassieke (OFF-mode) suggestie voor een willekeurige datum — kopie van de logica
+        // in calculateSuggestion(), maar zonder afhankelijkheid van currentDate. Nodig voor
+        // de vangrail-klem in de diagnose.
+        function diagClassic(p, dateObj) {
+            for (let weeks = 1; weeks <= 4; weeks++) {
+                const target = new Date(dateObj);
+                target.setDate(target.getDate() - weeks * 7);
+                const rec = historicalData.find(d => d.datum === formatDateISO(target) && d.product === p.name);
+                if (!rec || rec.out_of_stock) continue;
+                let sug = rec.totaal;
+                const breuk = rec.breuk || 0;
+                if (breuk === 0) sug += p.bij0;
+                else if (breuk > p.d3) sug -= 3;
+                else if (breuk > p.d2) sug -= 2;
+                else if (breuk > p.d1) sug -= 1;
+                return Math.max(1, sug);
+            }
+            return 1;
+        }
+
+        // Date-bewuste variant van refDemands() die ook per referentie de tussenwaarden
+        // bewaart voor weergave. planISO = de dag die gediagnosticeerd wordt ("vandaag").
+        function diagRefDemands(p, dates, promoSet, planISO) {
+            const out = [];
+            for (let i = 0; i < dates.length && out.length < 4; i++) {
+                const iso = dates[i];
+                const rec = historicalData.find(r => r.datum === iso && r.product === p.name);
+                if (!rec || rec.out_of_stock || rec.breuk === null || rec.breuk === undefined) continue;
+                const ctx = getDayContext(iso, promoSet);
+                if (ctx.feestdag || ctx.promo || ctx.snow) continue;
+                const gebakken = (rec.totaal || 0) * p.ppp;
+                if (gebakken <= 0) continue;
+                const soldout = rec.breuk === 0;
+                const f = contextFactor(ctx, p.group);
+                let demand = soldout ? gebakken * (1 + selloutBumpPct(p, iso) / 100)
+                                     : Math.max(0, gebakken - rec.breuk);
+                demand /= f;
+                let gebNorm = gebakken / f;
+                const neighborWasOOS = PRODUCTS.some(o =>
+                    o.group === p.group && o.id !== p.id &&
+                    historicalData.find(r => r.datum === iso && r.product === o.name)?.out_of_stock &&
+                    !isProductOOSOnDate(o, planISO)
+                );
+                if (neighborWasOOS) {
+                    demand /= 1 + SETTINGS.pSubstitutie / 100;
+                    gebNorm /= 1 + SETTINGS.pSubstitutie / 100;
+                }
+                out.push({ iso, gebakkenPlates: rec.totaal || 0, gebakken, breuk: rec.breuk,
+                           soldout, demand, gebNorm, weight: out.length < 2 ? 2 : 1,
+                           neighborWasOOS, ctx, f });
+            }
+            return out;
+        }
+
+        // Volledige diagnose voor één product op een datum. Spiegelt
+        // calculateSuggestionAdvanced() stap voor stap en geeft een breakdown-object terug.
+        function diagnoseProduct(p, dateObj) {
+            const promoSet = buildPromoDateSet();
+            const planISO = formatDateISO(dateObj);
+            const ctx = getDayContext(planISO, promoSet);
+            const dow = ctx.feestdag ? 0 : dateObj.getDay();
+            let refs = diagRefDemands(p, lastDatesOfDow(dateObj, dow, 9), promoSet, planISO);
+            let fallbackDow = false;
+            if (!refs.length && ctx.feestdag) {
+                refs = diagRefDemands(p, lastDatesOfDow(dateObj, dateObj.getDay(), 9), promoSet, planISO);
+                fallbackDow = true;
+            }
+            const cf = contextFactor(ctx, p.group);
+            if (!refs.length) {
+                return { ctx, cf, fellBack: true, classic: diagClassic(p, dateObj) };
+            }
+
+            // Sold-out floor: een uitverkochte referentie mag de mediaan nooit naar beneden trekken.
+            let floorApplied = false, floorTo = null;
+            const exact = refs.filter(r => !r.soldout).map(r => r.demand);
+            if (exact.length) {
+                const m0 = median(exact);
+                refs.forEach(r => { if (r.soldout && r.demand < m0) { r.demand = m0; floorApplied = true; floorTo = m0; } });
+            }
+
+            const weighted = [];
+            refs.forEach(r => { for (let k = 0; k < r.weight; k++) weighted.push(r.demand); });
+            const baseDemand = median(weighted);
+            let demand = baseDemand;
+
+            let selloutStreak = false;
+            if (refs.length >= 2 && refs[0].soldout && refs[1].soldout) {
+                demand *= 1 + SETTINGS.pSelloutStreak / 100;
+                selloutStreak = true;
+            }
+            let feestdagFactor = null;
+            if (ctx.feestdag) { feestdagFactor = SETTINGS.pFeestdag / 100; demand *= feestdagFactor; }
+            demand *= cf;
+            const demandFinal = demand;
+
+            const planStuks = demand / (1 - SETTINGS.targetBreuk / 100);
+            let plates = Math.round(planStuks / p.ppp);
+            if (plates * p.ppp < demand) plates++;
+            plates = Math.max(1, plates);
+            const platesRaw = plates;
+
+            // Vangrail
+            const simple = diagClassic(p, dateObj);
+            let vangrail = null;
+            if (!ctx.feestdag && simple > 1) {
+                const lo = Math.max(1, Math.floor(simple * cf * 0.5));
+                const hi = Math.max(lo, Math.ceil(simple * cf * 2));
+                const clamped = Math.min(hi, Math.max(lo, plates));
+                vangrail = { lo, hi, simple, applied: clamped !== plates };
+                plates = clamped;
+            }
+
+            // Groeirem
+            let groeirem = null;
+            if (SETTINGS.pMaxGroei > 0 && refs[0].gebNorm > 0) {
+                const fToday = cf * (ctx.feestdag ? SETTINGS.pFeestdag / 100 : 1);
+                const capStuks = refs[0].gebNorm * fToday * (1 + SETTINGS.pMaxGroei / 100);
+                const capPlates = Math.max(1, Math.round(capStuks / p.ppp));
+                groeirem = { capPlates, applied: plates > capPlates };
+                if (plates > capPlates) plates = capPlates;
+            }
+
+            return { ctx, cf, fellBack: false, fallbackDow, refs, baseDemand, selloutStreak,
+                     feestdagFactor, demandFinal, planStuks, platesRaw, vangrail, groeirem,
+                     finalPlates: plates, floorApplied, floorTo };
+        }
+
+        // Bouwt de leesbare lijst van actieve dag-buffs (chips) uit een context.
+        // group is optioneel — geeft de groep-specifieke % erbij waar relevant.
+        function diagContextChips(ctx, dateISO) {
+            const chips = [];
+            const w = weatherInfoForDate(dateISO);
+            if (w.temp !== null) chips.push({ icon: '🌡️', label: `${w.temp}°`, color: 'var(--text-secondary)' });
+            if (ctx.promo) chips.push({ icon: '📢', label: `Promo (B +${SETTINGS.pPromoB}% / A +${SETTINGS.pPromoA}%)`, color: 'var(--accent-orange)' });
+            if (ctx.feestdag) chips.push({ icon: '🎉', label: `Feestdag (×${SETTINGS.pFeestdag}% v. zondag)`, color: 'var(--accent-orange)' });
+            if (ctx.rondFeestdag) chips.push({ icon: '🎉', label: `Rond feestdag (+${SETTINGS.pRondFeestdag}%)`, color: 'var(--accent-orange)' });
+            if (ctx.snow) chips.push({ icon: '❄️', label: `Sneeuw (−${SETTINGS.pSnow}%)`, color: 'var(--accent-cyan)' });
+            else if (ctx.bbq) chips.push({ icon: '☀️', label: `BBQ (B +${SETTINGS.pBbqB}% / A +${SETTINGS.pBbqA}%)`, color: 'var(--accent-orange)' });
+            else if (ctx.warm) chips.push({ icon: '🌤️', label: `Warm (B +${SETTINGS.pWarmB}%)`, color: 'var(--accent-orange)' });
+            if (!chips.length || (chips.length === 1 && chips[0].icon === '🌡️'))
+                chips.push({ icon: '😐', label: 'Normaal (geen buffs)', color: 'var(--text-muted)' });
+            return chips;
+        }
+
+        function renderSuggestionDiagnose() {
+            const out = document.getElementById('diag-output');
+            if (!out) return;
+            const inp = document.getElementById('diag-date');
+            if (inp && !inp.value) inp.value = formatDateISO(currentDate);
+            const iso = inp?.value;
+            if (!iso) { out.innerHTML = ''; return; }
+            const dateObj = new Date(iso + 'T00:00:00');
+            const promoSet = buildPromoDateSet();
+            const ctx = getDayContext(iso, promoSet);
+
+            const chips = diagContextChips(ctx, iso).map(c =>
+                `<span style="display:inline-flex; align-items:center; gap:4px; background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:3px 8px; font-size:0.72rem; color:${c.color};">${c.icon} ${c.label}</span>`
+            ).join('');
+
+            const num = (v, d = 0) => (v === null || v === undefined) ? '—' : v.toFixed(d);
+            let rows = '';
+            PRODUCTS.forEach(p => {
+                const d = diagnoseProduct(p, dateObj);
+                const rec = historicalData.find(r => r.datum === iso && r.product === p.name);
+                const oos = !!rec?.out_of_stock;
+                const gebakken = rec ? rec.totaal : null;
+                const breuk = (rec && rec.breuk !== null && rec.breuk !== undefined) ? rec.breuk : null;
+                const gebStuks = (gebakken || 0) * p.ppp;
+                const breukPct = (breuk !== null && gebStuks > 0) ? (breuk / gebStuks * 100) : null;
+                const storedSug = (rec && rec.suggestie !== null && rec.suggestie !== undefined) ? rec.suggestie : null;
+                const sug = d.fellBack ? d.classic : d.finalPlates;
+                const groupColor = p.group === 'A' ? 'var(--accent-cyan)' : 'var(--accent-orange)';
+
+                // Detail-breakdown
+                let detail = '';
+                if (oos) {
+                    detail = `<div style="color:var(--text-muted); font-size:0.72rem;">Was uit voorraad op deze dag — geen suggestie-berekening.</div>`;
+                } else if (d.fellBack) {
+                    detail = `<div style="color:var(--text-muted); font-size:0.72rem;">Te weinig normale referentiedagen → val terug op klassieke berekening: <b>${d.classic}</b> platen.</div>`;
+                } else {
+                    const refLines = d.refs.map(r => {
+                        const rd = new Date(r.iso + 'T00:00:00');
+                        const tags = [];
+                        if (r.soldout) tags.push('uitverkocht');
+                        if (r.weight === 2) tags.push('×2');
+                        if (r.neighborWasOOS) tags.push('subst.−');
+                        const tagStr = tags.length ? ` <span style="color:var(--text-muted);">(${tags.join(', ')})</span>` : '';
+                        return `<div>• ${formatDate(rd)} ${getDayName(rd).slice(0,2)}: ${r.gebakkenPlates}pl (${r.gebakken}st), breuk ${r.breuk} → <b>${r.demand.toFixed(0)}st</b>${tagStr}</div>`;
+                    }).join('');
+                    const steps = [];
+                    steps.push(`Basis (gewogen mediaan): <b>${d.baseDemand.toFixed(0)}st</b>`);
+                    if (d.floorApplied) steps.push(`↑ uitverkocht-vloer naar ${d.floorTo.toFixed(0)}st`);
+                    if (d.selloutStreak) steps.push(`🔥 2× uitverkocht: ×${(1 + SETTINGS.pSelloutStreak / 100).toFixed(2)}`);
+                    if (d.feestdagFactor) steps.push(`🎉 Feestdag: ×${d.feestdagFactor.toFixed(2)}`);
+                    if (Math.abs(d.cf - 1) > 0.001) steps.push(`Dag-multiplier (${p.group}): ×${d.cf.toFixed(2)}`);
+                    steps.push(`→ Verwachte vraag: <b>${d.demandFinal.toFixed(0)}st</b>`);
+                    steps.push(`Plan ÷ ${(1 - SETTINGS.targetBreuk / 100).toFixed(2)} (doel ${SETTINGS.targetBreuk}% breuk) = ${d.planStuks.toFixed(0)}st → <b>${d.platesRaw}pl</b>`);
+                    if (d.vangrail && d.vangrail.applied) steps.push(`🛡️ Vangrail klem naar ${d.vangrail.lo}–${d.vangrail.hi}pl`);
+                    if (d.groeirem && d.groeirem.applied) steps.push(`📈 Groeirem cap: max ${d.groeirem.capPlates}pl`);
+                    steps.push(`<b style="color:${groupColor};">Suggestie: ${d.finalPlates} platen</b>`);
+                    detail = `<div style="font-size:0.72rem; color:var(--text-secondary); line-height:1.5;">
+                        <div style="margin-bottom:4px; color:var(--text-muted);">Referenties (${d.refs.length}):</div>
+                        ${refLines}
+                        <div style="margin-top:6px; border-top:1px solid var(--border-light); padding-top:6px;">${steps.join('<br>')}</div>
+                    </div>`;
+                }
+
+                const sugDisp = oos ? '—' : sug;
+                const storedNote = (storedSug !== null && !oos && storedSug !== sug)
+                    ? ` <span style="color:var(--text-muted); font-size:0.65rem;">(opgeslagen: ${storedSug})</span>` : '';
+
+                rows += `
+                    <div style="background:var(--bg-card); border-radius:var(--radius-sm); padding:10px; margin-bottom:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <span style="font-weight:600; font-size:0.85rem;">${p.short}
+                                <span style="font-size:0.6rem; background:${groupColor}; color:#0f172a; border-radius:3px; padding:1px 5px; margin-left:4px;">${p.group}</span>
+                            </span>
+                            <span style="font-size:0.72rem; color:var(--text-secondary);">
+                                Sug <b style="color:${groupColor};">${sugDisp}</b>${storedNote}
+                                · Gebakken <b>${num(gebakken)}</b>
+                                · Breuk <b>${num(breuk)}</b>${breukPct !== null ? ` <span style="color:var(--text-muted);">(${breukPct.toFixed(0)}%)</span>` : ''}
+                            </span>
+                        </div>
+                        ${detail}
+                    </div>`;
+            });
+
+            const wd = getDayName(dateObj);
+            out.innerHTML = `
+                <div style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:6px;">${wd} ${formatDate(dateObj)}</div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;">${chips}</div>
+                ${rows}`;
         }
 
         // Returns array of batch numbers (1-based) where Group B is skipped on the given date.
@@ -2405,6 +2660,11 @@
                     <td><input type="number" value="${p.d3}" data-id="${p.id}" data-field="d3" onchange="updateProductSetting(this)" style="width: 32px;"></td>
                 </tr>
             `).join('');
+
+            // Suggestie-diagnose: default op de huidige planningsdatum, render direct.
+            const diagInp = document.getElementById('diag-date');
+            if (diagInp && !diagInp.value) diagInp.value = formatDateISO(currentDate);
+            renderSuggestionDiagnose();
         }
         
         function updateProductSetting(input) {
