@@ -667,11 +667,19 @@
             <div class="settings-section">
                 <h3>🔍 Suggestie-diagnose</h3>
                 <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Kies een dag en zie wat de Slimme Suggesties-motor erover concludeert: de suggestie, wat er gebakken is, de breuk, en welke buffs/multipliers meespeelden. Read-only — verandert niets aan je planning. Opgeslagen dagen tonen gebakken + breuk uit de database; een toekomstige dag toont de berekening (breuk is dan nog leeg). Handig om te zien waaróm een suggestie uitschoot en of een multiplier bijgesteld moet worden.</p>
-                <div class="setting-row">
-                    <label>Referentiedatum</label>
-                    <input type="date" id="diag-date" onchange="renderSuggestionDiagnose()" style="width: 150px;">
+                <div class="collapsible-section">
+                    <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                        <span>📅 Open diagnose</span>
+                        <span class="collapse-icon">▶</span>
+                    </div>
+                    <div class="collapsible-content" style="display: none;">
+                        <div class="setting-row">
+                            <label>Referentiedatum</label>
+                            <input type="date" id="diag-date" onchange="renderSuggestionDiagnose()" style="padding: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-sans);">
+                        </div>
+                        <div id="diag-output" style="margin-top: 10px;"></div>
+                    </div>
                 </div>
-                <div id="diag-output" style="margin-top: 10px;"></div>
             </div>
             <div class="settings-section">
                 <h3>📊 Breuk Drempels</h3>
@@ -1147,10 +1155,11 @@
                 const gebakken = (rec.totaal || 0) * p.ppp;
                 if (gebakken <= 0) continue;
                 const soldout = rec.breuk === 0;
+                const bump = soldout ? selloutBumpPct(p, iso) : null;
                 const f = contextFactor(ctx, p.group);
-                let demand = soldout ? gebakken * (1 + selloutBumpPct(p, iso) / 100)
-                                     : Math.max(0, gebakken - rec.breuk);
-                demand /= f;
+                const demandRaw = soldout ? gebakken * (1 + bump / 100)
+                                          : Math.max(0, gebakken - rec.breuk);
+                let demand = demandRaw / f;
                 let gebNorm = gebakken / f;
                 const neighborWasOOS = PRODUCTS.some(o =>
                     o.group === p.group && o.id !== p.id &&
@@ -1162,8 +1171,8 @@
                     gebNorm /= 1 + SETTINGS.pSubstitutie / 100;
                 }
                 out.push({ iso, gebakkenPlates: rec.totaal || 0, gebakken, breuk: rec.breuk,
-                           soldout, demand, gebNorm, weight: out.length < 2 ? 2 : 1,
-                           neighborWasOOS, ctx, f });
+                           soldout, bump, demandRaw, demandNorm: demand, demand, gebNorm,
+                           weight: out.length < 2 ? 2 : 1, neighborWasOOS, ctx, f });
             }
             return out;
         }
@@ -1258,6 +1267,19 @@
             return chips;
         }
 
+        // Ontleedt contextFactor() in de losse buffs die stapelen, zodat de diagnose
+        // toont WELKE buffs samen de dag-multiplier vormen (i.p.v. enkel het totaal).
+        // Spiegelt exact de volgorde/voorwaarden van contextFactor().
+        function contextFactorParts(ctx, group) {
+            const parts = [];
+            if (ctx.promo) parts.push({ icon: '📢', label: `Promo (${group})`, factor: 1 + (group === 'B' ? SETTINGS.pPromoB : SETTINGS.pPromoA) / 100 });
+            if (ctx.rondFeestdag) parts.push({ icon: '🎉', label: 'Rond feestdag', factor: 1 + SETTINGS.pRondFeestdag / 100 });
+            if (ctx.snow) parts.push({ icon: '❄️', label: 'Sneeuw', factor: 1 - SETTINGS.pSnow / 100 });
+            else if (ctx.bbq) parts.push({ icon: '☀️', label: `BBQ (${group})`, factor: 1 + (group === 'B' ? SETTINGS.pBbqB : SETTINGS.pBbqA) / 100 });
+            else if (ctx.warm && group === 'B') parts.push({ icon: '🌤️', label: 'Warm (B)', factor: 1 + SETTINGS.pWarmB / 100 });
+            return parts;
+        }
+
         function renderSuggestionDiagnose() {
             const out = document.getElementById('diag-output');
             if (!out) return;
@@ -1296,19 +1318,30 @@
                 } else {
                     const refLines = d.refs.map(r => {
                         const rd = new Date(r.iso + 'T00:00:00');
-                        const tags = [];
-                        if (r.soldout) tags.push('uitverkocht');
-                        if (r.weight === 2) tags.push('×2');
-                        if (r.neighborWasOOS) tags.push('subst.−');
-                        const tagStr = tags.length ? ` <span style="color:var(--text-muted);">(${tags.join(', ')})</span>` : '';
-                        return `<div>• ${formatDate(rd)} ${getDayName(rd).slice(0,2)}: ${r.gebakkenPlates}pl (${r.gebakken}st), breuk ${r.breuk} → <b>${r.demand.toFixed(0)}st</b>${tagStr}</div>`;
+                        const w = r.weight === 2 ? ' <span style="color:var(--text-muted);">(telt ×2)</span>' : '';
+                        // Normalisatie-keten van deze referentiedag — élke multiplier zichtbaar.
+                        const sub = [];
+                        if (r.soldout) sub.push(`🔥 uitverkocht → vraag ≥ ${r.gebakken} × (1 + bump ${r.bump}%) = ${r.demandRaw.toFixed(0)}st`);
+                        else sub.push(`vraag = ${r.gebakken} − ${r.breuk} breuk = ${r.demandRaw.toFixed(0)}st`);
+                        contextFactorParts(r.ctx, p.group).forEach(pt =>
+                            sub.push(`${pt.icon} ${pt.label} op die dag → normaliseer ÷${pt.factor.toFixed(2)}`));
+                        if (r.neighborWasOOS) sub.push(`🔄 groepsgenoot was uit voorraad → ÷${(1 + SETTINGS.pSubstitutie / 100).toFixed(2)}`);
+                        let tail = `→ <b>${r.demandNorm.toFixed(0)}st</b>`;
+                        if (r.soldout && Math.abs(r.demand - r.demandNorm) > 0.5) tail += ` <span style="color:var(--text-muted);">↑ vloer → ${r.demand.toFixed(0)}st</span>`;
+                        sub.push(tail);
+                        return `<div style="margin-bottom:5px;">
+                            <div>• ${formatDate(rd)} ${getDayName(rd).slice(0,2)}: ${r.gebakkenPlates}pl (${r.gebakken}st)${w}</div>
+                            <div style="margin-left:12px; color:var(--text-muted);">${sub.join('<br>')}</div>
+                        </div>`;
                     }).join('');
                     const steps = [];
                     steps.push(`Basis (gewogen mediaan): <b>${d.baseDemand.toFixed(0)}st</b>`);
                     if (d.floorApplied) steps.push(`↑ uitverkocht-vloer naar ${d.floorTo.toFixed(0)}st`);
                     if (d.selloutStreak) steps.push(`🔥 2× uitverkocht: ×${(1 + SETTINGS.pSelloutStreak / 100).toFixed(2)}`);
                     if (d.feestdagFactor) steps.push(`🎉 Feestdag: ×${d.feestdagFactor.toFixed(2)}`);
-                    if (Math.abs(d.cf - 1) > 0.001) steps.push(`Dag-multiplier (${p.group}): ×${d.cf.toFixed(2)}`);
+                    const cfParts = contextFactorParts(d.ctx, p.group);
+                    cfParts.forEach(pt => steps.push(`${pt.icon} ${pt.label}: ×${pt.factor.toFixed(2)}`));
+                    if (cfParts.length > 1) steps.push(`= Dag-multiplier totaal (${p.group}): ×${d.cf.toFixed(2)}`);
                     steps.push(`→ Verwachte vraag: <b>${d.demandFinal.toFixed(0)}st</b>`);
                     steps.push(`Plan ÷ ${(1 - SETTINGS.targetBreuk / 100).toFixed(2)} (doel ${SETTINGS.targetBreuk}% breuk) = ${d.planStuks.toFixed(0)}st → <b>${d.platesRaw}pl</b>`);
                     if (d.vangrail && d.vangrail.applied) steps.push(`🛡️ Vangrail klem naar ${d.vangrail.lo}–${d.vangrail.hi}pl`);
