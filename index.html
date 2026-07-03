@@ -500,7 +500,7 @@
                  toch al scrolt. Bewust ZONDER instel-hints — dat is diagnose-materiaal
                  en blijft in Instellingen. Aan/uit via Instellingen → Slimme Suggesties. -->
             <div class="reference-card" id="scoreboard-card" style="display: none;">
-                <div class="reference-header">🥊 Scorebord — jullie vs de suggestie (laatste 3 weken)</div>
+                <div class="reference-header">🥊 Scorebord (laatste 3 weken)</div>
                 <div id="scoreboard-content"></div>
                 <div class="collapsible-section" style="margin-top: 10px;">
                     <div class="collapsible-header" onclick="toggleCollapsible(this)">
@@ -509,8 +509,8 @@
                     </div>
                     <div class="collapsible-content" style="display: none; font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5; padding: 0 10px 10px;">
                         <p style="margin-bottom: 6px;">• Telt alleen opgeslagen dagen (laatste 21, mét ingevulde breuk) waarop de suggestie bij het opslaan is <b>aangepast met ≥ 2 platen</b>. 1 plaatje meer of minder is bij de kleine producten al 25–50% — dat is ruis, geen duel.</p>
-                        <p style="margin-bottom: 6px;">• <b style="color: var(--accent-cyan);">Punt suggestie:</b> jullie verlaagden → tóch uitverkocht · of jullie verhoogden → eindigde in duidelijke breuk terwijl de suggestie ok was.</p>
-                        <p style="margin-bottom: 6px;">• <b style="color: var(--accent-orange);">Punt jullie:</b> jullie verhoogden → en dat bleek nodig · of jullie verlaagden → de suggestie volgen had duidelijke breuk gegeven (&gt; 2× doel-breuk én &gt; 1 plaat).</p>
+                        <p style="margin-bottom: 6px;">• <b style="color: var(--accent-cyan);">Punt voor de suggestie:</b> jullie verlaagden → tóch uitverkocht · of jullie verhoogden → eindigde in duidelijke breuk terwijl de suggestie ok was.</p>
+                        <p style="margin-bottom: 6px;">• <b style="color: var(--accent-orange);">Punt voor jullie:</b> jullie verhoogden → en dat bleek nodig · of jullie verlaagden → de suggestie volgen had duidelijke breuk gegeven (&gt; 2× doel-breuk én &gt; 1 plaat).</p>
                         <p style="margin-bottom: 6px;">• <b>Onbeslist:</b> beide keuzes waren ok geweest. Bij uitverkocht is de echte vraag onbekend — twijfel levert nooit een punt op.</p>
                         <p>• Uit voorraad-dagen tellen niet mee. De stand rekent live op de lokale historiek; er wordt niets extra opgeslagen.</p>
                     </div>
@@ -1610,12 +1610,11 @@
                 content.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8rem;">Nog geen duels in de laatste 3 weken (een duel = suggestie ≥ 2 platen aangepast, breuk ingevuld).</div>';
                 return;
             }
-            const lead = duel.motor > duel.jullie ? '🤖 De suggestie staat voor — laten staan loont!'
-                       : duel.jullie > duel.motor ? '🧑‍🍳 Jullie staan voor — de bakkersneus wint (nog).'
-                       : '🤝 Gelijkspel.';
+            // Compact (eigenaar 2026-07-03): alleen de drie tellers — de stand spreekt
+            // voor zich, labels in wit voor leesbaarheid.
             const box = (label, val, color) => `
                 <div style="flex: 1; text-align: center; background: var(--bg-card); border-radius: var(--radius-sm); padding: 8px 4px;">
-                    <div style="font-size: 0.65rem; color: var(--text-muted);">${label}</div>
+                    <div style="font-size: 0.65rem; color: var(--text-primary);">${label}</div>
                     <div style="font-family: var(--font-mono); font-size: 1.3rem; font-weight: 700; color: ${color};">${val}</div>
                 </div>`;
             content.innerHTML = `
@@ -1623,8 +1622,7 @@
                     ${box('🤖 Suggestie', duel.motor, 'var(--accent-cyan)')}
                     ${box('🤝 Onbeslist', duel.onbeslist, 'var(--text-muted)')}
                     ${box('🧑‍🍳 Jullie', duel.jullie, 'var(--accent-orange)')}
-                </div>
-                <div style="margin-top: 8px; font-size: 0.78rem; color: var(--text-secondary); text-align: center;">${lead} <span style="color: var(--text-muted);">(${duels} duels)</span></div>`;
+                </div>`;
         }
 
         // Returns array of batch numbers (1-based) where Group B is skipped on the given date.
