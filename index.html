@@ -288,14 +288,15 @@
         .reference-card {
             background: var(--bg-dark); border-radius: var(--radius);
             padding: 12px; margin-top: 16px;
+            overflow-x: auto; /* 5 weken + Gem = 12 kolommen; smalle schermen scrollen */
         }
-        
+
         .reference-header { font-weight: 600; margin-bottom: 10px; color: var(--text-secondary); font-size: 0.85rem; }
-        
-        .reference-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-        .reference-table th { padding: 6px; font-size: 0.65rem; color: var(--text-muted); text-align: center; }
+
+        .reference-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+        .reference-table th { padding: 6px 2px; font-size: 0.65rem; color: var(--text-muted); text-align: center; }
         .reference-table th:first-child { text-align: left; }
-        .reference-table td { padding: 5px; text-align: center; font-family: var(--font-mono); }
+        .reference-table td { padding: 5px 3px; text-align: center; font-family: var(--font-mono); }
         .reference-table td:first-child { text-align: left; font-family: var(--font-sans); }
         .reference-table .breuk { color: var(--accent-red); font-weight: 600; }
         
@@ -476,7 +477,7 @@
             <div class="reference-card">
                 <div class="reference-header">📊 Vorige Weken (zelfde dag)</div>
                 <table class="reference-table">
-                    <thead><tr><th>Product</th><th>W-1</th><th>Brk</th><th>W-2</th><th>Brk</th><th>W-3</th><th>Brk</th></tr></thead>
+                    <thead><tr><th>Product</th><th>Gem</th><th>W-1</th><th>Brk</th><th>W-2</th><th>Brk</th><th>W-3</th><th>Brk</th><th>W-4</th><th>Brk</th><th>W-5</th><th>Brk</th></tr></thead>
                     <tbody id="reference-body"></tbody>
                 </table>
             </div>
@@ -685,6 +686,16 @@
                         <div id="diag-output" style="margin-top: 10px;"></div>
                     </div>
                 </div>
+                <div class="collapsible-section">
+                    <div class="collapsible-header" onclick="toggleCollapsible(this); renderSuggestionReport();">
+                        <span>📈 Rapport laatste 3 weken</span>
+                        <span class="collapse-icon">▶</span>
+                    </div>
+                    <div class="collapsible-content" style="display: none;">
+                        <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Vergelijkt per dag de opgeslagen suggestie met wat er echt gebakken en verkocht is. ✅ = suggestie zat goed · 🔽 = te hoog (suggestie volgen had duidelijk extra breuk gegeven) · 🔼 = te laag (dekte de verkoop niet / uitverkocht). Onderaan: welke instelling in Fijnafstelling het vaakst de oorzaak lijkt.</p>
+                        <div id="diag-report"></div>
+                    </div>
+                </div>
             </div>
             <div class="settings-section">
                 <h3>📊 Breuk Drempels</h3>
@@ -754,6 +765,11 @@
         
         let SETTINGS = {
             oven1Max: 16, oven2Max: 15, batchMax: 31,
+            // Weekdag 3e batch (eigenaar-regel 2026-07-03): past een groep niet in
+            // 2× de eigen oven, open dan L3 — maar alleen als de overloop een bak
+            // waard is: minstens 3 platen (Groep A) of 4 platen (Groep B). Kleinere
+            // overloop blijft zichtbaar in L2 staan zodat de bakkers zelf beslissen.
+            minL3A: 3, minL3B: 4,
             // skipB: per-day list of batch numbers (1-5) where Group B is skipped.
             // Flexible by design — adding new batches or weekday entries needs no code changes
             // beyond the UI. e.g. { sat:[2,3], sun:[2,3,4], mon:[] } would all just work.
@@ -1415,6 +1431,91 @@
                 ${rows}`;
         }
 
+        // ===== SUGGESTIE-RAPPORT (read-only) =====
+        // Scoort de opgeslagen suggesties van de laatste 21 dagen tegen de uitkomst:
+        //   suggestie (bij opslaan) vs totaal (wat er echt gebakken is) vs breuk.
+        // Oordeel per product-dag, in stuks (verkocht = gebakken − breuk; bij
+        // uitverkocht is dat een ONDERGRENS van de vraag, geen meting):
+        //   🔼 te laag  = suggestie dekte de verkoop niet, of uitverkocht aan ≤ suggestie
+        //   ✅ + 💪     = eigenaar verlaagde en tóch uitverkocht → motor had gelijk
+        //   🔽 te hoog  = suggestie volgen had > 2× doel-breuk én > 1 plaat extra breuk gegeven
+        //   ✅ goed     = anders
+        // Read-only: rekent alleen op opgeslagen rijen, raakt de suggestie-motor niet aan.
+        function renderSuggestionReport() {
+            const out = document.getElementById('diag-report');
+            if (!out) return;
+            const todayISO = formatDateISO(new Date());
+            const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 21);
+            const cutoffISO = formatDateISO(cutoff);
+            const rows = historicalData.filter(r =>
+                r.datum >= cutoffISO && r.datum <= todayISO &&
+                r.suggestie !== null && r.suggestie !== undefined &&
+                r.breuk !== null && r.breuk !== undefined &&
+                !r.out_of_stock && (r.totaal || 0) > 0);
+
+            const stats = {};
+            PRODUCTS.forEach(p => stats[p.id] = { goed: 0, hoog: 0, laag: 0, cutSoldout: 0, laagRegenWarm: 0 });
+            let scored = 0;
+            rows.forEach(r => {
+                const p = PRODUCTS.find(x => x.name === r.product);
+                if (!p) return;
+                const s = stats[p.id];
+                const gebStuks = r.totaal * p.ppp;
+                const verkocht = Math.max(0, gebStuks - r.breuk);
+                const sugStuks = r.suggestie * p.ppp;
+                const soldOut = r.breuk === 0;
+                scored++;
+                if (sugStuks < verkocht || (soldOut && r.suggestie <= r.totaal)) {
+                    s.laag++;
+                    // Signaal voor de lucht-kwaliteit-instelling: te laag op een warme
+                    // regen-/onweersdag wijst naar een te strenge 🌧️ Regen %-korting.
+                    const w = weatherInfoForDate(r.datum);
+                    if (/🌧️|⛈️/.test(r.weather || '') && w.temp !== null && w.temp >= SETTINGS.tempWarm) s.laagRegenWarm++;
+                } else if (soldOut) {
+                    // Eigenaar verlaagde de suggestie en het was tóch uitverkocht:
+                    // vraag ≥ verkocht, dus de hogere suggestie was (minstens) juist.
+                    s.goed++;
+                    s.cutSoldout++;
+                } else {
+                    const hypBreuk = sugStuks - verkocht;
+                    const hypPct = sugStuks > 0 ? hypBreuk / sugStuks * 100 : 0;
+                    if (hypBreuk > p.ppp && hypPct > SETTINGS.targetBreuk * 2) s.hoog++;
+                    else s.goed++;
+                }
+            });
+
+            if (!scored) {
+                out.innerHTML = '<span style="color:var(--text-muted); font-size:0.75rem;">Nog geen opgeslagen suggesties met ingevulde breuk in de laatste 3 weken.</span>';
+                return;
+            }
+
+            let html = '<table class="reference-table"><thead><tr><th>Product</th><th>✅ goed</th><th>🔽 te hoog</th><th>🔼 te laag</th><th>💪</th></tr></thead><tbody>';
+            PRODUCTS.forEach(p => {
+                const s = stats[p.id];
+                const tot = s.goed + s.hoog + s.laag;
+                if (!tot) return;
+                const laagStyle = s.laag > s.goed ? 'color:var(--accent-red); font-weight:600;' : '';
+                const hoogStyle = s.hoog > s.goed ? 'color:var(--accent-orange); font-weight:600;' : '';
+                html += `<tr><td>${p.short}</td><td>${s.goed}</td><td style="${hoogStyle}">${s.hoog}</td><td style="${laagStyle}">${s.laag}</td><td>${s.cutSoldout}</td></tr>`;
+            });
+            html += '</tbody></table>';
+            html += '<div style="font-size:0.65rem; color:var(--text-muted); margin-top:4px;">💪 = suggestie verlaagd bij opslaan en tóch uitverkocht (motor had gelijk).</div>';
+
+            // Datagedreven hints: wijzen naar de instelling in Fijnafstelling die het
+            // vaakst als oorzaak uit de cijfers komt. Drempels bewust conservatief.
+            const sum = k => PRODUCTS.reduce((n, p) => n + stats[p.id][k], 0);
+            const totLaag = sum('laag'), totHoog = sum('hoog'),
+                  totLaagRW = sum('laagRegenWarm'), totCut = sum('cutSoldout');
+            const hints = [];
+            if (totLaagRW >= 3) hints.push(`🌧️ <b>${totLaagRW}×</b> te laag op warme regen-/onweersdagen. De lucht-korting (🌧️ Regen %, nu <b>${SETTINGS.skyRainPct}%</b>) knijpt de warmte-buff dan bijna dicht, terwijl een voorspelde (onweers)bui in de zomer vaak maar een deel van de dag kost. Probeer 50.`);
+            if (totCut >= 3) hints.push(`💪 <b>${totCut}×</b> een verlaagde suggestie die tóch uitverkocht raakte — vertrouw de grote getallen van de motor wat vaker.`);
+            if (totLaag - totLaagRW >= scored / 4) hints.push(`🔥 Ook los van het weer vaak te laag → verhoog 🔥 Uitverkocht +% (nu <b>${SETTINGS.pSellout}</b>) met 5.`);
+            if (totHoog >= scored / 4) hints.push(`📉 Vaak te hoog → verlaag 📈 Max stijging per week % (nu <b>${SETTINGS.pMaxGroei}</b>) richting 15.`);
+            if (!hints.length) hints.push('👍 Geen duidelijke scheefstand — instellingen laten staan.');
+            html += hints.map(h => `<div style="font-size:0.72rem; color:var(--text-secondary); margin-top:8px; line-height:1.4;">${h}</div>`).join('');
+            out.innerHTML = html;
+        }
+
         // Returns array of batch numbers (1-based) where Group B is skipped on the given date.
         // Reads SETTINGS.skipB by weekday key. Empty array on weekdays.
         // Een feestdag op een weekdag gedraagt zich als ZONDAG (open tot 13u, zelfde
@@ -1758,6 +1859,41 @@
                 });
             }
 
+            // Weekdag 3e batch (eigenaar-regel 2026-07-03, n.a.v. do 3/7: suggestie
+            // stok wit 32 + bruin 3 = 35 platen Groep B > 2× oven → L2 liep stilletjes
+            // over de ovencapaciteit). Vroeger was weekdag hard 2 batches; nu geldt:
+            //   - overloop boven 2× de eigen oven ≥ minL3A (3pl, A) / minL3B (4pl, B)
+            //     → open L3 en verschuif de overloop daarheen (een bak waard);
+            //   - kleinere overloop blijft in L2 staan (rood gemarkeerd) — de bakkers
+            //     beslissen zelf of zo'n mini-batch de rijskast waard is. De suggestie
+            //     zelf wordt NOOIT afgekapt.
+            // Zelfde kandidaat-regels als de L1-rebalance: pistolet wit als laatste,
+            // en nooit een product volledig uit L2 halen (vers rond de middag).
+            if (!weekend) {
+                ['A', 'B'].forEach(group => {
+                    const products = PRODUCTS.filter(p => p.group === group);
+                    const cap = group === 'A' ? SETTINGS.oven1Max : SETTINGS.oven2Max;
+                    const minL3 = group === 'A' ? SETTINGS.minL3A : SETTINGS.minL3B;
+                    let sumL2 = products.reduce((s, p) => s + (displayData[p.id].batches[1] || 0), 0);
+                    if (sumL2 - cap < minL3) return; // geen of te kleine overloop
+                    let safety = 50;
+                    while (sumL2 > cap && safety-- > 0) {
+                        let candidates = products.filter(p =>
+                            p.id !== 'pistolet_wit' && displayData[p.id].batches[1] > 1
+                        );
+                        if (candidates.length === 0) {
+                            candidates = products.filter(p => displayData[p.id].batches[1] > 1);
+                        }
+                        if (candidates.length === 0) break;
+                        candidates.sort((a, b) => displayData[b.id].batches[1] - displayData[a.id].batches[1]);
+                        const pick = candidates[0];
+                        displayData[pick.id].batches[1]--;
+                        displayData[pick.id].batches[2]++;
+                        sumL2--;
+                    }
+                });
+            }
+
             // Fix rounding errors: ensure batches sum to totaal
             PRODUCTS.forEach(p => {
                 const data = displayData[p.id];
@@ -1897,24 +2033,30 @@
         }
         
         function renderReference() {
+            // 5 weken zelfde weekdag (eigenaar 2026-07-03: 3 was te weinig als er
+            // uitverkochte/promo-weken tussen zaten) + Gem-kolom vooraan: gemiddeld
+            // gebakken platen over de getoonde weken mét data (UIT/ontbrekend telt niet mee).
+            const NWEEKS = 5;
             let html = '';
-            
+
             // Calculate totals for each week
-            const weekTotals = [0, 0, 0];
-            const weekBreuk = [0, 0, 0];
-            
+            const weekTotals = Array(NWEEKS).fill(0);
+            const weekBreuk = Array(NWEEKS).fill(0);
+            const weekHasData = Array(NWEEKS).fill(false);
+
             // First add the weather row
-            html += '<tr style="background: var(--bg-card);"><td style="font-weight: 600;">Weer</td>';
-            for (let w = 1; w <= 3; w++) {
+            html += '<tr style="background: var(--bg-card);"><td style="font-weight: 600;">Weer</td><td></td>';
+            for (let w = 1; w <= NWEEKS; w++) {
                 const weekData = getSameWeekdayData(currentDate, w);
+                weekHasData[w-1] = weekData.length > 0;
                 const weather = weekData[0]?.weather || '--';
                 html += `<td colspan="2" style="text-align: center; font-size: 0.8rem;">${weather}</td>`;
             }
             html += '</tr>';
-            
+
             // Add the event row
-            html += '<tr style="background: var(--bg-card);"><td style="font-weight: 600;">Event</td>';
-            for (let w = 1; w <= 3; w++) {
+            html += '<tr style="background: var(--bg-card);"><td style="font-weight: 600;">Event</td><td></td>';
+            for (let w = 1; w <= NWEEKS; w++) {
                 const weekData = getSameWeekdayData(currentDate, w);
                 const event = weekData[0]?.event || 'Normal';
                 const eventIcons = {
@@ -1928,36 +2070,46 @@
                 html += `<td colspan="2" style="text-align: center; font-size: 0.75rem; color: var(--text-secondary);">${icon} ${event}</td>`;
             }
             html += '</tr>';
-            
+
             // Then product rows
             PRODUCTS.forEach(p => {
-                html += `<tr><td>${p.short}</td>`;
-                for (let w = 1; w <= 3; w++) {
+                let cells = '';
+                let sum = 0, cnt = 0;
+                for (let w = 1; w <= NWEEKS; w++) {
                     const data = getSameWeekdayData(currentDate, w).find(d => d.product === p.name);
                     if (data?.out_of_stock) {
                         // Out of stock that day — don't count in totals, show clear marker
-                        html += `<td colspan="2" style="text-align:center; color: var(--accent-red); font-size: 0.75rem;" title="Uit voorraad">UIT</td>`;
+                        cells += `<td colspan="2" style="text-align:center; color: var(--accent-red); font-size: 0.75rem;" title="Uit voorraad">UIT</td>`;
                     } else {
                         const totaal = data?.totaal || 0;
                         const breuk = data?.breuk ?? '-';
                         weekTotals[w-1] += totaal;
                         if (typeof breuk === 'number') weekBreuk[w-1] += breuk;
-                        html += `<td>${totaal}</td><td class="breuk">${breuk}</td>`;
+                        if (data) { sum += totaal; cnt++; }
+                        cells += `<td>${totaal}</td><td class="breuk">${breuk}</td>`;
                     }
                 }
-                html += '</tr>';
+                const avg = cnt ? Math.round(sum / cnt) : '-';
+                // Gem in stil grijs zoals de Sug-kolom (eigenaar 2026-07-03: cyaan leidde af)
+                html += `<tr><td>${p.short}</td><td style="color: var(--text-secondary);">${avg}</td>${cells}</tr>`;
             });
-            
+
             // Add totals row with top border separator
+            let totSum = 0, totCnt = 0;
+            for (let w = 0; w < NWEEKS; w++) {
+                if (weekHasData[w]) { totSum += weekTotals[w]; totCnt++; }
+            }
+            const totAvg = totCnt ? Math.round(totSum / totCnt) : '-';
             html += '<tr style="border-top: 1px solid var(--text-muted);"><td style="font-weight: 600; color: var(--text-muted);">Totaal</td>';
-            for (let w = 0; w < 3; w++) {
+            html += `<td style="color: var(--text-secondary);">${totAvg}</td>`;
+            for (let w = 0; w < NWEEKS; w++) {
                 html += `<td style="color: var(--accent-cyan); font-weight: 600;">${weekTotals[w]}</td><td class="breuk">${weekBreuk[w]}</td>`;
             }
             html += '</tr>';
-            
+
             // Add note row
-            html += '<tr><td style="font-weight: 600; color: var(--text-muted);">Notitie</td>';
-            for (let w = 1; w <= 3; w++) {
+            html += '<tr><td style="font-weight: 600; color: var(--text-muted);">Notitie</td><td></td>';
+            for (let w = 1; w <= NWEEKS; w++) {
                 const weekData = getSameWeekdayData(currentDate, w);
                 const recordWithNote = weekData.find(d => d.note && d.note.length > 0);
                 const note = recordWithNote?.note || '';
@@ -1968,7 +2120,7 @@
                 html += `<td colspan="2" style="text-align: center;"><span class="${iconClass}" ${onclick}>📝</span></td>`;
             }
             html += '</tr>';
-            
+
             document.getElementById('reference-body').innerHTML = html;
             
             // Also update note button state
@@ -2732,6 +2884,7 @@
             const diagInp = document.getElementById('diag-date');
             if (diagInp && !diagInp.value) diagInp.value = formatDateISO(currentDate);
             renderSuggestionDiagnose();
+            renderSuggestionReport();
         }
         
         function updateProductSetting(input) {
@@ -2837,7 +2990,9 @@
             const advDefaults = { advancedMode: true, targetBreuk: 5, pPromoB: 50, pPromoA: 5,
                 pBbqB: 50, pBbqA: 5, pWarmB: 20, pSnow: 38, pFeestdag: 80, pRondFeestdag: 20,
                 tempBbq: 23, tempWarm: 18, pSellout: 10, pSelloutStreak: 15, pMaxGroei: 25,
-                pSubstitutie: 15, skySunPct: 100, skyPcloudPct: 85, skyCloudPct: 65, skyRainPct: 20 };
+                pSubstitutie: 15, skySunPct: 100, skyPcloudPct: 85, skyCloudPct: 65, skyRainPct: 20,
+                // Weekdag 3e-batch drempels (eigenaar-regel 2026-07-03)
+                minL3A: 3, minL3B: 4 };
             Object.entries(advDefaults).forEach(([k, v]) => {
                 if (SETTINGS[k] === undefined || SETTINGS[k] === null) SETTINGS[k] = v;
             });
