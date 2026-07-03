@@ -288,15 +288,24 @@
         .reference-card {
             background: var(--bg-dark); border-radius: var(--radius);
             padding: 12px; margin-top: 16px;
-            overflow-x: auto; /* 5 weken + Gem = 12 kolommen; smalle schermen scrollen */
         }
+        /* Scrollen gebeurt in een eigen wrapper (niet de kaart zelf): zo plakt de
+           productkolom strak tegen de rand en piept er geen tekst door de padding. */
+        .reference-scroll { overflow-x: auto; }
 
         .reference-header { font-weight: 600; margin-bottom: 10px; color: var(--text-secondary); font-size: 0.85rem; }
 
-        .reference-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
-        .reference-table th { padding: 6px 2px; font-size: 0.65rem; color: var(--text-muted); text-align: center; }
+        .reference-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        .reference-table th { padding: 6px; font-size: 0.65rem; color: var(--text-muted); text-align: center; white-space: nowrap; }
         .reference-table th:first-child { text-align: left; }
-        .reference-table td { padding: 5px 3px; text-align: center; font-family: var(--font-mono); }
+        .reference-table td { padding: 5px; text-align: center; font-family: var(--font-mono); white-space: nowrap; }
+        /* Vorige Weken: comfortabele breedte zoals vroeger (±3 weken in beeld op
+           mobiel), rest via horizontaal scrollen. Productkolom blijft plakken. */
+        .reference-card .reference-table { min-width: 640px; }
+        .reference-card .reference-table th:first-child,
+        .reference-card .reference-table td:first-child {
+            position: sticky; left: 0; background: var(--bg-dark); z-index: 1;
+        }
         .reference-table td:first-child { text-align: left; font-family: var(--font-sans); }
         .reference-table .breuk { color: var(--accent-red); font-weight: 600; }
         
@@ -476,10 +485,12 @@
             
             <div class="reference-card">
                 <div class="reference-header">📊 Vorige Weken (zelfde dag)</div>
-                <table class="reference-table">
-                    <thead><tr><th>Product</th><th>Gem</th><th>W-1</th><th>Brk</th><th>W-2</th><th>Brk</th><th>W-3</th><th>Brk</th><th>W-4</th><th>Brk</th><th>W-5</th><th>Brk</th></tr></thead>
-                    <tbody id="reference-body"></tbody>
-                </table>
+                <div class="reference-scroll">
+                    <table class="reference-table">
+                        <thead><tr><th>Product</th><th>Gem</th><th>W-1</th><th>Brk</th><th>W-2</th><th>Brk</th><th>W-3</th><th>Brk</th><th>W-4</th><th>Brk</th><th>W-5</th><th>Brk</th></tr></thead>
+                        <tbody id="reference-body"></tbody>
+                    </table>
+                </div>
             </div>
             
             <div class="collapsible-section">
@@ -1455,6 +1466,9 @@
 
             const stats = {};
             PRODUCTS.forEach(p => stats[p.id] = { goed: 0, hoog: 0, laag: 0, cutSoldout: 0, laagRegenWarm: 0 });
+            // Scorebord jullie-vs-motor: telt ALLEEN dagen waarop de suggestie bij het
+            // opslaan is aangepast (suggestie ≠ totaal) — alleen dan is er een "duel".
+            const duel = { motor: 0, jullie: 0, onbeslist: 0 };
             let scored = 0;
             rows.forEach(r => {
                 const p = PRODUCTS.find(x => x.name === r.product);
@@ -1464,9 +1478,13 @@
                 const verkocht = Math.max(0, gebStuks - r.breuk);
                 const sugStuks = r.suggestie * p.ppp;
                 const soldOut = r.breuk === 0;
+                const override = r.suggestie !== r.totaal;
                 scored++;
                 if (sugStuks < verkocht || (soldOut && r.suggestie <= r.totaal)) {
                     s.laag++;
+                    // Alleen bereikbaar met suggestie ≤ verkoop: bij een verlaging kan dit
+                    // niet, dus een override hier = verhoogd én (minstens) terecht.
+                    if (override) duel.jullie++;
                     // Signaal voor de lucht-kwaliteit-instelling: te laag op een warme
                     // regen-/onweersdag wijst naar een te strenge 🌧️ Regen %-korting.
                     const w = weatherInfoForDate(r.datum);
@@ -1476,11 +1494,24 @@
                     // vraag ≥ verkocht, dus de hogere suggestie was (minstens) juist.
                     s.goed++;
                     s.cutSoldout++;
+                    duel.motor++;
                 } else {
                     const hypBreuk = sugStuks - verkocht;
                     const hypPct = sugStuks > 0 ? hypBreuk / sugStuks * 100 : 0;
-                    if (hypBreuk > p.ppp && hypPct > SETTINGS.targetBreuk * 2) s.hoog++;
-                    else s.goed++;
+                    const actPct = gebStuks > 0 ? r.breuk / gebStuks * 100 : 0;
+                    if (hypBreuk > p.ppp && hypPct > SETTINGS.targetBreuk * 2) {
+                        s.hoog++;
+                        // Suggestie volgen had duidelijk breuk gegeven: wie lager zat wint.
+                        if (override) { if (r.totaal < r.suggestie) duel.jullie++; else duel.motor++; }
+                    } else {
+                        s.goed++;
+                        // Suggestie was prima; een verhoging die in echte breuk eindigde
+                        // verliest van de motor, anders onbeslist (beide waren ok geweest).
+                        if (override) {
+                            if (r.totaal > r.suggestie && actPct > SETTINGS.targetBreuk * 2) duel.motor++;
+                            else duel.onbeslist++;
+                        }
+                    }
                 }
             });
 
@@ -1500,6 +1531,17 @@
             });
             html += '</tbody></table>';
             html += '<div style="font-size:0.65rem; color:var(--text-muted); margin-top:4px;">💪 = suggestie verlaagd bij opslaan en tóch uitverkocht (motor had gelijk).</div>';
+
+            // Scorebord: alleen dagen met een aangepaste suggestie tellen als duel.
+            const duels = duel.motor + duel.jullie + duel.onbeslist;
+            if (duels > 0) {
+                html += `<div style="background:var(--bg-card); border-radius:var(--radius-sm); padding:8px 10px; margin-top:10px; font-size:0.78rem;">
+                    🥊 <b>Scorebord</b> (${duels} aangepaste suggesties):
+                    motor <b style="color:var(--accent-cyan);">${duel.motor}</b> ·
+                    jullie <b style="color:var(--accent-orange);">${duel.jullie}</b> ·
+                    onbeslist <b style="color:var(--text-muted);">${duel.onbeslist}</b>
+                </div>`;
+            }
 
             // Datagedreven hints: wijzen naar de instelling in Fijnafstelling die het
             // vaakst als oorzaak uit de cijfers komt. Drempels bewust conservatief.
@@ -2044,8 +2086,9 @@
             const weekBreuk = Array(NWEEKS).fill(0);
             const weekHasData = Array(NWEEKS).fill(false);
 
-            // First add the weather row
-            html += '<tr style="background: var(--bg-card);"><td style="font-weight: 600;">Weer</td><td></td>';
+            // First add the weather row (label-cel krijgt zelf bg-card: hij is sticky
+            // en zou anders het donkere kaart-grijs tonen op deze getinte rij)
+            html += '<tr style="background: var(--bg-card);"><td style="font-weight: 600; background: var(--bg-card);">Weer</td><td></td>';
             for (let w = 1; w <= NWEEKS; w++) {
                 const weekData = getSameWeekdayData(currentDate, w);
                 weekHasData[w-1] = weekData.length > 0;
@@ -2055,7 +2098,7 @@
             html += '</tr>';
 
             // Add the event row
-            html += '<tr style="background: var(--bg-card);"><td style="font-weight: 600;">Event</td><td></td>';
+            html += '<tr style="background: var(--bg-card);"><td style="font-weight: 600; background: var(--bg-card);">Event</td><td></td>';
             for (let w = 1; w <= NWEEKS; w++) {
                 const weekData = getSameWeekdayData(currentDate, w);
                 const event = weekData[0]?.event || 'Normal';
