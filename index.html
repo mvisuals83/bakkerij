@@ -495,6 +495,27 @@
                     </table>
                 </div>
             </div>
+
+            <!-- 🥊 Scorebord-spel (eigenaar-idee 2026-07-03): zichtbaar waar de collega
+                 toch al scrolt. Bewust ZONDER instel-hints — dat is diagnose-materiaal
+                 en blijft in Instellingen. Aan/uit via Instellingen → Slimme Suggesties. -->
+            <div class="reference-card" id="scoreboard-card" style="display: none;">
+                <div class="reference-header">🥊 Scorebord — jullie vs de suggestie (laatste 3 weken)</div>
+                <div id="scoreboard-content"></div>
+                <div class="collapsible-section" style="margin-top: 10px;">
+                    <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                        <span>📜 Spelregels</span>
+                        <span class="collapse-icon">▶</span>
+                    </div>
+                    <div class="collapsible-content" style="display: none; font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5; padding: 0 10px 10px;">
+                        <p style="margin-bottom: 6px;">• Telt alleen opgeslagen dagen (laatste 21, mét ingevulde breuk) waarop de suggestie bij het opslaan is <b>aangepast met ≥ 2 platen</b>. 1 plaatje meer of minder is bij de kleine producten al 25–50% — dat is ruis, geen duel.</p>
+                        <p style="margin-bottom: 6px;">• <b style="color: var(--accent-cyan);">Punt suggestie:</b> jullie verlaagden → tóch uitverkocht · of jullie verhoogden → eindigde in duidelijke breuk terwijl de suggestie ok was.</p>
+                        <p style="margin-bottom: 6px;">• <b style="color: var(--accent-orange);">Punt jullie:</b> jullie verhoogden → en dat bleek nodig · of jullie verlaagden → de suggestie volgen had duidelijke breuk gegeven (&gt; 2× doel-breuk én &gt; 1 plaat).</p>
+                        <p style="margin-bottom: 6px;">• <b>Onbeslist:</b> beide keuzes waren ok geweest. Bij uitverkocht is de echte vraag onbekend — twijfel levert nooit een punt op.</p>
+                        <p>• Uit voorraad-dagen tellen niet mee. De stand rekent live op de lokale historiek; er wordt niets extra opgeslagen.</p>
+                    </div>
+                </div>
+            </div>
             
             <div class="collapsible-section">
                 <div class="collapsible-header" onclick="toggleCollapsible(this)">
@@ -655,6 +676,7 @@
                 <h3>🧠 Slimme Suggesties</h3>
                 <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">AAN = suggesties op basis van de mediaan van 5 weken verkoop (recentste 2 tellen dubbel), met automatische promo/weer/feestdag-correcties, richting het doel-breuk %. UIT = klassieke drempel-berekening hieronder. Promo wordt automatisch herkend voor de hele week (wo→di) zodra één dag het label Promo heeft.</p>
                 <div class="setting-row"><label>Slimme suggesties actief</label><label class="toggle"><input type="checkbox" id="setting-advanced" onchange="saveAdvancedSettings()"><span class="toggle-slider"></span></label></div>
+                <div class="setting-row"><label>🥊 Scorebord op Planning-tab</label><label class="toggle"><input type="checkbox" id="setting-scoreboard" onchange="saveAdvancedSettings()"><span class="toggle-slider"></span></label></div>
                 <div class="collapsible-section">
                     <div class="collapsible-header" onclick="toggleCollapsible(this)">
                         <span>🔧 Fijnafstelling</span>
@@ -779,6 +801,7 @@
         
         let SETTINGS = {
             oven1Max: 16, oven2Max: 15, batchMax: 31,
+            showScoreboard: true,    // 🥊 scorebord-kaart op de Planning-tab
             // Weekdag 3e batch (eigenaar-regel 2026-07-03): past een groep niet in
             // 2× de eigen oven, open dan L3 — maar alleen als de overloop een bak
             // waard is: minstens 3 platen (Groep A) of 4 platen (Groep B). Kleinere
@@ -1455,11 +1478,16 @@
         //   🔽 te hoog  = suggestie volgen had > 2× doel-breuk én > 1 plaat extra breuk gegeven
         //   ✅ goed     = anders
         // Read-only: rekent alleen op opgeslagen rijen, raakt de suggestie-motor niet aan.
-        function renderSuggestionReport() {
-            const out = document.getElementById('diag-report');
-            if (!out) return;
+        // Kern-telling voor rapport én scorebord. Loopt over de opgeslagen rijen van de
+        // laatste `days` dagen uit de LOKALE cache (historicalData) — geen database-
+        // query, dus gratis snel; er wordt ook niets extra opgeslagen (regels kunnen zo
+        // later nog bijgesteld worden en gelden dan meteen met terugwerkende kracht).
+        // Duel-regel (eigenaar 2026-07-03): een aanpassing telt pas als duel bij een
+        // verschil van ≥ 2 platen — 1 plaatje op de kleine producten is al 25–50%
+        // van hun totaal en dus ruis, geen bewuste keuze tegen de suggestie in.
+        function scoreSuggestions(days = 21) {
             const todayISO = formatDateISO(new Date());
-            const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 21);
+            const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days);
             const cutoffISO = formatDateISO(cutoff);
             const rows = historicalData.filter(r =>
                 r.datum >= cutoffISO && r.datum <= todayISO &&
@@ -1469,8 +1497,6 @@
 
             const stats = {};
             PRODUCTS.forEach(p => stats[p.id] = { goed: 0, hoog: 0, laag: 0, cutSoldout: 0, laagRegenWarm: 0 });
-            // Scorebord jullie-vs-motor: telt ALLEEN dagen waarop de suggestie bij het
-            // opslaan is aangepast (suggestie ≠ totaal) — alleen dan is er een "duel".
             const duel = { motor: 0, jullie: 0, onbeslist: 0 };
             let scored = 0;
             rows.forEach(r => {
@@ -1481,13 +1507,13 @@
                 const verkocht = Math.max(0, gebStuks - r.breuk);
                 const sugStuks = r.suggestie * p.ppp;
                 const soldOut = r.breuk === 0;
-                const override = r.suggestie !== r.totaal;
+                const duelDag = Math.abs(r.suggestie - r.totaal) >= 2;
                 scored++;
                 if (sugStuks < verkocht || (soldOut && r.suggestie <= r.totaal)) {
                     s.laag++;
                     // Alleen bereikbaar met suggestie ≤ verkoop: bij een verlaging kan dit
-                    // niet, dus een override hier = verhoogd én (minstens) terecht.
-                    if (override) duel.jullie++;
+                    // niet, dus een duel hier = verhoogd én (minstens) terecht.
+                    if (duelDag) duel.jullie++;
                     // Signaal voor de lucht-kwaliteit-instelling: te laag op een warme
                     // regen-/onweersdag wijst naar een te strenge 🌧️ Regen %-korting.
                     const w = weatherInfoForDate(r.datum);
@@ -1497,7 +1523,7 @@
                     // vraag ≥ verkocht, dus de hogere suggestie was (minstens) juist.
                     s.goed++;
                     s.cutSoldout++;
-                    duel.motor++;
+                    if (duelDag) duel.motor++;
                 } else {
                     const hypBreuk = sugStuks - verkocht;
                     const hypPct = sugStuks > 0 ? hypBreuk / sugStuks * 100 : 0;
@@ -1505,18 +1531,25 @@
                     if (hypBreuk > p.ppp && hypPct > SETTINGS.targetBreuk * 2) {
                         s.hoog++;
                         // Suggestie volgen had duidelijk breuk gegeven: wie lager zat wint.
-                        if (override) { if (r.totaal < r.suggestie) duel.jullie++; else duel.motor++; }
+                        if (duelDag) { if (r.totaal < r.suggestie) duel.jullie++; else duel.motor++; }
                     } else {
                         s.goed++;
                         // Suggestie was prima; een verhoging die in echte breuk eindigde
-                        // verliest van de motor, anders onbeslist (beide waren ok geweest).
-                        if (override) {
+                        // verliest, anders onbeslist (beide waren ok geweest).
+                        if (duelDag) {
                             if (r.totaal > r.suggestie && actPct > SETTINGS.targetBreuk * 2) duel.motor++;
                             else duel.onbeslist++;
                         }
                     }
                 }
             });
+            return { stats, duel, scored };
+        }
+
+        function renderSuggestionReport() {
+            const out = document.getElementById('diag-report');
+            if (!out) return;
+            const { stats, duel, scored } = scoreSuggestions(21);
 
             if (!scored) {
                 out.innerHTML = '<span style="color:var(--text-muted); font-size:0.75rem;">Nog geen opgeslagen suggesties met ingevulde breuk in de laatste 3 weken.</span>';
@@ -1539,7 +1572,7 @@
             const duels = duel.motor + duel.jullie + duel.onbeslist;
             if (duels > 0) {
                 html += `<div style="background:var(--bg-card); border-radius:var(--radius-sm); padding:8px 10px; margin-top:10px; font-size:0.78rem;">
-                    🥊 <b>Scorebord</b> (${duels} aangepaste suggesties):
+                    🥊 <b>Scorebord</b> (${duels} duels · aanpassing ≥ 2 platen):
                     suggestie <b style="color:var(--accent-cyan);">${duel.motor}</b> ·
                     jullie <b style="color:var(--accent-orange);">${duel.jullie}</b> ·
                     onbeslist <b style="color:var(--text-muted);">${duel.onbeslist}</b>
@@ -1559,6 +1592,39 @@
             if (!hints.length) hints.push('👍 Geen duidelijke scheefstand — instellingen laten staan.');
             html += hints.map(h => `<div style="font-size:0.72rem; color:var(--text-secondary); margin-top:8px; line-height:1.4;">${h}</div>`).join('');
             out.innerHTML = html;
+        }
+
+        // 🥊 Scorebord op de Planning-tab: zelfde duel-telling als het rapport
+        // (scoreSuggestions), compact gepresenteerd als spel. Doel: laten zien dat
+        // laten-staan meestal wint, zodat er alleen nog bij echte overtuiging wordt
+        // ingegrepen — precies wat de motor beter maakt.
+        function renderPlanningScoreboard() {
+            const card = document.getElementById('scoreboard-card');
+            if (!card) return;
+            if (!SETTINGS.showScoreboard) { card.style.display = 'none'; return; }
+            card.style.display = '';
+            const content = document.getElementById('scoreboard-content');
+            const { duel } = scoreSuggestions(21);
+            const duels = duel.motor + duel.jullie + duel.onbeslist;
+            if (!duels) {
+                content.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8rem;">Nog geen duels in de laatste 3 weken (een duel = suggestie ≥ 2 platen aangepast, breuk ingevuld).</div>';
+                return;
+            }
+            const lead = duel.motor > duel.jullie ? '🤖 De suggestie staat voor — laten staan loont!'
+                       : duel.jullie > duel.motor ? '🧑‍🍳 Jullie staan voor — de bakkersneus wint (nog).'
+                       : '🤝 Gelijkspel.';
+            const box = (label, val, color) => `
+                <div style="flex: 1; text-align: center; background: var(--bg-card); border-radius: var(--radius-sm); padding: 8px 4px;">
+                    <div style="font-size: 0.65rem; color: var(--text-muted);">${label}</div>
+                    <div style="font-family: var(--font-mono); font-size: 1.3rem; font-weight: 700; color: ${color};">${val}</div>
+                </div>`;
+            content.innerHTML = `
+                <div style="display: flex; gap: 8px;">
+                    ${box('🤖 Suggestie', duel.motor, 'var(--accent-cyan)')}
+                    ${box('🤝 Onbeslist', duel.onbeslist, 'var(--text-muted)')}
+                    ${box('🧑‍🍳 Jullie', duel.jullie, 'var(--accent-orange)')}
+                </div>
+                <div style="margin-top: 8px; font-size: 0.78rem; color: var(--text-secondary); text-align: center;">${lead} <span style="color: var(--text-muted);">(${duels} duels)</span></div>`;
         }
 
         // Returns array of batch numbers (1-based) where Group B is skipped on the given date.
@@ -2064,8 +2130,9 @@
             }
 
             renderReference();
+            renderPlanningScoreboard();
         }
-        
+
         // Simple distribution for single product
         function distributeSimple(totaal, limits) {
             const batches = [0, 0, 0, 0, 0];
@@ -2963,6 +3030,8 @@
                 return isNaN(v) ? fallback : v;
             };
             SETTINGS.advancedMode = document.getElementById('setting-advanced').checked;
+            const sb = document.getElementById('setting-scoreboard');
+            if (sb) SETTINGS.showScoreboard = sb.checked;
             SETTINGS.targetBreuk = Math.min(30, Math.max(0, num('setting-target-breuk', 5)));
             SETTINGS.pPromoB = num('setting-p-promo-b', 50);
             SETTINGS.pPromoA = num('setting-p-promo-a', 5);
@@ -2996,6 +3065,7 @@
             const el = id => document.getElementById(id);
             if (!el('setting-advanced')) return;
             el('setting-advanced').checked = !!SETTINGS.advancedMode;
+            if (el('setting-scoreboard')) el('setting-scoreboard').checked = SETTINGS.showScoreboard !== false;
             el('setting-target-breuk').value = SETTINGS.targetBreuk;
             el('setting-p-promo-b').value = SETTINGS.pPromoB;
             el('setting-p-promo-a').value = SETTINGS.pPromoA;
@@ -3037,8 +3107,8 @@
                 pBbqB: 50, pBbqA: 5, pWarmB: 20, pSnow: 38, pFeestdag: 80, pRondFeestdag: 20,
                 tempBbq: 23, tempWarm: 18, pSellout: 10, pSelloutStreak: 15, pMaxGroei: 25,
                 pSubstitutie: 15, skySunPct: 100, skyPcloudPct: 85, skyCloudPct: 65, skyRainPct: 20,
-                // Weekdag 3e-batch drempels (eigenaar-regel 2026-07-03)
-                minL3A: 3, minL3B: 4 };
+                // Weekdag 3e-batch drempels + scorebord-toggle (eigenaar 2026-07-03)
+                minL3A: 3, minL3B: 4, showScoreboard: true };
             Object.entries(advDefaults).forEach(([k, v]) => {
                 if (SETTINGS[k] === undefined || SETTINGS[k] === null) SETTINGS[k] = v;
             });
