@@ -299,12 +299,15 @@
         .reference-table th { padding: 6px; font-size: 0.65rem; color: var(--text-muted); text-align: center; white-space: nowrap; }
         .reference-table th:first-child { text-align: left; }
         .reference-table td { padding: 5px; text-align: center; font-family: var(--font-mono); white-space: nowrap; }
-        /* Vorige Weken: comfortabele breedte zoals vroeger (±3 weken in beeld op
-           mobiel), rest via horizontaal scrollen. Productkolom blijft plakken. */
-        .reference-card .reference-table { min-width: 640px; }
+        /* Vorige Weken: comfortabele breedte zoals vroeger (±2-3 weken in beeld op
+           mobiel), rest via horizontaal scrollen. Productkolom blijft plakken maar
+           mag WEL wrappen ("Stok. bruin" op 2 regels) — smal houden wint schermruimte.
+           Gem plakt bewust NIET mee (eigenaar: liever meer zicht bij het scrollen). */
+        .reference-card .reference-table { min-width: 560px; }
         .reference-card .reference-table th:first-child,
         .reference-card .reference-table td:first-child {
             position: sticky; left: 0; background: var(--bg-dark); z-index: 1;
+            white-space: normal; width: 52px;
         }
         .reference-table td:first-child { text-align: left; font-family: var(--font-sans); }
         .reference-table .breuk { color: var(--accent-red); font-weight: 600; }
@@ -1530,14 +1533,14 @@
                 html += `<tr><td>${p.short}</td><td>${s.goed}</td><td style="${hoogStyle}">${s.hoog}</td><td style="${laagStyle}">${s.laag}</td><td>${s.cutSoldout}</td></tr>`;
             });
             html += '</tbody></table>';
-            html += '<div style="font-size:0.65rem; color:var(--text-muted); margin-top:4px;">💪 = suggestie verlaagd bij opslaan en tóch uitverkocht (motor had gelijk).</div>';
+            html += '<div style="font-size:0.65rem; color:var(--text-muted); margin-top:4px;">💪 = suggestie verlaagd bij opslaan en tóch uitverkocht (de suggestie had gelijk).</div>';
 
             // Scorebord: alleen dagen met een aangepaste suggestie tellen als duel.
             const duels = duel.motor + duel.jullie + duel.onbeslist;
             if (duels > 0) {
                 html += `<div style="background:var(--bg-card); border-radius:var(--radius-sm); padding:8px 10px; margin-top:10px; font-size:0.78rem;">
                     🥊 <b>Scorebord</b> (${duels} aangepaste suggesties):
-                    motor <b style="color:var(--accent-cyan);">${duel.motor}</b> ·
+                    suggestie <b style="color:var(--accent-cyan);">${duel.motor}</b> ·
                     jullie <b style="color:var(--accent-orange);">${duel.jullie}</b> ·
                     onbeslist <b style="color:var(--text-muted);">${duel.onbeslist}</b>
                 </div>`;
@@ -1550,7 +1553,7 @@
                   totLaagRW = sum('laagRegenWarm'), totCut = sum('cutSoldout');
             const hints = [];
             if (totLaagRW >= 3) hints.push(`🌧️ <b>${totLaagRW}×</b> te laag op warme regen-/onweersdagen. De lucht-korting (🌧️ Regen %, nu <b>${SETTINGS.skyRainPct}%</b>) knijpt de warmte-buff dan bijna dicht, terwijl een voorspelde (onweers)bui in de zomer vaak maar een deel van de dag kost. Probeer 50.`);
-            if (totCut >= 3) hints.push(`💪 <b>${totCut}×</b> een verlaagde suggestie die tóch uitverkocht raakte — vertrouw de grote getallen van de motor wat vaker.`);
+            if (totCut >= 3) hints.push(`💪 <b>${totCut}×</b> een verlaagde suggestie die tóch uitverkocht raakte — vertrouw de grote suggesties wat vaker.`);
             if (totLaag - totLaagRW >= scored / 4) hints.push(`🔥 Ook los van het weer vaak te laag → verhoog 🔥 Uitverkocht +% (nu <b>${SETTINGS.pSellout}</b>) met 5.`);
             if (totHoog >= scored / 4) hints.push(`📉 Vaak te hoog → verlaag 📈 Max stijging per week % (nu <b>${SETTINGS.pMaxGroei}</b>) richting 15.`);
             if (!hints.length) hints.push('👍 Geen duidelijke scheefstand — instellingen laten staan.');
