@@ -496,9 +496,24 @@
                 </div>
             </div>
 
-            <!-- 🥊 Scorebord-spel (eigenaar-idee 2026-07-03): zichtbaar waar de collega
-                 toch al scrolt. Bewust ZONDER instel-hints — dat is diagnose-materiaal
-                 en blijft in Instellingen. Aan/uit via Instellingen → Slimme Suggesties. -->
+            <div class="collapsible-section">
+                <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                    <span>📅 Referentie</span>
+                    <span class="collapse-icon">▶</span>
+                </div>
+                <div class="collapsible-content" style="display: none;">
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                        <input type="date" id="ref-date-picker" onchange="loadReferencePlanning()" style="flex: 1; padding: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary);">
+                        <button onclick="copyReferencePlanning()" style="padding: 8px 12px; background: var(--accent-blue); border: none; border-radius: var(--radius-sm); color: white; font-weight: 600; cursor: pointer; white-space: nowrap;">📋 Kopieer</button>
+                    </div>
+                    <div id="ref-planning-content" style="color: var(--text-muted); font-size: 0.85rem;">Selecteer een datum...</div>
+                </div>
+            </div>
+
+            <!-- 🥊 Scorebord-spel (eigenaar 2026-07-03/04): helemaal ONDERAAN de tab —
+                 het is een spel, geen werkgereedschap; Referentie staat erboven.
+                 Bewust ZONDER instel-hints (diagnose-materiaal blijft in Instellingen).
+                 Aan/uit via Instellingen → Slimme Suggesties. -->
             <div class="reference-card" id="scoreboard-card" style="display: none;">
                 <div class="reference-header">🥊 Scorebord (laatste 3 weken)</div>
                 <div id="scoreboard-content"></div>
@@ -520,27 +535,13 @@
                         <p style="margin-bottom: 6px;">• Telt alleen opgeslagen dagen (laatste 21, mét ingevulde breuk) waarop de suggestie bij het opslaan is <b>aangepast met ≥ 2 platen</b>. 1 plaatje meer of minder is bij de kleine producten al 25–50% — dat is ruis, geen duel.</p>
                         <p style="margin-bottom: 6px;">• <b style="color: var(--accent-cyan);">Punt voor de suggestie:</b> jullie verlaagden → tóch uitverkocht · of jullie verhoogden → eindigde in duidelijke breuk terwijl de suggestie ok was.</p>
                         <p style="margin-bottom: 6px;">• <b style="color: var(--accent-orange);">Punt voor jullie:</b> jullie verhoogden → en dat bleek nodig · of jullie verlaagden → de suggestie volgen had duidelijke breuk gegeven (&gt; 2× doel-breuk én &gt; 1 plaat).</p>
-                        <p style="margin-bottom: 6px;">• <b>Onbeslist:</b> beide keuzes waren ok geweest. Bij uitverkocht is de echte vraag onbekend — twijfel levert nooit een punt op.</p>
-                        <p>• Uit voorraad-dagen tellen niet mee. De stand rekent live op de lokale historiek; er wordt niets extra opgeslagen.</p>
+                        <p style="margin-bottom: 6px;">• <b>Onbeslist:</b> beide keuzes waren ok geweest (0 punten). Bij uitverkocht is de echte vraag onbekend — twijfel levert nooit een punt op.</p>
+                        <p>• Elk duel is altijd +1 voor de winnaar of onbeslist — er zijn geen minpunten. Uit voorraad-dagen tellen niet mee. De stand rekent live op de lokale historiek; er wordt niets extra opgeslagen.</p>
                     </div>
-                </div>
-            </div>
-            
-            <div class="collapsible-section">
-                <div class="collapsible-header" onclick="toggleCollapsible(this)">
-                    <span>📅 Referentie</span>
-                    <span class="collapse-icon">▶</span>
-                </div>
-                <div class="collapsible-content" style="display: none;">
-                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
-                        <input type="date" id="ref-date-picker" onchange="loadReferencePlanning()" style="flex: 1; padding: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary);">
-                        <button onclick="copyReferencePlanning()" style="padding: 8px 12px; background: var(--accent-blue); border: none; border-radius: var(--radius-sm); color: white; font-weight: 600; cursor: pointer; white-space: nowrap;">📋 Kopieer</button>
-                    </div>
-                    <div id="ref-planning-content" style="color: var(--text-muted); font-size: 0.85rem;">Selecteer een datum...</div>
                 </div>
             </div>
         </div>
-        
+
         <div class="page" id="page-breuk">
             <div class="breuk-date-selector">
                 <label>Selecteer datum:</label>
@@ -1650,12 +1651,41 @@
             const logEl = document.getElementById('scoreboard-log');
             if (logEl) {
                 const style = { suggestie: ['🤖', 'var(--accent-cyan)'], jullie: ['🧑‍🍳', 'var(--accent-orange)'], onbeslist: ['🤝', 'var(--text-muted)'] };
-                logEl.innerHTML = log.length ? log.map(e => {
+                const lines = log.map(e => {
                     const d = new Date(e.datum + 'T00:00:00');
                     const [icon, color] = style[e.winner];
                     const brk = e.breuk > 0 ? ` <span style="color: var(--accent-red);">(breuk ${e.breuk})</span>` : '';
-                    return `<div>${icon} <span style="color: var(--text-muted);">${getDayName(d).slice(0,2)} ${formatDate(d).slice(0,5)}</span> · ${e.short} <b>${e.sug}→${e.tot}</b> · <span style="color: ${color};">${e.reason}</span>${brk}</div>`;
-                }).join('') : '<span style="color: var(--text-muted);">Nog geen duels.</span>';
+                    // Altijd +1 voor de winnaar, nooit minpunten; onbeslist = 0 pt.
+                    const pt = e.winner === 'onbeslist' ? ' <span style="color: var(--text-muted);">· 0 pt</span>'
+                                                        : ` <b style="color: ${color};">· +1 ${e.winner}</b>`;
+                    return `<div>${icon} <span style="color: var(--text-muted);">${getDayName(d).slice(0,2)} ${formatDate(d).slice(0,5)}</span> · ${e.short} <b>${e.sug}→${e.tot}</b> · <span style="color: ${color};">${e.reason}</span>${brk}${pt}</div>`;
+                }).join('');
+
+                // Samenvatting (eigenaar 2026-07-04): verlaagd/verhoogd × goed/fout —
+                // in één oogopslag zien of jullie vooral fout zitten bij het verlagen.
+                // Bewust een eigen mini-tabel (geen .reference-table: die heeft binnen
+                // .reference-card een sticky kolom + min-width voor het weken-overzicht).
+                const sum = { cut: { win: 0, lose: 0, draw: 0 }, raise: { win: 0, lose: 0, draw: 0 } };
+                log.forEach(e => {
+                    const dir = e.tot < e.sug ? 'cut' : 'raise';
+                    sum[dir][e.winner === 'jullie' ? 'win' : e.winner === 'suggestie' ? 'lose' : 'draw']++;
+                });
+                const td = 'padding: 4px 8px; text-align: center; font-family: var(--font-mono);';
+                const sumTable = `
+                    <div style="margin-top: 10px; color: var(--text-muted);">Samenvatting van jullie ingrepen:</div>
+                    <table style="border-collapse: collapse; margin-top: 4px; font-size: 0.72rem;">
+                        <thead><tr>
+                            <th style="text-align: left; padding: 4px 8px; color: var(--text-muted); font-size: 0.65rem;">Ingreep</th>
+                            <th style="${td} color: var(--text-muted); font-size: 0.65rem;">✅ jullie gelijk</th>
+                            <th style="${td} color: var(--text-muted); font-size: 0.65rem;">❌ suggestie gelijk</th>
+                            <th style="${td} color: var(--text-muted); font-size: 0.65rem;">🤝</th>
+                        </tr></thead>
+                        <tbody>
+                            <tr><td style="padding: 4px 8px;">Verlaagd ↓</td><td style="${td} color: var(--accent-orange);">${sum.cut.win}</td><td style="${td} color: var(--accent-cyan);">${sum.cut.lose}</td><td style="${td}">${sum.cut.draw}</td></tr>
+                            <tr><td style="padding: 4px 8px;">Verhoogd ↑</td><td style="${td} color: var(--accent-orange);">${sum.raise.win}</td><td style="${td} color: var(--accent-cyan);">${sum.raise.lose}</td><td style="${td}">${sum.raise.draw}</td></tr>
+                        </tbody>
+                    </table>`;
+                logEl.innerHTML = log.length ? lines + sumTable : '<span style="color: var(--text-muted);">Nog geen duels.</span>';
             }
 
             if (!duels) {
@@ -2499,8 +2529,17 @@
                 return;
             }
             
+            // Dag-context bovenaan (eigenaar 2026-07-04): event + weer van die dag —
+            // handig bij het kopiëren van een vorige feestdag of het nalezen van een
+            // speciale dag ("wat deden we toen, en onder welke omstandigheden?").
+            const refEventIcons = { 'Sneeuw': '❄️', 'BBQ': '☀️', 'Feestdag': '🎉', 'Promo': '📢' };
+            const refEvent = dayData[0]?.event || 'Normal';
+            const refWeather = dayData.find(d => d.weather && /\d/.test(d.weather))?.weather || '';
+            const refDate = new Date(dateStr + 'T00:00:00');
+            let html = `<div style="margin-bottom: 8px; font-size: 0.8rem; color: var(--text-secondary);">${getDayName(refDate)} ${formatDate(refDate)} · ${refEventIcons[refEvent] || ''} ${refEvent}${refWeather ? ` · ${refWeather}` : ''}</div>`;
+
             // Build table
-            let html = `<table class="ref-table">
+            html += `<table class="ref-table">
                 <thead><tr><th>Product</th><th class="totaal-col">Totaal</th><th>Breuk</th><th>L1</th><th>L2</th><th>L3</th><th>L4</th><th>L5</th></tr></thead>
                 <tbody>`;
 
