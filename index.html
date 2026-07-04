@@ -504,6 +504,15 @@
                 <div id="scoreboard-content"></div>
                 <div class="collapsible-section" style="margin-top: 10px;">
                     <div class="collapsible-header" onclick="toggleCollapsible(this)">
+                        <span>📋 Punten-detail</span>
+                        <span class="collapse-icon">▶</span>
+                    </div>
+                    <div class="collapsible-content" style="display: none; padding: 0 10px 10px;">
+                        <div id="scoreboard-log" style="font-size: 0.72rem; line-height: 1.6;"></div>
+                    </div>
+                </div>
+                <div class="collapsible-section" style="margin-top: 8px;">
+                    <div class="collapsible-header" onclick="toggleCollapsible(this)">
                         <span>📜 Spelregels</span>
                         <span class="collapse-icon">▶</span>
                     </div>
@@ -646,6 +655,7 @@
                 <div class="setting-row"><label>Oven 1 max</label><input type="number" id="setting-oven1" value="16" onchange="saveCapacitySettings()"></div>
                 <div class="setting-row"><label>Oven 2 max</label><input type="number" id="setting-oven2" value="15" onchange="saveCapacitySettings()"></div>
                 <div class="setting-row"><label>Batch max</label><input type="number" id="setting-batch-max" value="31" onchange="saveCapacitySettings()"></div>
+                <div class="setting-row"><label>3e rijskast (5e batch op zo/feestdag)</label><label class="toggle"><input type="checkbox" id="setting-extra-rijskast" onchange="saveCapacitySettings()"><span class="toggle-slider"></span></label></div>
             </div>
             <div class="settings-section">
                 <h3>🔥 Weekend Strategie — Skip Groep B</h3>
@@ -802,6 +812,7 @@
         let SETTINGS = {
             oven1Max: 16, oven2Max: 15, batchMax: 31,
             showScoreboard: true,    // 🥊 scorebord-kaart op de Planning-tab
+            extraRijskast: false,    // 3e rijskast aanwezig → 5e batch mag op zo/feestdag
             // Weekdag 3e batch (eigenaar-regel 2026-07-03): past een groep niet in
             // 2× de eigen oven, open dan L3 — maar alleen als de overloop een bak
             // waard is: minstens 3 platen (Groep A) of 4 platen (Groep B). Kleinere
@@ -1498,6 +1509,13 @@
             const stats = {};
             PRODUCTS.forEach(p => stats[p.id] = { goed: 0, hoog: 0, laag: 0, cutSoldout: 0, laagRegenWarm: 0 });
             const duel = { motor: 0, jullie: 0, onbeslist: 0 };
+            // Punten-detail (eigenaar-idee 2026-07-04): elk duel wordt gelogd met
+            // datum, product, sug→totaal en de reden — leer-materiaal tegen te
+            // triggerhappy bijstellen.
+            const log = [];
+            const note = (r, p, winner, reason) => log.push({
+                datum: r.datum, short: p.short, sug: r.suggestie, tot: r.totaal,
+                breuk: r.breuk, winner, reason });
             let scored = 0;
             rows.forEach(r => {
                 const p = PRODUCTS.find(x => x.name === r.product);
@@ -1513,7 +1531,10 @@
                     s.laag++;
                     // Alleen bereikbaar met suggestie ≤ verkoop: bij een verlaging kan dit
                     // niet, dus een duel hier = verhoogd én (minstens) terecht.
-                    if (duelDag) duel.jullie++;
+                    if (duelDag) {
+                        duel.jullie++;
+                        note(r, p, 'jullie', soldOut ? 'verhoogd → tóch uitverkocht' : 'verhoogd → en dat was nodig');
+                    }
                     // Signaal voor de lucht-kwaliteit-instelling: te laag op een warme
                     // regen-/onweersdag wijst naar een te strenge 🌧️ Regen %-korting.
                     const w = weatherInfoForDate(r.datum);
@@ -1523,7 +1544,10 @@
                     // vraag ≥ verkocht, dus de hogere suggestie was (minstens) juist.
                     s.goed++;
                     s.cutSoldout++;
-                    if (duelDag) duel.motor++;
+                    if (duelDag) {
+                        duel.motor++;
+                        note(r, p, 'suggestie', 'verlaagd → tóch uitverkocht');
+                    }
                 } else {
                     const hypBreuk = sugStuks - verkocht;
                     const hypPct = sugStuks > 0 ? hypBreuk / sugStuks * 100 : 0;
@@ -1531,19 +1555,33 @@
                     if (hypBreuk > p.ppp && hypPct > SETTINGS.targetBreuk * 2) {
                         s.hoog++;
                         // Suggestie volgen had duidelijk breuk gegeven: wie lager zat wint.
-                        if (duelDag) { if (r.totaal < r.suggestie) duel.jullie++; else duel.motor++; }
+                        if (duelDag) {
+                            if (r.totaal < r.suggestie) {
+                                duel.jullie++;
+                                note(r, p, 'jullie', 'verlaagd → suggestie had breuk gegeven');
+                            } else {
+                                duel.motor++;
+                                note(r, p, 'suggestie', 'verhoogd → eindigde in breuk');
+                            }
+                        }
                     } else {
                         s.goed++;
                         // Suggestie was prima; een verhoging die in echte breuk eindigde
                         // verliest, anders onbeslist (beide waren ok geweest).
                         if (duelDag) {
-                            if (r.totaal > r.suggestie && actPct > SETTINGS.targetBreuk * 2) duel.motor++;
-                            else duel.onbeslist++;
+                            if (r.totaal > r.suggestie && actPct > SETTINGS.targetBreuk * 2) {
+                                duel.motor++;
+                                note(r, p, 'suggestie', 'verhoogd → onnodig, gaf breuk');
+                            } else {
+                                duel.onbeslist++;
+                                note(r, p, 'onbeslist', 'beide waren ok geweest');
+                            }
                         }
                     }
                 }
             });
-            return { stats, duel, scored };
+            log.sort((a, b) => b.datum.localeCompare(a.datum));
+            return { stats, duel, scored, log };
         }
 
         function renderSuggestionReport() {
@@ -1604,8 +1642,22 @@
             if (!SETTINGS.showScoreboard) { card.style.display = 'none'; return; }
             card.style.display = '';
             const content = document.getElementById('scoreboard-content');
-            const { duel } = scoreSuggestions(21);
+            const { duel, log } = scoreSuggestions(21);
             const duels = duel.motor + duel.jullie + duel.onbeslist;
+
+            // 📋 Punten-detail: elk duel als leesbare regel, nieuwste eerst — zo zie
+            // je wáár de punten vandaan komen en leer je van te snelle ingrepen.
+            const logEl = document.getElementById('scoreboard-log');
+            if (logEl) {
+                const style = { suggestie: ['🤖', 'var(--accent-cyan)'], jullie: ['🧑‍🍳', 'var(--accent-orange)'], onbeslist: ['🤝', 'var(--text-muted)'] };
+                logEl.innerHTML = log.length ? log.map(e => {
+                    const d = new Date(e.datum + 'T00:00:00');
+                    const [icon, color] = style[e.winner];
+                    const brk = e.breuk > 0 ? ` <span style="color: var(--accent-red);">(breuk ${e.breuk})</span>` : '';
+                    return `<div>${icon} <span style="color: var(--text-muted);">${getDayName(d).slice(0,2)} ${formatDate(d).slice(0,5)}</span> · ${e.short} <b>${e.sug}→${e.tot}</b> · <span style="color: ${color};">${e.reason}</span>${brk}</div>`;
+                }).join('') : '<span style="color: var(--text-muted);">Nog geen duels.</span>';
+            }
+
             if (!duels) {
                 content.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8rem;">Nog geen duels in de laatste 3 weken (een duel = suggestie ≥ 2 platen aangepast, breuk ingevuld).</div>';
                 return;
@@ -1787,8 +1839,10 @@
             const feestdag = eventSelect?.value === 'Feestdag';
             const weekend = isWeekend(currentDate) || feestdag;
             const skipBatches = getSkipBBatches(currentDate, feestdag);
-            // Zondag + feestdag sluiten om 13u: maximaal 4 batches haalbaar (L5 = 0).
-            const fourBatch = feestdag || currentDate.getDay() === 0;
+            // Zondag + feestdag sluiten om 13u: met 2 rijskasten zijn maar 4 batches
+            // haalbaar (L5 = 0). Na aankoop van een 3e rijskast: toggle "3e rijskast"
+            // in Instellingen → Capaciteit aan en L5 doet weer gewoon mee.
+            const fourBatch = (feestdag || currentDate.getDay() === 0) && !SETTINGS.extraRijskast;
 
             // Build display data for each product
             const displayData = {};
@@ -2117,6 +2171,7 @@
                 el.textContent = total;
                 el.parentElement.className = 'lading-item' + (total > SETTINGS.batchMax ? ' danger' : total > SETTINGS.batchMax * 0.8 ? ' warning' : '');
             }
+            updateGhostL5();
 
             applyGroupTotalWarnings();
 
@@ -2347,6 +2402,46 @@
                 el.textContent = total;
                 el.parentElement.className = 'lading-item' + (total > SETTINGS.batchMax ? ' danger' : total > SETTINGS.batchMax * 0.8 ? ' warning' : '');
             }
+            updateGhostL5();
+        }
+
+        // 🔒 Zondag/feestdag zonder 3e rijskast: L5 kan fysiek niet (winkel dicht om
+        // 13u, 4 batches max). Toon in het L5-vakje hoeveel platen de suggestie MEER
+        // wilde dan er gepland staat — het lopende bewijs-dossier voor een 3e rijskast
+        // (±10k€): staat hier structureel een tekort, dan laten we omzet liggen.
+        // Bewust GEEN echte L5-invoer (zou als gebakken worden opgeslagen en de data
+        // vervuilen) — alleen weergave op de lading-indicator. Met de Capaciteit-toggle
+        // "3e rijskast" aan verdwijnt dit en doet L5 gewoon mee in de verdeling.
+        function updateGhostL5() {
+            const el = document.getElementById('lading-l5');
+            if (!el) return;
+            const item = el.parentElement;
+            const label = item.querySelector('.label');
+            const feestdag = document.getElementById('event-select')?.value === 'Feestdag';
+            const fourBatch = (feestdag || currentDate.getDay() === 0) && !SETTINGS.extraRijskast;
+            if (!fourBatch) {
+                if (label) label.textContent = 'L5';
+                el.style.color = '';
+                item.title = '';
+                return;
+            }
+            let missed = 0;
+            PRODUCTS.forEach(p => {
+                const inp = document.querySelector(`input[data-id="${p.id}"][data-field="totaal"]`);
+                if (!inp) return;
+                const row = inp.closest('tr');
+                if (row?.classList.contains('product-row-oos')) return;
+                const sug = parseInt(row?.querySelector('.sug-value')?.textContent) || 0;
+                const tot = parseInt(inp.value) || 0;
+                if (sug > tot) missed += sug - tot;
+            });
+            if (label) label.textContent = 'L5 🔒';
+            el.textContent = missed > 0 ? `−${missed}` : '0';
+            el.style.color = 'var(--text-muted)';
+            item.className = 'lading-item';
+            item.title = missed > 0
+                ? `Suggestie wil ${missed} platen meer dan gepland — past niet vóór 13u zonder 3e rijskast`
+                : 'Geen tekort vandaag';
         }
 
         function applyGroupTotalWarnings() {
@@ -3015,6 +3110,7 @@
             SETTINGS.oven1Max = parseInt(document.getElementById('setting-oven1').value) || 16;
             SETTINGS.oven2Max = parseInt(document.getElementById('setting-oven2').value) || 15;
             SETTINGS.batchMax = parseInt(document.getElementById('setting-batch-max').value) || 31;
+            SETTINGS.extraRijskast = document.getElementById('setting-extra-rijskast')?.checked || false;
             localStorage.setItem('bakkerij_settings', JSON.stringify(SETTINGS));
             saveCloudSetting('app', SETTINGS);
             planningData = {}; // Reset manual overrides so new settings apply
@@ -3106,7 +3202,7 @@
                 tempBbq: 23, tempWarm: 18, pSellout: 10, pSelloutStreak: 15, pMaxGroei: 25,
                 pSubstitutie: 15, skySunPct: 100, skyPcloudPct: 85, skyCloudPct: 65, skyRainPct: 20,
                 // Weekdag 3e-batch drempels + scorebord-toggle (eigenaar 2026-07-03)
-                minL3A: 3, minL3B: 4, showScoreboard: true };
+                minL3A: 3, minL3B: 4, showScoreboard: true, extraRijskast: false };
             Object.entries(advDefaults).forEach(([k, v]) => {
                 if (SETTINGS[k] === undefined || SETTINGS[k] === null) SETTINGS[k] = v;
             });
@@ -3615,6 +3711,8 @@
             document.getElementById('setting-oven1').value = SETTINGS.oven1Max;
             document.getElementById('setting-oven2').value = SETTINGS.oven2Max;
             document.getElementById('setting-batch-max').value = SETTINGS.batchMax;
+            const erk = document.getElementById('setting-extra-rijskast');
+            if (erk) erk.checked = !!SETTINGS.extraRijskast;
             document.getElementById('setting-price-a').value = SETTINGS.priceA || 0.69;
             document.getElementById('setting-price-b').value = SETTINGS.priceB || 1.59;
             applySkipBToInputs();
