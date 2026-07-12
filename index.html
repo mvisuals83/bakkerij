@@ -1968,23 +1968,40 @@
             }
             
             // Calculate batches for products that need it (where batches is null)
+            // recalcIds: producten waarvan de verdeling DEZE render vers berekend is.
+            // Alleen die mag de remainder-optimalisatie verderop verschuiven — opgeslagen
+            // of handmatig gezette batches blijven exact zoals ingevoerd (owner-regel
+            // 12/07/26: een batch-edit mag nooit stilletjes herverdeeld worden).
+            const recalcIds = new Set();
             ['A', 'B'].forEach(group => {
                 const products = PRODUCTS.filter(p => p.group === group);
                 const isGroupA = group === 'A';
-                
+
                 // Check if any product in this group needs batch calculation
                 const needsCalc = products.filter(p => displayData[p.id].batches === null);
                 if (needsCalc.length === 0) return;
+                needsCalc.forEach(p => recalcIds.add(p.id));
                 
                 // If some products have batches and some don't, calculate only for those that don't
                 if (needsCalc.length < products.length) {
-                    // Mixed: some saved, some new - distribute individually
+                    // Mixed: sommige producten houden hun (opgeslagen/handmatige) batches.
+                    // Trek die platen van de batchlimieten af vóór het herverdelen —
+                    // anders krijgt het herverdeelde product de VOLLE groepscapaciteit
+                    // bovenop de rest (bug za 11/07/26: pist wit alleen al kreeg L1=16 en
+                    // L2=32 terwijl bruin/tijger/piccolo daar al platen hadden → 19/38 rood).
                     needsCalc.forEach(p => {
                         const tot = displayData[p.id].totaal;
                         if (weekend) {
                             const limits = getGroupBatchLimits(isGroupA, true, skipBatches);
                             if (fourBatch) limits[4] = 0;
-                            displayData[p.id].batches = distributeSimple(tot, limits);
+                            const occupied = [0, 0, 0, 0, 0];
+                            products.forEach(o => {
+                                const b = displayData[o.id].batches;
+                                if (o.id === p.id || !b) return;
+                                for (let i = 0; i < 5; i++) occupied[i] += b[i] || 0;
+                            });
+                            const free = limits.map((lim, i) => Math.max(0, lim - occupied[i]));
+                            displayData[p.id].batches = distributeSimple(tot, free);
                         } else {
                             const l1 = Math.ceil(tot / 2);
                             displayData[p.id].batches = [l1, tot - l1, 0, 0, 0];
@@ -2124,20 +2141,31 @@
 
                 for (let late = 4; late >= 2; late--) {
                     if (combinedTotals[late] > 0 && combinedTotals[late] <= 3) {
+                        // Alleen platen van vers berekende verdelingen mogen schuiven.
+                        // Opgeslagen/handmatige batches zijn een bewuste keuze van de
+                        // bakkers — op 11/07/26 schoof deze pass de 3 L5-platen stok wit
+                        // uit de OPGESLAGEN planning naar L4 (→ 18) zonder dat groep B
+                        // ooit was aangeraakt.
+                        const movable = PRODUCTS.every(p =>
+                            displayData[p.id].batches[late] === 0 || recalcIds.has(p.id)
+                        );
+                        if (!movable) continue;
                         const lateG = batchGroupTotals(late);
                         for (let early = 0; early < late; early++) {
                             const earlyG = batchGroupTotals(early);
                             const room = batchMax - combinedTotals[early];
                             if (room < combinedTotals[late]) continue;
 
-                            // If both groups would share this batch, neither group may
-                            // exceed its own oven capacity.
                             const newA = earlyG.a + lateG.a;
                             const newB = earlyG.b + lateG.b;
-                            if (newA > 0 && newB > 0) {
-                                if (newA > SETTINGS.oven1Max) continue;
-                                if (newB > SETTINGS.oven2Max) continue;
-                            }
+                            // Groep B bakt NOOIT boven zijn eigen oven — ook niet "alleen
+                            // in de batch" (getGroupBatchLimits plant B ook nooit hoger;
+                            // owner 12/07/26: stokbrood max = oven 2, punt).
+                            if (newB > SETTINGS.oven2Max) continue;
+                            // Groep A boven zijn eigen oven kan alleen als A alleen in de
+                            // batch zit (dan zijn beide ovens beschikbaar, cap = batchMax
+                            // via de room-check hierboven).
+                            if (newB > 0 && newA > SETTINGS.oven1Max) continue;
 
                             PRODUCTS.forEach(p => {
                                 if (displayData[p.id].batches[late] > 0) {
@@ -2354,9 +2382,19 @@
             if (!planningData[id]) planningData[id] = {};
             
             if (field === 'totaal') {
-                // User changed total - store it, batches will be recalculated
-                planningData[id] = { totaal: value };
-                // Clear batch overrides so they get recalculated
+                // Totaal "gewijzigd" naar exact de som van de huidige batches? Dan is
+                // er niets te herverdelen — batches behouden. Vangt de val af waarbij
+                // een blur/change op het totaalveld (nadat een batch-edit dat veld al
+                // herschreven had) de handmatige batches wiste en alles opnieuw
+                // verdeelde (bug za 11/07/26).
+                const cur = ['l1', 'l2', 'l3', 'l4', 'l5'].map(f =>
+                    parseInt(row.querySelector(`[data-field="${f}"]`).value) || 0);
+                if (value === cur.reduce((a, b) => a + b, 0)) {
+                    planningData[id] = { totaal: value, l1: cur[0], l2: cur[1], l3: cur[2], l4: cur[3], l5: cur[4] };
+                } else {
+                    // User changed total - store it, batches will be recalculated
+                    planningData[id] = { totaal: value };
+                }
             } else {
                 // User changed a batch - update only totaal, keep all batches as user set them
                 const l1 = parseInt(row.querySelector('[data-field="l1"]').value) || 0;
@@ -2500,7 +2538,11 @@
                 for (let i = 0; i < 5; i++) {
                     const thisVal = groupTotals[g][i];
                     const otherVal = groupTotals[other][i];
-                    const max = otherVal > 0 ? ownOven : SETTINGS.batchMax;
+                    // A alleen in een batch mag beide ovens gebruiken (batchMax);
+                    // B is ALTIJD op zijn eigen oven gecapt — 19 stokbrood in L4
+                    // bleef op 11/07/26 onterecht zonder rode markering.
+                    const max = g === 'B' ? ownOven
+                              : (otherVal > 0 ? ownOven : SETTINGS.batchMax);
                     const cell = cells[3 + i];
                     if (thisVal > max) cell.classList.add('cell-over-capacity');
                     else cell.classList.remove('cell-over-capacity');
