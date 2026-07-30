@@ -1558,8 +1558,18 @@
                         // Suggestie volgen had duidelijk breuk gegeven: wie lager zat wint.
                         if (duelDag) {
                             if (r.totaal < r.suggestie) {
-                                duel.jullie++;
-                                note(r, p, 'jullie', 'verlaagd → suggestie had breuk gegeven');
+                                // Eigenaar-regel 2026-07-30: een punt verdien je door het
+                                // te HALEN, niet door minder fout te zitten. Bleef er ook
+                                // na de verlaging fors breuk over, dan zaten suggestie én
+                                // bakker te hoog — dat is onbeslist, geen overwinning.
+                                // (12 van de 18 jullie-punten in juni+juli waren dit.)
+                                if (actPct > SETTINGS.targetBreuk * 2) {
+                                    duel.onbeslist++;
+                                    note(r, p, 'onbeslist', 'allebei te hoog — nog lager kon');
+                                } else {
+                                    duel.jullie++;
+                                    note(r, p, 'jullie', 'verlaagd → suggestie had breuk gegeven');
+                                }
                             } else {
                                 duel.motor++;
                                 note(r, p, 'suggestie', 'verhoogd → eindigde in breuk');
@@ -1624,7 +1634,10 @@
             const totLaag = sum('laag'), totHoog = sum('hoog'),
                   totLaagRW = sum('laagRegenWarm'), totCut = sum('cutSoldout');
             const hints = [];
-            if (totLaagRW >= 3) hints.push(`🌧️ <b>${totLaagRW}×</b> te laag op warme regen-/onweersdagen. De lucht-korting (🌧️ Regen %, nu <b>${SETTINGS.skyRainPct}%</b>) knijpt de warmte-buff dan bijna dicht, terwijl een voorspelde (onweers)bui in de zomer vaak maar een deel van de dag kost. Probeer 50.`);
+            // De hint rekent elke keer opnieuw — hij verdwijnt vanzelf zodra het patroon
+            // weg is. Advieswaarde meegroeien met de huidige stand i.p.v. een vaste "50",
+            // anders blijft hij een al doorgevoerde wijziging aanraden (stond zo tot 30-07).
+            if (totLaagRW >= 3) hints.push(`🌧️ <b>${totLaagRW}×</b> te laag op warme regen-/onweersdagen. De lucht-korting (🌧️ Regen %, nu <b>${SETTINGS.skyRainPct}%</b>) knijpt de warmte-buff dan bijna dicht, terwijl een voorspelde (onweers)bui in de zomer vaak maar een deel van de dag kost. ` + (SETTINGS.skyRainPct >= 80 ? 'Die staat al hoog — zoek het eerder in 🔥 Uitverkocht +%.' : `Probeer ${Math.min(80, SETTINGS.skyRainPct + 30)}.`));
             if (totCut >= 3) hints.push(`💪 <b>${totCut}×</b> een verlaagde suggestie die tóch uitverkocht raakte — vertrouw de grote suggesties wat vaker.`);
             if (totLaag - totLaagRW >= scored / 4) hints.push(`🔥 Ook los van het weer vaak te laag → verhoog 🔥 Uitverkocht +% (nu <b>${SETTINGS.pSellout}</b>) met 5.`);
             if (totHoog >= scored / 4) hints.push(`📉 Vaak te hoog → verlaag 📈 Max stijging per week % (nu <b>${SETTINGS.pMaxGroei}</b>) richting 15.`);
@@ -1840,15 +1853,21 @@
             const eventSelect = document.getElementById('event-select');
             if (eventSelect && !planningData._eventEdited) {
                 eventSelect.value = savedEvent;
-                if (!hasSavedData && savedEvent === 'Normal') {
+                if (savedEvent === 'Normal') {
                     // Belgische feestdag → vooraf op Feestdag (zondag uitgezonderd: dan
                     // gelden toch al zondag-uren). Feestdag wint van promo (zie 25 mei '26).
-                    if (currentDate.getDay() !== 0 && isBelgianHoliday(currentDate)) {
+                    const feestdagVandaag = currentDate.getDay() !== 0 && isBelgianHoliday(currentDate);
+                    if (!hasSavedData && feestdagVandaag) {
                         eventSelect.value = 'Feestdag';
                     // Dag valt in een herkend promo-venster (wo→di, één gelabelde dag is
-                    // genoeg) → vooraf op Promo. Zo is de dropdown zelf de indicator én
-                    // wordt het label bij opslaan automatisch aangevuld. Blijft aanpasbaar.
-                    } else if (buildPromoDateSet().has(dateStr)) {
+                    // genoeg) → op Promo. Zo is de dropdown zelf de indicator én wordt het
+                    // label bij opslaan aangevuld. Blijft aanpasbaar.
+                    // Dit herstelt óók een AL OPGESLAGEN 'Normal' (2026-07-30): wie een dag
+                    // opslaat vóórdat het promo-label van die week bestaat, hield anders
+                    // voorgoed Normal in beeld en in de database — zo 26/07/'26 was zo'n dag.
+                    // De motor rekende die dagen al wél als promo (getDayContext gebruikt
+                    // hetzelfde venster), dus dit maakt alleen het label eerlijk.
+                    } else if (!feestdagVandaag && buildPromoDateSet().has(dateStr)) {
                         eventSelect.value = 'Promo';
                     }
                 }
@@ -3446,9 +3465,43 @@
             historicalData.sort((a, b) => b.datum.localeCompare(a.datum));
             localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
             if (supabaseClient) syncToSupabase(dateStr);
+            if (event === 'Promo') backfillPromoWeek(dateStr);
             markSaved();
             showToast(`✅ Planning voor ${formatDate(currentDate)} opgeslagen!`);
             renderBreukPage();
+        }
+
+        // Promo pas op donderdag gelabeld terwijl woensdag al opgeslagen was?
+        // Zet het label alsnog op de rest van de promo-week (wo→di). Eigenaar-regel
+        // 2026-07-30: de promo-week is een FEIT, een 'Normal' erbinnen is een vergeten
+        // label, geen keuze. Raakt UITSLUITEND de event-kolom aan — aantallen, breuk en
+        // de opgeslagen suggestie blijven staan. Die suggestie is bewust historie: hij
+        // legt vast wat de motor die ochtend zei, en dat is de meetlat voor het
+        // natuningen. Achteraf herrekenen zou die meting vervalsen.
+        // Feestdag wint van promo, dus die dagen blijven ongemoeid.
+        function backfillPromoWeek(dateStr) {
+            const wo = new Date(dateStr + 'T00:00:00');
+            wo.setDate(wo.getDate() - ((wo.getDay() + 4) % 7));
+            const gewijzigd = [];
+            for (let i = 0; i < 7; i++) {
+                const iso = formatDateISO(wo); wo.setDate(wo.getDate() + 1);
+                if (iso === dateStr) continue;
+                const rijen = historicalData.filter(r => r.datum === iso);
+                if (!rijen.length || rijen[0].event !== 'Normal') continue;
+                rijen.forEach(r => { r.event = 'Promo'; });
+                gewijzigd.push(iso);
+            }
+            if (!gewijzigd.length) return;
+            localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
+            // BEWUST geen syncToSupabase(): die uploadt de hele rij, en dit toestel kan
+            // voor een oudere dag verouderde aantallen hebben staan — dan overschrijf je
+            // de nieuwere invoer van de collega (zie de waarschuwing bij syncToSupabase).
+            // Alleen de event-kolom patchen, en alleen waar hij nog op 'Normal' staat.
+            if (supabaseClient) {
+                supabaseClient.from('planning_data')
+                    .update({ event: 'Promo' }).in('datum', gewijzigd).eq('event', 'Normal');
+            }
+            showToast(`📢 Promo-label aangevuld voor ${gewijzigd.length} dag(en) in deze week`);
         }
         
         function changeDate(delta) {
@@ -3809,7 +3862,23 @@
             updateWeather();
             await initSupabase();
         }
-        
+
+        // De app haalde de cloud-data ALLEEN bij het opstarten op. Een toestel dat de
+        // hele dag open blijft staan (winkel-tablet, telefoon in de achtergrond) miste
+        // daardoor alles wat op een ánder toestel werd opgeslagen. Voor promo is dat
+        // concreet: buildPromoDateSet() leest historicalData, dus zonder verse data kent
+        // het toestel het promo-venster niet en vult het de wo→di-week niet aan.
+        // Bij terugkeer in de app opnieuw ophalen — nooit over niet-opgeslagen werk heen,
+        // en hoogstens één keer per minuut.
+        let lastCloudLoad = Date.now();
+        document.addEventListener('visibilitychange', async () => {
+            if (document.hidden || !supabaseClient || hasUnsavedChanges) return;
+            if (Date.now() - lastCloudLoad < 60000) return;
+            lastCloudLoad = Date.now();
+            await loadCloudSettings();
+            await loadFromSupabase();
+        });
+
         init();
     </script>
 </body>
