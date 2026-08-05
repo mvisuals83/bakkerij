@@ -640,11 +640,22 @@
             </div>
             
             <div class="settings-section">
-                <h3 style="margin-bottom: 10px;">📊 Week Vergelijking (verkocht)</h3>
+                <h3 style="margin-bottom: 4px;">📊 Week Vergelijking (verkocht)</h3>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Per weekdag, 5 kalenderweken naast elkaar (W32 = week 32). Groot getal = verkocht (gebakken stuks − breuk), klein getal = verschil met dezelfde dag een week eerder. Zo zie je of één <em>dag</em> wegzakt. ◀ Zijwaarts scrollen voor de oudere weken. <b>*</b> = lopende week: alleen afgesloten dagen (t/m gisteren) tellen mee.</p>
                 <div class="history-table-wrapper">
-                    <table class="history-table" id="week-compare-table">
-                        <thead><tr><th>Dag</th><th>W-1</th><th>W-2</th><th>W-3</th></tr></thead>
+                    <table class="history-table" id="week-compare-table" style="min-width: 460px;">
+                        <thead id="week-compare-head"></thead>
                         <tbody id="week-compare-body"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="settings-section">
+                <h3 style="margin-bottom: 4px;">🥖 Week Vergelijking (verkocht per product)</h3>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Per product de verkoop van een hele week — om te zien of één <em>product</em> wegzakt of aantrekt (bv. kwaliteitsprobleem), los van de dagpatronen. Het verschil wordt berekend op de dagen die in béide weken data hebben, dus een halve week vertekent niets. <b>*</b> = lopende week, <span style="font-family: var(--font-mono);">ⁿd</span> = aantal meegetelde dagen als het er geen 7 zijn.</p>
+                <div class="history-table-wrapper">
+                    <table class="history-table" id="product-week-compare-table" style="min-width: 460px;">
+                        <thead id="product-week-compare-head"></thead>
+                        <tbody id="product-week-compare-body"></tbody>
                     </table>
                 </div>
             </div>
@@ -877,6 +888,22 @@
         function getDayName(d) { return ['zondag','maandag','dinsdag','woensdag','donderdag','vrijdag','zaterdag'][d.getDay()]; }
         function isWeekend(d) { return d.getDay() === 0 || d.getDay() === 6; }
         function isSaturday(d) { return d.getDay() === 6; }
+
+        // ISO-8601 kalenderweken (ma→zo) — dezelfde nummering die in België op de
+        // kalender staat, zodat de app "W32" kan zeggen i.p.v. "3 weken terug".
+        // Let op: dit is bewust NIET de promo-week (wo→di, zie buildPromoDateSet);
+        // die blijft ongemoeid, want promo is een winkel-venster en geen kalenderweek.
+        function isoWeekStart(d) {
+            const s = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            s.setDate(s.getDate() - ((s.getDay() + 6) % 7)); // terug naar maandag
+            return s;
+        }
+        function isoWeekNumber(d) {
+            const t = isoWeekStart(d);
+            t.setDate(t.getDate() + 3); // de donderdag bepaalt bij welk jaar de week hoort
+            const firstMonday = isoWeekStart(new Date(t.getFullYear(), 0, 4));
+            return Math.round((t - firstMonday) / 604800000) + 1;
+        }
         
         function showToast(msg) {
             const t = document.getElementById('toast');
@@ -2959,8 +2986,9 @@
             document.getElementById('stat-percentage').textContent = gebakken > 0 ? (breuk / gebakken * 100).toFixed(1) + '%' : '0%';
             document.getElementById('stat-omzet').textContent = '€' + totalOmzet.toFixed(2).replace('.', ',');
             
-            // Week comparison - compare same weekdays
+            // Week comparison — rollend venster van 5 kalenderweken, per dag én per product
             renderWeekComparison();
+            renderProductWeekComparison();
             
             // Build table with group totals
             let html = '';
@@ -2996,67 +3024,199 @@
             drawChart();
         }
         
+        // ===== WEEK VERGELIJKING (historiek) ==================================
+        // Twee blokken op dezelfde basis:
+        //   1. per weekdag  → zakt een bepaalde DAG weg? (patroon in de week)
+        //   2. per product  → zakt een bepaald PRODUCT weg? (kwaliteitsprobleem)
+        // Beide over een rollend venster van 5 ISO-kalenderweken, kolomkop = het
+        // echte weeknummer (W32), niet "W-1 / W-2" — zo praat de winkel er ook over.
+        //
+        // "Verkocht" = gebakken stuks (platen × stuks-per-plaat) − breuk. Breuk is
+        // wat niet over de toonbank ging, dus die hoort er af: dit blok meet verkoop,
+        // niet productie.
+        //
+        // De lopende week telt WEL mee, maar alleen met afgesloten dagen (t/m
+        // gisteren). Vandaag valt af omdat de breuk pas 's avonds ingevuld wordt —
+        // meetellen zou de dag kunstmatig als "alles verkocht" laten scoren. De hele
+        // lopende week overslaan is niet nodig zolang de vergelijking op gelijke dagen
+        // gebeurt (zie weekTotals): zo krijg je een vroeg signaal zonder vals alarm.
+        const WEEK_COMPARE_COUNT = 5;   // breedte van het rollende venster
+        const WEEK_COMPARE_FLAT = 5;    // |Δ%| hieronder = "ongeveer gelijk", ruisfilter
+
+        // Alle verkoopdata in één keer plat slaan: { '2026-08-04': { pistolet_wit: 312, ... } }
+        function buildVerkochtIndex() {
+            const map = {};
+            historicalData.forEach(r => {
+                const p = PRODUCTS.find(x => x.name === r.product);
+                if (!p) return;
+                if (!map[r.datum]) map[r.datum] = {};
+                map[r.datum][p.id] = (map[r.datum][p.id] || 0) + (r.totaal || 0) * p.ppp - (r.breuk || 0);
+            });
+            return map;
+        }
+
+        // De 5 weken van het venster, oud → nieuw (nieuwste rechts).
+        function weekCompareWindow() {
+            const curStart = isoWeekStart(new Date());
+            const weeks = [];
+            for (let i = WEEK_COMPARE_COUNT - 1; i >= 0; i--) {
+                const start = new Date(curStart);
+                start.setDate(curStart.getDate() - i * 7);
+                weeks.push({ start, num: isoWeekNumber(start), running: i === 0 });
+            }
+            return weeks;
+        }
+
+        // Verkocht op één datum. productId leeg = alle producten samen, '__A'/'__B' =
+        // groepstotaal. null = geen data (≠ 0 verkocht), zodat een lege dag niet als
+        // dip meetelt maar gewoon buiten de vergelijking valt.
+        function verkochtOnDate(index, dateISO, productId) {
+            const day = index[dateISO];
+            if (!day) return null;
+            const ids = !productId ? PRODUCTS.map(p => p.id)
+                : (productId === '__A' || productId === '__B')
+                    ? PRODUCTS.filter(p => p.group === productId.slice(2)).map(p => p.id)
+                    : [productId];
+            let sum = 0, any = false;
+            ids.forEach(id => { if (day[id] !== undefined) { sum += day[id]; any = true; } });
+            return any ? sum : null;
+        }
+
+        // Datum van weekdag `dow` (0 = maandag) in een weekobject.
+        function weekDayISO(week, dow) {
+            const d = new Date(week.start);
+            d.setDate(week.start.getDate() + dow);
+            return formatDateISO(d);
+        }
+
+        // Cel: groot getal = verkocht, klein getal = Δ% t.o.v. de vergelijkingsbasis.
+        function weekCompareCell(value, prev, note, dim) {
+            if (value === null) return '<td style="color: var(--text-muted);">–</td>';
+            let sub = '';
+            if (prev !== null && prev > 0) {
+                const pct = (value - prev) / prev * 100;
+                const flat = Math.abs(pct) < WEEK_COMPARE_FLAT;
+                const color = flat ? 'var(--text-muted)' : pct > 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+                const arrow = flat ? '≈' : pct > 0 ? '↑' : '↓';
+                const n = Math.round(pct); // Math.round geeft -0 → template literal maakt er "0" van
+                sub = `<div style="font-size: 0.65rem; color: ${color};">${n > 0 ? '+' : ''}${n}%${arrow}</div>`;
+            } else if (prev !== null) {
+                // Vorige week 0 verkocht (bv. product niet gebakken) — een % zegt dan
+                // niets, dus tonen we de richting zonder getal.
+                sub = value > 0
+                    ? '<div style="font-size: 0.65rem; color: var(--accent-green);">uit 0↑</div>'
+                    : '<div style="font-size: 0.65rem; color: var(--text-muted);">0≈</div>';
+            }
+            const label = note ? `<span style="font-size: 0.6rem; color: var(--text-muted);"> ${note}</span>` : '';
+            return `<td style="${dim ? 'opacity: 0.75;' : ''}"><div style="font-weight: 600;">${value}${label}</div>${sub}</td>`;
+        }
+
+        // Gedeelde kolomkoppen: W32 + de maandag van die week. * = lopende week.
+        function weekCompareHead(firstCol, weeks) {
+            const cols = weeks.map(w => {
+                const star = w.running ? '<span style="color: var(--accent-orange);">*</span>' : '';
+                const dm = `${w.start.getDate()}/${w.start.getMonth() + 1}`;
+                return `<th style="text-align: center; white-space: nowrap;">W${w.num}${star}<div style="font-weight: 400; font-size: 0.6rem; opacity: 0.6;">${dm}</div></th>`;
+            }).join('');
+            return `<tr><th>${firstCol}</th>${cols}</tr>`;
+        }
+
+        // --- Blok 1: per weekdag ---------------------------------------------
         function renderWeekComparison() {
-            const dayNames = ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'];
-            const today = new Date();
-            let html = '';
-            
-            // Helper function to get verkocht for a date
-            function getVerkocht(dateStr) {
-                const dayData = historicalData.filter(d => d.datum === dateStr);
-                let verkocht = 0;
-                dayData.forEach(d => {
-                    const p = PRODUCTS.find(x => x.name === d.product);
-                    if (p) {
-                        const stuks = d.totaal * p.ppp;
-                        verkocht += stuks - (d.breuk || 0);
-                    }
+            const index = buildVerkochtIndex();
+            const weeks = weekCompareWindow();
+            const todayISO = formatDateISO(new Date());
+            const dayLabels = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
+
+            let body = '';
+            for (let dow = 0; dow < 7; dow++) {
+                body += `<tr><td>${dayLabels[dow]}</td>`;
+                weeks.forEach(w => {
+                    const iso = weekDayISO(w, dow);
+                    // Vandaag en later blijven leeg: breuk is dan nog niet definitief.
+                    const cur = iso < todayISO ? verkochtOnDate(index, iso, null) : null;
+                    const prevD = new Date(iso + 'T00:00:00');
+                    prevD.setDate(prevD.getDate() - 7);
+                    const prev = verkochtOnDate(index, formatDateISO(prevD), null);
+                    body += weekCompareCell(cur, prev, '', w.running);
                 });
-                return verkocht;
+                body += '</tr>';
             }
-            
-            // Show last 7 days and their week-over-week trends
-            for (let i = 6; i >= 0; i--) {
-                const baseDate = new Date(today);
-                baseDate.setDate(today.getDate() - i);
-                
-                const dayName = dayNames[baseDate.getDay()];
-                const dateLabel = `${dayName} ${baseDate.getDate()}/${baseDate.getMonth() + 1}`;
-                
-                html += `<tr><td>${dateLabel}</td>`;
-                
-                // W-1 = this week vs last week (week 0 vs week 1)
-                // W-2 = last week vs 2 weeks ago (week 1 vs week 2)
-                // W-3 = 2 weeks ago vs 3 weeks ago (week 2 vs week 3)
-                for (let w = 0; w < 3; w++) {
-                    const thisWeekDate = new Date(baseDate);
-                    thisWeekDate.setDate(baseDate.getDate() - (w * 7));
-                    const lastWeekDate = new Date(baseDate);
-                    lastWeekDate.setDate(baseDate.getDate() - ((w + 1) * 7));
-                    
-                    const thisVerkocht = getVerkocht(formatDateISO(thisWeekDate));
-                    const lastVerkocht = getVerkocht(formatDateISO(lastWeekDate));
-                    
-                    let diffStr = '-';
-                    let diffColor = 'var(--text-muted)';
-                    
-                    if (lastVerkocht > 0 && thisVerkocht > 0) {
-                        const diffPct = ((thisVerkocht - lastVerkocht) / lastVerkocht * 100);
-                        const arrow = diffPct > 0 ? '↑' : diffPct < 0 ? '↓' : '';
-                        diffStr = `${diffPct > 0 ? '+' : ''}${diffPct.toFixed(0)}%${arrow}`;
-                        diffColor = diffPct > 0 ? 'var(--accent-green)' : diffPct < 0 ? 'var(--accent-red)' : 'var(--text-secondary)';
-                    } else if (thisVerkocht > 0 && lastVerkocht === 0) {
-                        diffStr = 'nieuw';
-                        diffColor = 'var(--accent-blue)';
-                    }
-                    
-                    html += `<td style="color: ${diffColor}; font-weight: 500; font-size: 0.8rem;">${diffStr}</td>`;
+
+            document.getElementById('week-compare-head').innerHTML = weekCompareHead('Dag', weeks);
+            document.getElementById('week-compare-body').innerHTML = body;
+        }
+
+        // --- Blok 2: per product ---------------------------------------------
+        // Weektotalen per product. De vergelijking gebeurt op de doorsnede van de
+        // dagen die in béide weken data hebben — anders zou een lopende week van 2
+        // dagen tegen een volle week van 7 een dramatische -70% laten zien die niets
+        // met verkoop te maken heeft. Het getoonde totaal is wél de eigen week.
+        function renderProductWeekComparison() {
+            const index = buildVerkochtIndex();
+            const weeks = weekCompareWindow();
+            const todayISO = formatDateISO(new Date());
+
+            // De week vóór de oudste kolom is de vergelijkingsbasis voor die kolom,
+            // zodat ook de linkerkolom een Δ% krijgt.
+            const preStart = new Date(weeks[0].start);
+            preStart.setDate(preStart.getDate() - 7);
+            const allWeeks = [{ start: preStart }].concat(weeks);
+
+            // Bruikbare weekdagen voor dít product: afgesloten dag (t/m gisteren) mét data.
+            function maskFor(week, productId) {
+                const m = [];
+                for (let dow = 0; dow < 7; dow++) {
+                    const iso = weekDayISO(week, dow);
+                    m[dow] = iso < todayISO && verkochtOnDate(index, iso, productId) !== null;
                 }
-                
-                html += '</tr>';
+                return m;
             }
-            
-            document.getElementById('week-compare-body').innerHTML = html;
+
+            function sumWeek(week, mask, productId) {
+                let sum = 0, days = 0;
+                for (let dow = 0; dow < 7; dow++) {
+                    if (!mask[dow]) continue;
+                    const v = verkochtOnDate(index, weekDayISO(week, dow), productId);
+                    if (v === null) continue;
+                    sum += v; days++;
+                }
+                return days === 0 ? { sum: null, days: 0 } : { sum, days };
+            }
+
+            function rowFor(productId, label, style) {
+                const masks = allWeeks.map(w => maskFor(w, productId));
+                let row = `<tr${style || ''}><td${style ? ' style="font-family: var(--font-sans);"' : ''}>${label}</td>`;
+                weeks.forEach((w, wi) => {
+                    const mi = wi + 1;                    // index in allWeeks
+                    const own = sumWeek(w, masks[mi], productId);
+                    // Gelijke-dagen-basis: alleen de weekdagen die in béide weken data hebben.
+                    const shared = masks[mi].map((ok, dow) => ok && masks[mi - 1][dow]);
+                    const curLike = sumWeek(w, shared, productId);
+                    const prevLike = sumWeek(allWeeks[mi - 1], shared, productId);
+                    // Δ% hoort bij die gelijke dagen, maar staat naast het éigen weektotaal.
+                    // Wijkt de doorsnede af, dan schalen we de basis mee — het getoonde
+                    // percentage blijft dan exact curLike/prevLike−1, zonder dat het naast
+                    // het grote getal onlogisch oogt.
+                    let base = null;
+                    if (own.sum !== null && curLike.sum !== null && prevLike.sum !== null && curLike.sum > 0) {
+                        base = prevLike.sum * (own.sum / curLike.sum);
+                    }
+                    const note = own.days > 0 && own.days < 7 ? `${own.days}d` : '';
+                    row += weekCompareCell(own.sum, base, note, w.running);
+                });
+                return row + '</tr>';
+            }
+
+            const bold = ' style="background: var(--bg-card); font-weight: 700; border-top: 2px solid var(--border-color);"';
+            let body = '';
+            PRODUCTS.filter(p => p.group === 'A').forEach(p => { body += rowFor(p.id, p.short); });
+            body += rowFor('__A', 'Totaal Pistolets', bold);
+            PRODUCTS.filter(p => p.group === 'B').forEach(p => { body += rowFor(p.id, p.short); });
+            body += rowFor('__B', 'Totaal Stokbrood', bold);
+
+            document.getElementById('product-week-compare-head').innerHTML = weekCompareHead('Product', weeks);
+            document.getElementById('product-week-compare-body').innerHTML = body;
         }
         
         function drawChart() {
