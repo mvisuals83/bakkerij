@@ -388,6 +388,16 @@
             font-family: var(--font-main);
         }
         
+        /* Week-vergelijking: de labelkolom is sticky en zou met min-width mee
+           uitrekken, waardoor er een kolom cijfers minder in beeld past. Vastzetten
+           op een smalle breedte duwt de getallen naar links (eigenaar 2026-08-05). */
+        #week-compare-table th:first-child, #week-compare-table td:first-child,
+        #product-week-compare-table th:first-child, #product-week-compare-table td:first-child {
+            width: 86px; min-width: 86px; padding-left: 8px; padding-right: 4px; white-space: nowrap;
+        }
+        #week-compare-table th, #week-compare-table td,
+        #product-week-compare-table th, #product-week-compare-table td { padding: 8px 6px; }
+
         .settings-section { background: var(--bg-dark); border-radius: var(--radius); padding: 14px; margin-bottom: 12px; }
         .settings-section h3 { font-size: 0.95rem; margin-bottom: 12px; color: var(--text-secondary); }
         .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-light); }
@@ -490,7 +500,7 @@
                 <div class="reference-header">📊 Vorige Weken (zelfde dag)</div>
                 <div class="reference-scroll">
                     <table class="reference-table">
-                        <thead><tr><th>Product</th><th>Gem</th><th>W-1</th><th>Brk</th><th>W-2</th><th>Brk</th><th>W-3</th><th>Brk</th><th>W-4</th><th>Brk</th><th>W-5</th><th>Brk</th></tr></thead>
+                        <thead id="reference-head"></thead>
                         <tbody id="reference-body"></tbody>
                     </table>
                 </div>
@@ -641,7 +651,7 @@
             
             <div class="settings-section">
                 <h3 style="margin-bottom: 4px;">📊 Week Vergelijking (verkocht)</h3>
-                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Per weekdag, 5 kalenderweken naast elkaar (W32 = week 32). Groot getal = verkocht (gebakken stuks − breuk), klein getal = verschil met dezelfde dag een week eerder. Zo zie je of één <em>dag</em> wegzakt. ◀ Zijwaarts scrollen voor de oudere weken. <b>*</b> = lopende week: alleen afgesloten dagen (t/m gisteren) tellen mee.</p>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;"><b>*</b> = lopende week</p>
                 <div class="history-table-wrapper">
                     <table class="history-table" id="week-compare-table" style="min-width: 460px;">
                         <thead id="week-compare-head"></thead>
@@ -651,7 +661,7 @@
             </div>
             <div class="settings-section">
                 <h3 style="margin-bottom: 4px;">🥖 Week Vergelijking (verkocht per product)</h3>
-                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Per product de verkoop van een hele week — om te zien of één <em>product</em> wegzakt of aantrekt (bv. kwaliteitsprobleem), los van de dagpatronen. Het verschil wordt berekend op de dagen die in béide weken data hebben, dus een halve week vertekent niets. <b>*</b> = lopende week, <span style="font-family: var(--font-mono);">ⁿd</span> = aantal meegetelde dagen als het er geen 7 zijn.</p>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;"><b>*</b> = lopende week · <span style="font-family: var(--font-mono);">d</span> = aantal dagen</p>
                 <div class="history-table-wrapper">
                     <table class="history-table" id="product-week-compare-table" style="min-width: 460px;">
                         <thead id="product-week-compare-head"></thead>
@@ -2308,6 +2318,18 @@
             const NWEEKS = 5;
             let html = '';
 
+            // Kolomkoppen tonen het echte kalenderweeknummer (W31, W30, ...) i.p.v.
+            // W-1/W-2. Ze hangen aan currentDate, niet aan vandaag: blader je naar een
+            // andere planningsdag, dan schuiven de weeknummers mee. Volgorde blijft
+            // nieuw → oud.
+            let headHtml = '<tr><th>Product</th><th>Gem</th>';
+            for (let w = 1; w <= NWEEKS; w++) {
+                const refDate = new Date(currentDate);
+                refDate.setDate(currentDate.getDate() - w * 7);
+                headHtml += `<th>W${isoWeekNumber(refDate)}</th><th>Brk</th>`;
+            }
+            document.getElementById('reference-head').innerHTML = headHtml + '</tr>';
+
             // Calculate totals for each week
             const weekTotals = Array(NWEEKS).fill(0);
             const weekBreuk = Array(NWEEKS).fill(0);
@@ -3055,11 +3077,12 @@
             return map;
         }
 
-        // De 5 weken van het venster, oud → nieuw (nieuwste rechts).
+        // De 5 weken van het venster, nieuw → oud (lopende week vooraan, net als de
+        // Vorige Weken-tabel op Planning: het meest recente staat links).
         function weekCompareWindow() {
             const curStart = isoWeekStart(new Date());
             const weeks = [];
-            for (let i = WEEK_COMPARE_COUNT - 1; i >= 0; i--) {
+            for (let i = 0; i < WEEK_COMPARE_COUNT; i++) {
                 const start = new Date(curStart);
                 start.setDate(curStart.getDate() - i * 7);
                 weeks.push({ start, num: isoWeekNumber(start), running: i === 0 });
@@ -3157,11 +3180,12 @@
             const weeks = weekCompareWindow();
             const todayISO = formatDateISO(new Date());
 
-            // De week vóór de oudste kolom is de vergelijkingsbasis voor die kolom,
-            // zodat ook de linkerkolom een Δ% krijgt.
-            const preStart = new Date(weeks[0].start);
+            // Weken staan nieuw → oud, dus de vergelijkingsbasis van kolom i is kolom
+            // i+1. Achteraan komt de week vóór de oudste kolom, zodat ook die rechter
+            // buitenkolom een Δ% krijgt.
+            const preStart = new Date(weeks[weeks.length - 1].start);
             preStart.setDate(preStart.getDate() - 7);
-            const allWeeks = [{ start: preStart }].concat(weeks);
+            const allWeeks = weeks.concat([{ start: preStart }]);
 
             // Bruikbare weekdagen voor dít product: afgesloten dag (t/m gisteren) mét data.
             function maskFor(week, productId) {
@@ -3188,12 +3212,11 @@
                 const masks = allWeeks.map(w => maskFor(w, productId));
                 let row = `<tr${style || ''}><td${style ? ' style="font-family: var(--font-sans);"' : ''}>${label}</td>`;
                 weeks.forEach((w, wi) => {
-                    const mi = wi + 1;                    // index in allWeeks
-                    const own = sumWeek(w, masks[mi], productId);
+                    const own = sumWeek(w, masks[wi], productId);
                     // Gelijke-dagen-basis: alleen de weekdagen die in béide weken data hebben.
-                    const shared = masks[mi].map((ok, dow) => ok && masks[mi - 1][dow]);
+                    const shared = masks[wi].map((ok, dow) => ok && masks[wi + 1][dow]);
                     const curLike = sumWeek(w, shared, productId);
-                    const prevLike = sumWeek(allWeeks[mi - 1], shared, productId);
+                    const prevLike = sumWeek(allWeeks[wi + 1], shared, productId);
                     // Δ% hoort bij die gelijke dagen, maar staat naast het éigen weektotaal.
                     // Wijkt de doorsnede af, dan schalen we de basis mee — het getoonde
                     // percentage blijft dan exact curLike/prevLike−1, zonder dat het naast
@@ -3210,10 +3233,12 @@
 
             const bold = ' style="background: var(--bg-card); font-weight: 700; border-top: 2px solid var(--border-color);"';
             let body = '';
+            // Korte labels: de eerste kolom is sticky, dus elke letter erin duwt de
+            // cijferkolommen verder van het scherm af (eigenaar 2026-08-05).
             PRODUCTS.filter(p => p.group === 'A').forEach(p => { body += rowFor(p.id, p.short); });
-            body += rowFor('__A', 'Totaal Pistolets', bold);
+            body += rowFor('__A', 'Totaal pist.', bold);
             PRODUCTS.filter(p => p.group === 'B').forEach(p => { body += rowFor(p.id, p.short); });
-            body += rowFor('__B', 'Totaal Stokbrood', bold);
+            body += rowFor('__B', 'Totaal stok.', bold);
 
             document.getElementById('product-week-compare-head').innerHTML = weekCompareHead('Product', weeks);
             document.getElementById('product-week-compare-body').innerHTML = body;
