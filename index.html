@@ -678,6 +678,8 @@
                 <div class="setting-row"><label>Oven 2 max</label><input type="number" id="setting-oven2" value="15" onchange="saveCapacitySettings()"></div>
                 <div class="setting-row"><label>Batch max</label><input type="number" id="setting-batch-max" value="31" onchange="saveCapacitySettings()"></div>
                 <div class="setting-row"><label>3e rijskast (5e batch op zo/feestdag)</label><label class="toggle"><input type="checkbox" id="setting-extra-rijskast" onchange="saveCapacitySettings()"><span class="toggle-slider"></span></label></div>
+                <div class="setting-row"><label>4-stuks stokbroodplaten in huis</label><input type="number" id="setting-plate4" value="18" onchange="saveCapacitySettings()"></div>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Stokbrood ligt liefst op 4-stuks platen (meer volume). Bruin krijgt ze eerst, wit de rest; wat niet meer past gaat op 5-stuks platen. Budget geldt per dag — de hele dag wordt in één keer klaargezet.</p>
             </div>
             <div class="settings-section">
                 <h3>🔥 Weekend Strategie — Skip Groep B</h3>
@@ -827,12 +829,21 @@
             { id: 'pistolet_bruin', name: 'pistolet bruin', short: 'Pist. bruin', group: 'A', ppp: 15, bij0: 1, d1: 20, d2: 40, d3: 60, price: 0.69 },
             { id: 'tijger_pistolet', name: 'tijger pistolet', short: 'Tijger', group: 'A', ppp: 15, bij0: 1, d1: 20, d2: 40, d3: 60, price: 0.69 },
             { id: 'piccolo', name: 'piccolo', short: 'Piccolo', group: 'A', ppp: 12, bij0: 1, d1: 20, d2: 40, d3: 60, price: 0.69 },
-            { id: 'stokbrood_wit', name: 'stokbrood wit', short: 'Stok. wit', group: 'B', ppp: 5, bij0: 1, d1: 15, d2: 30, d3: 45, price: 1.59 },
-            { id: 'stokbrood_bruin', name: 'stokbrood bruin', short: 'Stok. bruin', group: 'B', ppp: 4, bij0: 1, d1: 12, d2: 24, d3: 36, price: 1.59 }
+            // Groep B ligt op twee plaatsoorten: ppp4 = de 4-stuks plaat (voorkeur, geeft
+            // de baguette meer volume), ppp = de 5-stuks plaat waarop de overloop gaat.
+            // p4rank bepaalt wie het eerst uit de 4-platen voorraad mag putten (laag = eerst).
+            // Bruin heeft ppp === ppp4 en verandert dus niets aan zijn eigen telling — hij
+            // claimt alleen 4-platen vóór wit. Zie plaatverdeling-blok bij stuksFromPlates().
+            { id: 'stokbrood_wit', name: 'stokbrood wit', short: 'Stok. wit', group: 'B', ppp: 5, ppp4: 4, p4rank: 2, bij0: 1, d1: 15, d2: 30, d3: 45, price: 1.59 },
+            { id: 'stokbrood_bruin', name: 'stokbrood bruin', short: 'Stok. bruin', group: 'B', ppp: 4, ppp4: 4, p4rank: 1, bij0: 1, d1: 12, d2: 24, d3: 36, price: 1.59 }
         ];
         
         let SETTINGS = {
             oven1Max: 16, oven2Max: 15, batchMax: 31,
+            // Aantal 4-stuks stokbroodplaten in huis (geteld 2026-08-10). Budget per DAG,
+            // niet per lading: de hele dag wordt in één sessie vooruit ingepland, dus een
+            // plaat blijft de hele dag bezet. Uitbreiding = altijd 4-platen bijkopen.
+            plate4Stock: 18,
             showScoreboard: true,    // 🥊 scorebord-kaart op de Planning-tab
             extraRijskast: false,    // 3e rijskast aanwezig → 5e batch mag op zo/feestdag
             // Weekdag 3e batch (eigenaar-regel 2026-07-03): past een groep niet in
@@ -1084,6 +1095,106 @@
             return dates;
         }
 
+        // ===== 4/5-PLAATS VERDELING (GROEP B) =====
+        // Stokbrood ligt op twee soorten platen: 4-stuks (SETTINGS.plate4Stock in huis) en
+        // 5-stuks. De 4-plaat geeft de baguette meer volume/ambachtelijke look en gaat dus
+        // vóór. Bruin claimt ze altijd eerst (p4rank 1), wit krijgt wat overblijft (rank 2),
+        // de rest van wit gaat op 5-stuks. Weekdagen blijven zo volledig op 4; in het weekend
+        // loopt Groep B over de voorraad heen en ontstaat vanzelf een mix.
+        //
+        // SCOPE = PER DAG (eigenaar 2026-08-10): de volledige dagplanning wordt in één sessie
+        // vooruit klaargezet (rijskast + diepvries), dus een plaat is de hele dag bezet en
+        // wordt niet tussen ladingen hergebruikt. Zou het per lading zijn, dan bond 18 nooit
+        // — Groep B zit al op 16 per oven gecapt.
+        //
+        // WAAROM DIT ERTOE DOET: breuk is een ECHTE stuk-telling, gebakken was dat niet. Met
+        // ppp=5 voor wit werd elke 4-plaat als 5 broden geboekt → breuk-% ~20% (relatief) te
+        // laag en €1,59 fantoom-omzet per plaat. De plaatsuggestie zelf schoof nauwelijks:
+        // de fout blaast `gebakken` op maar deelt daarna weg tegen dezelfde opgeblazen ppp,
+        // zodat alleen de breuk-term overblijft (~1-2%). Daar zat het probleem dus niet.
+        //
+        // NIET gemodelleerd (bewust, eigenaar 2026-08-10):
+        //  - De zeldzame extra batch die op de dag zelf bijkomt als Groep B te vroeg opraakt.
+        //  - Kerst/Nieuwjaar, waar men juist 5-platen voortrekt om volume te duwen (~3× dag).
+        //    Die dagen zijn feestdagen en worden door refDemands sowieso als referentie
+        //    uitgesloten, dus ze kunnen geen enkele suggestie vervuilen — het scheelt daar
+        //    alleen een paar procent in de getoonde omzet.
+
+        // Hoeveel 4-platen zijn er nog vrij als dit product aan de beurt komt?
+        // platesOf(product) levert het aantal platen van een groepsgenoot op die dag.
+        function free4For(p, platesOf) {
+            if (p.group !== 'B') return 0;
+            let used = 0;
+            PRODUCTS.forEach(o => {
+                if (o.group !== 'B' || o.id === p.id) return;
+                if ((o.p4rank || 99) >= (p.p4rank || 99)) return; // komt ná ons in de rij
+                used += platesOf(o) || 0;
+            });
+            return Math.max(0, (SETTINGS.plate4Stock || 0) - used);
+        }
+
+        // Platen → stuks. Vervangt overal `totaal * p.ppp`.
+        function stuksFromPlates(p, plates, free4) {
+            const n = plates || 0;
+            if (p.group !== 'B') return n * p.ppp;
+            const small = p.ppp4 || p.ppp;
+            const n4 = Math.min(n, Math.max(0, free4));
+            return n4 * small + (n - n4) * p.ppp;
+        }
+
+        // Stuks → platen (de omgekeerde weg, voor suggesties). Vult eerst de vrije
+        // 4-platen, de rest op 5-stuks. Zelfde afrondingsgedrag als voorheen (round).
+        function platesFromStuks(p, stuks, free4) {
+            const s = Math.max(0, stuks || 0);
+            if (p.group !== 'B') return Math.round(s / p.ppp);
+            const small = p.ppp4 || p.ppp;
+            const cap4 = Math.max(0, free4);
+            if (s <= cap4 * small) return Math.round(s / small);
+            return cap4 + Math.round((s - cap4 * small) / p.ppp);
+        }
+
+        // --- Toegepast op een OPGESLAGEN dag (historiek, rapport, referenties) ---
+        // Leest de echte plaataantallen van de groepsgenoten uit historicalData.
+        function free4OnDate(p, dateISO) {
+            return free4For(p, o => historicalData.find(r => r.datum === dateISO && r.product === o.name)?.totaal || 0);
+        }
+
+        // Gebakken stuks op een opgeslagen dag. `plates` optioneel (anders uit de historiek).
+        function stuksOnDate(p, dateISO, plates) {
+            const n = plates !== undefined && plates !== null
+                ? plates
+                : (historicalData.find(r => r.datum === dateISO && r.product === p.name)?.totaal || 0);
+            return stuksFromPlates(p, n, free4OnDate(p, dateISO));
+        }
+
+        // --- Toegepast op de dag die je NU plant ---
+        // Voor de groepsgenoten die eerder in de rij staan: sessie-invoer > opgeslagen rij >
+        // klassieke suggestie. Bewust de KLASSIEKE suggestie als terugval — die raakt de
+        // geavanceerde motor niet aan en kan dus nooit terugketsen op zichzelf. Bruin staat
+        // eerste in de rij en heeft die terugval sowieso niet nodig (free4 = volle voorraad).
+        function free4ForPlan(p) {
+            const iso = formatDateISO(currentDate);
+            return free4For(p, o => {
+                const sess = planningData[o.id];
+                if (sess && sess.totaal !== undefined) return sess.totaal;
+                const rec = historicalData.find(r => r.datum === iso && r.product === o.name);
+                if (rec && rec.totaal !== undefined && rec.totaal !== null) return rec.totaal;
+                return calculateSuggestion(o);
+            });
+        }
+
+        // Zelfde idee als free4ForPlan, maar voor een WILLEKEURIGE datum (diagnose-tab):
+        // opgeslagen rij > klassieke suggestie voor díe dag. Bewust geen sessie-invoer —
+        // de diagnose mag de motor niet aanraken en kijkt alleen naar wat er echt staat.
+        function free4ForDate(p, dateObj) {
+            const iso = formatDateISO(dateObj);
+            return free4For(p, o => {
+                const rec = historicalData.find(r => r.datum === iso && r.product === o.name);
+                if (rec && rec.totaal !== undefined && rec.totaal !== null) return rec.totaal;
+                return diagClassic(o, dateObj);
+            });
+        }
+
         // Groeps-bewuste uitverkocht-bijtelling. Klanten pakken de "volgende favoriet"
         // als een product op is (gemeten: buurproduct +10..20% verkoop op zulke dagen).
         // Kijk dus naar de rest van de groep op die referentiedag:
@@ -1098,7 +1209,7 @@
                 if (!rec || rec.out_of_stock || rec.breuk === null || rec.breuk === undefined) return;
                 if ((rec.totaal || 0) <= 0) return;
                 restBreuk += rec.breuk;
-                restGebakken += (rec.totaal || 0) * o.ppp;
+                restGebakken += stuksOnDate(o, dateISO, rec.totaal || 0);
             });
             if (restGebakken === 0) return SETTINGS.pSellout; // geen bruikbare buren-data
             if (restBreuk === 0) return SETTINGS.pSellout * 2;
@@ -1133,7 +1244,7 @@
                 if (!rec || rec.out_of_stock || rec.breuk === null || rec.breuk === undefined) continue;
                 const ctx = getDayContext(iso, promoSet);
                 if (ctx.feestdag || ctx.promo || ctx.snow) continue;
-                const gebakken = (rec.totaal || 0) * p.ppp;
+                const gebakken = stuksOnDate(p, iso, rec.totaal || 0);
                 if (gebakken <= 0) continue;
                 const soldout = rec.breuk === 0;
                 const f = contextFactor(ctx, p.group);
@@ -1213,8 +1324,9 @@
             // Plan met buffer richting doel-breuk, afgerond naar platen,
             // maar nooit onder de verwachte vraag zelf.
             const planStuks = demand / (1 - SETTINGS.targetBreuk / 100);
-            let plates = Math.round(planStuks / p.ppp);
-            if (plates * p.ppp < demand) plates++;
+            const free4 = free4ForPlan(p);
+            let plates = platesFromStuks(p, planStuks, free4);
+            if (stuksFromPlates(p, plates, free4) < demand) plates++;
             plates = Math.max(1, plates);
 
             // Vangrail: blijf in de buurt van de klassieke suggestie × dagfactor.
@@ -1235,7 +1347,7 @@
             if (SETTINGS.pMaxGroei > 0 && refs[0].gebNorm > 0) {
                 const fToday = contextFactor(ctx, p.group) * (ctx.feestdag ? SETTINGS.pFeestdag / 100 : 1);
                 const capStuks = refs[0].gebNorm * fToday * (1 + SETTINGS.pMaxGroei / 100);
-                const capPlates = Math.max(1, Math.round(capStuks / p.ppp));
+                const capPlates = Math.max(1, platesFromStuks(p, capStuks, free4));
                 if (plates > capPlates) plates = capPlates;
             }
 
@@ -1284,7 +1396,7 @@
                 if (!rec || rec.out_of_stock || rec.breuk === null || rec.breuk === undefined) continue;
                 const ctx = getDayContext(iso, promoSet);
                 if (ctx.feestdag || ctx.promo || ctx.snow) continue;
-                const gebakken = (rec.totaal || 0) * p.ppp;
+                const gebakken = stuksOnDate(p, iso, rec.totaal || 0);
                 if (gebakken <= 0) continue;
                 const soldout = rec.breuk === 0;
                 const bump = soldout ? selloutBumpPct(p, iso) : null;
@@ -1351,8 +1463,9 @@
             const demandFinal = demand;
 
             const planStuks = demand / (1 - SETTINGS.targetBreuk / 100);
-            let plates = Math.round(planStuks / p.ppp);
-            if (plates * p.ppp < demand) plates++;
+            const free4 = free4ForDate(p, dateObj);
+            let plates = platesFromStuks(p, planStuks, free4);
+            if (stuksFromPlates(p, plates, free4) < demand) plates++;
             plates = Math.max(1, plates);
             const platesRaw = plates;
 
@@ -1372,7 +1485,7 @@
             if (SETTINGS.pMaxGroei > 0 && refs[0].gebNorm > 0) {
                 const fToday = cf * (ctx.feestdag ? SETTINGS.pFeestdag / 100 : 1);
                 const capStuks = refs[0].gebNorm * fToday * (1 + SETTINGS.pMaxGroei / 100);
-                const capPlates = Math.max(1, Math.round(capStuks / p.ppp));
+                const capPlates = Math.max(1, platesFromStuks(p, capStuks, free4));
                 groeirem = { capPlates, applied: plates > capPlates };
                 if (plates > capPlates) plates = capPlates;
             }
@@ -1439,7 +1552,7 @@
                 const oos = !!rec?.out_of_stock;
                 const gebakken = rec ? rec.totaal : null;
                 const breuk = (rec && rec.breuk !== null && rec.breuk !== undefined) ? rec.breuk : null;
-                const gebStuks = (gebakken || 0) * p.ppp;
+                const gebStuks = stuksOnDate(p, iso, gebakken || 0);
                 const breukPct = (breuk !== null && gebStuks > 0) ? (breuk / gebStuks * 100) : null;
                 const storedSug = (rec && rec.suggestie !== null && rec.suggestie !== undefined) ? rec.suggestie : null;
                 const sug = d.fellBack ? d.classic : d.finalPlates;
@@ -1559,9 +1672,15 @@
                 const p = PRODUCTS.find(x => x.name === r.product);
                 if (!p) return;
                 const s = stats[p.id];
-                const gebStuks = r.totaal * p.ppp;
+                const free4 = free4OnDate(p, r.datum);
+                const gebStuks = stuksFromPlates(p, r.totaal, free4);
                 const verkocht = Math.max(0, gebStuks - r.breuk);
-                const sugStuks = r.suggestie * p.ppp;
+                // De suggestie omgerekend naar stuks moet dezelfde plaatverdeling volgen als
+                // wat er echt gebakken is, anders vergelijk je 4-platen met 5-platen.
+                const sugStuks = stuksFromPlates(p, r.suggestie, free4);
+                // "Meer dan één plaat breuk" = de plaat die je écht had weggelaten, dus de
+                // LAATSTE in de verdeling (een 5-plaat bij overloop, anders een 4-plaat).
+                const plaatStuks = gebStuks - stuksFromPlates(p, Math.max(0, r.totaal - 1), free4);
                 const soldOut = r.breuk === 0;
                 const duelDag = Math.abs(r.suggestie - r.totaal) >= 2;
                 scored++;
@@ -1590,7 +1709,7 @@
                     const hypBreuk = sugStuks - verkocht;
                     const hypPct = sugStuks > 0 ? hypBreuk / sugStuks * 100 : 0;
                     const actPct = gebStuks > 0 ? r.breuk / gebStuks * 100 : 0;
-                    if (hypBreuk > p.ppp && hypPct > SETTINGS.targetBreuk * 2) {
+                    if (hypBreuk > plaatStuks && hypPct > SETTINGS.targetBreuk * 2) {
                         s.hoog++;
                         // Suggestie volgen had duidelijk breuk gegeven: wie lager zat wint.
                         if (duelDag) {
@@ -2892,7 +3011,7 @@
                         <input type="number" value="0" data-product="${p.name}" data-oos="1" disabled>
                     </div>`;
                 }
-                const gebakkenStuks = (data?.totaal || 0) * p.ppp;
+                const gebakkenStuks = stuksOnDate(p, dateStr, data?.totaal || 0);
                 return `<div class="breuk-item">
                     <div><div class="product-name">${p.name}</div>
                     <div class="product-baked">Gebakken: ${data?.totaal || 0} platen (${gebakkenStuks} st)</div>
@@ -2985,7 +3104,7 @@
             filteredData.forEach(d => {
                 const p = PRODUCTS.find(x => x.name === d.product);
                 if (p) {
-                    const stuks = d.totaal * p.ppp;
+                    const stuks = stuksOnDate(p, d.datum, d.totaal);
                     stats[d.product].gebakken += stuks;
                     stats[d.product].breuk += d.breuk || 0;
                     gebakken += stuks;
@@ -3072,7 +3191,7 @@
                 const p = PRODUCTS.find(x => x.name === r.product);
                 if (!p) return;
                 if (!map[r.datum]) map[r.datum] = {};
-                map[r.datum][p.id] = (map[r.datum][p.id] || 0) + (r.totaal || 0) * p.ppp - (r.breuk || 0);
+                map[r.datum][p.id] = (map[r.datum][p.id] || 0) + stuksOnDate(p, r.datum, r.totaal || 0) - (r.breuk || 0);
             });
             return map;
         }
@@ -3274,7 +3393,7 @@
                     if (selectedProductName && r.product !== selectedProductName) return;
                     
                     const p = PRODUCTS.find(x => x.name === r.product);
-                    if (p) { geb += r.totaal * p.ppp; brk += r.breuk || 0; }
+                    if (p) { geb += stuksOnDate(p, r.datum, r.totaal); brk += r.breuk || 0; }
                 });
                 return { date, geb, brk };
             });
@@ -3342,7 +3461,17 @@
         // ===== SETTINGS =====
         function renderSettings() {
             // PPP settings
-            document.getElementById('ppp-settings').innerHTML = PRODUCTS.map(p => `
+            // Groep B heeft twee plaatmaten: de 4-stuks plaat (voorkeur) en de 5-stuks
+            // waarop de overloop gaat. Groep A ligt op één soort plaat en houdt één veld.
+            document.getElementById('ppp-settings').innerHTML = PRODUCTS.map(p => p.group === 'B' ? `
+                <div class="setting-row">
+                    <label style="font-size: 0.85rem;">${p.name}</label>
+                    <span style="font-size: 0.7rem; color: var(--text-muted);">4-pl</span>
+                    <input type="number" value="${p.ppp4 ?? p.ppp}" data-id="${p.id}" data-field="ppp4" onchange="updateProductSetting(this)" style="width: 44px;">
+                    <span style="font-size: 0.7rem; color: var(--text-muted);">5-pl</span>
+                    <input type="number" value="${p.ppp}" data-id="${p.id}" data-field="ppp" onchange="updateProductSetting(this)" style="width: 44px;">
+                </div>
+            ` : `
                 <div class="setting-row">
                     <label style="font-size: 0.85rem;">${p.name}</label>
                     <input type="number" value="${p.ppp}" data-id="${p.id}" data-field="ppp" onchange="updateProductSetting(this)" style="width: 50px;">
@@ -3396,6 +3525,7 @@
             SETTINGS.oven2Max = parseInt(document.getElementById('setting-oven2').value) || 15;
             SETTINGS.batchMax = parseInt(document.getElementById('setting-batch-max').value) || 31;
             SETTINGS.extraRijskast = document.getElementById('setting-extra-rijskast')?.checked || false;
+            SETTINGS.plate4Stock = parseInt(document.getElementById('setting-plate4')?.value) || 0;
             localStorage.setItem('bakkerij_settings', JSON.stringify(SETTINGS));
             saveCloudSetting('app', SETTINGS);
             planningData = {}; // Reset manual overrides so new settings apply
@@ -3578,7 +3708,7 @@
                     r.datum <= todayStr &&
                     new Date(r.datum) >= cutoff
                 );
-                const stuksInWindow = myRecs.reduce((s, r) => s + (r.totaal || 0) * p.ppp, 0);
+                const stuksInWindow = myRecs.reduce((s, r) => s + stuksOnDate(p, r.datum, r.totaal || 0), 0);
                 // Normalize to per-week (7 days)
                 const weeklyStuks = basis === 'last7' ? stuksInWindow : stuksInWindow / 4;
                 const withBuffer = Math.ceil(weeklyStuks * bufferMult);
@@ -3929,6 +4059,7 @@
                         const cfg = byKey.products[p.id];
                         if (!cfg) return;
                         if (cfg.ppp      !== undefined) p.ppp     = cfg.ppp;
+                        if (cfg.ppp4     !== undefined) p.ppp4    = cfg.ppp4;
                         if (cfg.bij0     !== undefined) p.bij0    = cfg.bij0;
                         if (cfg.d1       !== undefined) p.d1      = cfg.d1;
                         if (cfg.d2       !== undefined) p.d2      = cfg.d2;
@@ -3944,6 +4075,7 @@
                 if (el('setting-oven1'))     el('setting-oven1').value   = SETTINGS.oven1Max;
                 if (el('setting-oven2'))     el('setting-oven2').value   = SETTINGS.oven2Max;
                 if (el('setting-batch-max')) el('setting-batch-max').value = SETTINGS.batchMax;
+                if (el('setting-plate4'))    el('setting-plate4').value   = SETTINGS.plate4Stock ?? 18;
                 if (el('setting-price-a'))   el('setting-price-a').value = SETTINGS.priceA ?? 0.69;
                 if (el('setting-price-b'))   el('setting-price-b').value = SETTINGS.priceB ?? 1.59;
                 applySkipBToInputs();
@@ -3968,7 +4100,7 @@
 
         function productsToCloudConfig() {
             return Object.fromEntries(PRODUCTS.map(p => [p.id, {
-                ppp: p.ppp, bij0: p.bij0, d1: p.d1, d2: p.d2, d3: p.d3,
+                ppp: p.ppp, ppp4: p.ppp4, bij0: p.bij0, d1: p.d1, d2: p.d2, d3: p.d3,
                 price: p.price, box_size: p.boxSize
             }]));
         }
@@ -4006,6 +4138,7 @@
                     const p = PRODUCTS.find(x => x.id === saved.id);
                     if (p) {
                         p.ppp = saved.ppp ?? p.ppp;
+                        p.ppp4 = saved.ppp4 ?? p.ppp4;
                         p.bij0 = saved.bij0 ?? p.bij0;
                         p.d1 = saved.d1 ?? p.d1;
                         p.d2 = saved.d2 ?? p.d2;
@@ -4030,6 +4163,7 @@
             document.getElementById('setting-oven1').value = SETTINGS.oven1Max;
             document.getElementById('setting-oven2').value = SETTINGS.oven2Max;
             document.getElementById('setting-batch-max').value = SETTINGS.batchMax;
+            document.getElementById('setting-plate4').value = SETTINGS.plate4Stock ?? 18;
             const erk = document.getElementById('setting-extra-rijskast');
             if (erk) erk.checked = !!SETTINGS.extraRijskast;
             document.getElementById('setting-price-a').value = SETTINGS.priceA || 0.69;
