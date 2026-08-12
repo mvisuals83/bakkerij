@@ -616,10 +616,16 @@
                 <div class="label" style="font-size: 0.9rem;">💰 Omzet (verkocht, incl. btw)</div>
                 <div class="value" id="stat-omzet" style="font-size: 1.8rem; color: var(--accent-green);">€0.00</div>
             </div>
-            <div class="stats-grid" style="margin-bottom: 4px;">
+            <!-- Marge en breuk-kost naast elkaar (2-koloms grid), de uitkomst eronder over de
+                 volle breedte — anders staat er een gat naast de 3e kaart en leest de winst
+                 als bijzaak. Zelfde opmaak als de omzetkaart: het is de tegenhanger daarvan. -->
+            <div class="stats-grid" style="margin-bottom: 10px;">
                 <div class="stat-card blue"><div class="label">Brutomarge (verkocht, excl. btw)</div><div class="value" id="stat-marge" style="font-size: 1.2rem;">€0,00</div></div>
                 <div class="stat-card red"><div class="label">Kost van breuk (inkoop)</div><div class="value" id="stat-breukkost" style="font-size: 1.2rem;">€0,00</div></div>
-                <div class="stat-card green"><div class="label">Nettowinst (excl. btw − breuk)</div><div class="value" id="stat-winst" style="font-size: 1.2rem;">€0,00</div></div>
+            </div>
+            <div class="stat-card green" style="margin-bottom: 4px;">
+                <div class="label" style="font-size: 0.9rem;">💵 Nettowinst (excl. btw − breuk)</div>
+                <div class="value" id="stat-winst" style="font-size: 1.8rem;">€0,00</div>
             </div>
             <p id="winst-promo-noot" style="display:none; font-size: 0.7rem; color: var(--accent-orange); margin-bottom: 12px;">📢 Bevat promodagen — gerekend alsof <b>iedereen</b> aan de promo kocht (<span id="winst-promo-prijs"></span>). De echte winst ligt dus hoger: wie er één koopt betaalt de normale prijs.</p>
 
