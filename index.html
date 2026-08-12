@@ -613,15 +613,22 @@
                 <div class="stat-card orange"><div class="label">Breuk %</div><div class="value" id="stat-percentage">0%</div></div>
             </div>
             <div class="stat-card" style="margin-bottom: 12px;">
-                <div class="label" style="font-size: 0.9rem;">💰 Omzet (verkocht)</div>
+                <div class="label" style="font-size: 0.9rem;">💰 Omzet (verkocht, incl. btw)</div>
                 <div class="value" id="stat-omzet" style="font-size: 1.8rem; color: var(--accent-green);">€0.00</div>
             </div>
-            
+            <div class="stats-grid" style="margin-bottom: 4px;">
+                <div class="stat-card blue"><div class="label">Brutomarge</div><div class="value" id="stat-marge" style="font-size: 1.2rem;">€0,00</div></div>
+                <div class="stat-card red"><div class="label">Kost van breuk</div><div class="value" id="stat-breukkost" style="font-size: 1.2rem;">€0,00</div></div>
+                <div class="stat-card green"><div class="label">Winst</div><div class="value" id="stat-winst" style="font-size: 1.2rem;">€0,00</div></div>
+            </div>
+            <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 12px;">Winst = brutomarge − kost van breuk, allebei <b>excl. btw</b> (btw is geen omzet en geen kost — je draagt alleen het verschil af). Inkoopprijzen staan per doos in Instellingen → 💶 Inkoopprijzen.</p>
+            <p id="winst-promo-noot" style="display:none; font-size: 0.7rem; color: var(--accent-orange); margin-top:-8px; margin-bottom: 12px;">📢 Er zitten promodagen in deze periode. Die zijn gerekend tegen de <b>promoprijs per stuk</b> (alsof iedereen de actie pakte) — de winst hierboven is dus een <b>ondergrens</b>; de echte ligt hoger, want wie er één koopt betaalt de normale prijs.</p>
+
             <div class="settings-section" style="margin-bottom: 12px;">
                 <h3 style="margin-bottom: 10px;">🥖 Per Product</h3>
                 <div class="history-table-wrapper">
                     <table class="history-table">
-                        <thead><tr><th>Product</th><th>Gebakken</th><th>Verkocht</th><th>Omzet</th><th>Breuk</th><th>%</th></tr></thead>
+                        <thead><tr><th>Product</th><th>Gebakken</th><th>Verkocht</th><th>Omzet</th><th>Breuk</th><th>%</th><th>Winst</th></tr></thead>
                         <tbody id="history-body"></tbody>
                     </table>
                 </div>
@@ -782,6 +789,18 @@
                 <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Aantal stuks per leveringsdoos — gebruikt in Bestelling berekening.</p>
                 <div id="box-size-settings"></div>
             </div>
+            <div class="settings-section">
+                <h3>💶 Inkoopprijzen (per doos, excl. btw)</h3>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Neem de doosprijs over van de leveranciersfactuur, <b>excl. btw</b>. Per stuk = doosprijs ÷ stuks per doos (zie 📦 Dozen hierboven). Wordt gebruikt voor winst en de kost van breuk in Historiek.</p>
+                <div id="cost-settings"></div>
+                <div class="setting-row" style="margin-top: 8px;"><label>Btw-tarief %</label><input type="number" step="0.1" id="setting-vat" value="6" onchange="saveVatSetting()" style="width: 70px;"></div>
+                <div class="setting-row"><label>Doosprijzen zijn <b>incl.</b> btw</label><label class="toggle"><input type="checkbox" id="setting-cost-incl-vat" onchange="saveVatSetting()"><span class="toggle-slider"></span></label></div>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">🔎 <b>Controleer dit één keer op de factuur:</b> tel de WAARDE-kolom op en vergelijk met "TE BETALEN" onderaan. Is dat totaal 6% hóger → doosprijzen zijn excl. btw (laat de schakelaar uit). Is het gelijk → zet hem aan. Dit scheelt 5,7% op élke kostprijs.</p>
+                <div class="setting-row" style="margin-top: 8px;"><label>Promoprijs/stuk Groep A</label><span style="color: var(--text-muted);">€</span><input type="number" step="0.005" id="setting-promo-a" value="0" onchange="saveVatSetting()" style="width: 70px;"></div>
+                <div class="setting-row"><label>Promoprijs/stuk Groep B</label><span style="color: var(--text-muted);">€</span><input type="number" step="0.005" id="setting-promo-b" value="0.995" onchange="saveVatSetting()" style="width: 70px;"></div>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Prijs per stuk incl. btw op dagen met label <b>Promo</b>. Stokbrood "2 voor €1,99" = €0,995. 0 = geen promoprijs. Wie er één koopt betaalt de normale prijs, dus dit is de <b>ondergrens</b> van de winst — de echte ligt hoger.</p>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 6px;">⚠️ Wijzig je een prijs, dan rekent de app de <b>volledige</b> historiek met de nieuwe prijs door — niet vanaf vandaag. Handig zolang de leverancier dezelfde blijft; na een echte leverancierswissel kloppen oude periodes dan niet meer.</p>
+            </div>
             <div class="settings-section" style="margin-top: 20px; opacity: 0.7;">
                 <h3>☁️ Database Status</h3>
                 <div class="setting-row">
@@ -825,17 +844,23 @@
         
         // ===== DATA =====
         const PRODUCTS = [
-            { id: 'pistolet_wit', name: 'pistolet wit', short: 'Pist. wit', group: 'A', ppp: 15, bij0: 1, d1: 30, d2: 60, d3: 90, price: 0.69 },
-            { id: 'pistolet_bruin', name: 'pistolet bruin', short: 'Pist. bruin', group: 'A', ppp: 15, bij0: 1, d1: 20, d2: 40, d3: 60, price: 0.69 },
-            { id: 'tijger_pistolet', name: 'tijger pistolet', short: 'Tijger', group: 'A', ppp: 15, bij0: 1, d1: 20, d2: 40, d3: 60, price: 0.69 },
-            { id: 'piccolo', name: 'piccolo', short: 'Piccolo', group: 'A', ppp: 12, bij0: 1, d1: 20, d2: 40, d3: 60, price: 0.69 },
+            // costBox = inkoopprijs per DOOS zoals op de leveranciersfactuur (2026-08-12).
+            // Die factuur staat INCL btw (bevestigd), dus SETTINGS.costInclVat = true en
+            // costPerPieceExcl() deelt door 1,06. Per stuk = costBox / boxSize / 1,06.
+            // pistolet wit stond NIET op die factuur (niet besteld die ronde) — aangenomen
+            // gelijk aan "groffe pistolets" (zelfde 60gr-pistolet, zelfde 150/doos).
+            // ⚠ Controleer dit op de eerstvolgende factuur waar pistolet wit wél op staat.
+            { id: 'pistolet_wit', name: 'pistolet wit', short: 'Pist. wit', group: 'A', ppp: 15, boxSize: 150, costBox: 31.27, bij0: 1, d1: 30, d2: 60, d3: 90, price: 0.69 },
+            { id: 'pistolet_bruin', name: 'pistolet bruin', short: 'Pist. bruin', group: 'A', ppp: 15, boxSize: 150, costBox: 31.27, bij0: 1, d1: 20, d2: 40, d3: 60, price: 0.69 },
+            { id: 'tijger_pistolet', name: 'tijger pistolet', short: 'Tijger', group: 'A', ppp: 15, boxSize: 150, costBox: 34.66, bij0: 1, d1: 20, d2: 40, d3: 60, price: 0.69 },
+            { id: 'piccolo', name: 'piccolo', short: 'Piccolo', group: 'A', ppp: 12, boxSize: 140, costBox: 31.27, bij0: 1, d1: 20, d2: 40, d3: 60, price: 0.69 },
             // Groep B ligt op twee plaatsoorten: ppp4 = de 4-stuks plaat (voorkeur, geeft
             // de baguette meer volume), ppp = de 5-stuks plaat waarop de overloop gaat.
             // p4rank bepaalt wie het eerst uit de 4-platen voorraad mag putten (laag = eerst).
             // Bruin heeft ppp === ppp4 en verandert dus niets aan zijn eigen telling — hij
             // claimt alleen 4-platen vóór wit. Zie plaatverdeling-blok bij stuksFromPlates().
-            { id: 'stokbrood_wit', name: 'stokbrood wit', short: 'Stok. wit', group: 'B', ppp: 5, ppp4: 4, p4rank: 2, bij0: 1, d1: 15, d2: 30, d3: 45, price: 1.59 },
-            { id: 'stokbrood_bruin', name: 'stokbrood bruin', short: 'Stok. bruin', group: 'B', ppp: 4, ppp4: 4, p4rank: 1, bij0: 1, d1: 12, d2: 24, d3: 36, price: 1.59 }
+            { id: 'stokbrood_wit', name: 'stokbrood wit', short: 'Stok. wit', group: 'B', ppp: 5, ppp4: 4, p4rank: 2, boxSize: 30, costBox: 23.32, bij0: 1, d1: 15, d2: 30, d3: 45, price: 1.59 },
+            { id: 'stokbrood_bruin', name: 'stokbrood bruin', short: 'Stok. bruin', group: 'B', ppp: 4, ppp4: 4, p4rank: 1, boxSize: 30, costBox: 23.32, bij0: 1, d1: 12, d2: 24, d3: 36, price: 1.59 }
         ];
         
         let SETTINGS = {
@@ -856,6 +881,13 @@
             // beyond the UI. e.g. { sat:[2,3], sun:[2,3,4], mon:[] } would all just work.
             skipB: { sat: [2], sun: [2] },
             priceA: 0.69, priceB: 1.59,
+            vatPct: 6,               // btw-tarief brood/banket (BE). Zie winst-helpers.
+            // BEVESTIGD 2026-08-12 door de eigenaar: de WAARDE-kolom op de factuur telt op tot
+            // €1.294,36 en dát is óók het TE BETALEN-bedrag → doosprijzen zijn INCL btw.
+            // Verklaart meteen de "ongeveer €0,19" van de baas: 31,27 ÷ 1,06 ÷ 150 = €0,1967.
+            costInclVat: true,
+            promoPriceA: 0,          // promoprijs per stuk incl btw (0 = geen promoprijs)
+            promoPriceB: 0.995,      // stokbrood promo "2 voor €1,99" → €0,995/stuk
             // ===== Slimme suggesties (advanced mode) =====
             // advancedMode OFF = klassieke drempel-berekening (calculateSuggestion), ongewijzigd.
             // Percentages zijn afgeleid uit 6 maanden eigen verkoopdata (analyse 2026-06-11):
@@ -1094,6 +1126,38 @@
             for (let i = 0; i < n; i++) { dates.push(formatDateISO(d)); d.setDate(d.getDate() - 7); }
             return dates;
         }
+
+        // ===== KOSTPRIJS & WINST (factuur eigenaar 2026-08-12) =====
+        // Inkoop staat op de leveranciersfactuur per DOOS en EXCL. btw; per stuk = doosprijs
+        // / doosinhoud (dezelfde boxSize die de Bestelling-tab al gebruikt, dus één getal om
+        // te onderhouden). De verkoopprijzen in de app zijn SCHAPPRIJZEN, dus INCL. btw.
+        //
+        // WINST WORDT ALTIJD EXCL. BTW GEREKEND. Btw is geen omzet en geen kost: je int hem
+        // op de verkoop, betaalt hem op de inkoop en draagt alleen het verschil af. Reken je
+        // een incl-btw verkoopprijs tegen een excl-btw inkoopprijs weg, dan tel je het hele
+        // btw-bedrag als winst — bij 6% is dat ~9% te veel marge op een pistolet.
+        // De getoonde "Omzet" blijft bewust INCL. btw (= wat er door de kassa gaat, het getal
+        // dat de eigenaar herkent); alles wat winst heet is expliciet excl. btw gelabeld.
+        function vatFactor() { return 1 + (SETTINGS.vatPct || 0) / 100; }
+        function sellPerPieceExcl(p) { return (p.price || 0) / vatFactor(); }
+        function costPerPieceExcl(p) {
+            const box = p.boxSize || 0;
+            if (box <= 0) return 0;                        // geen doosinhoud → geen kostprijs
+            const per = (p.costBox || 0) / box;
+            return SETTINGS.costInclVat ? per / vatFactor() : per;
+        }
+        // Promo Groep B is "2 voor €1,99" → €0,995/stuk. Wie er één koopt betaalt gewoon
+        // €1,59, en hoeveel klanten er twee pakken weten we niet zonder kassa-analyse.
+        // We rekenen promodagen daarom op de DEALPRIJS: dat is de ondergrens van de winst,
+        // niet een gok. De echte winst ligt tussen deze uitkomst en de normale prijs.
+        function sellPerPieceExclOn(p, event) {
+            const promo = p.group === 'A' ? SETTINGS.promoPriceA : SETTINGS.promoPriceB;
+            const prijs = (event === 'Promo' && promo > 0) ? promo : (p.price || 0);
+            return prijs / vatFactor();
+        }
+        function marginPerPiece(p) { return sellPerPieceExcl(p) - costPerPieceExcl(p); }
+        function hasCostPrice(p) { return costPerPieceExcl(p) > 0; }
+        const euro = v => '€' + v.toFixed(2).replace('.', ',');
 
         // ===== 4/5-PLAATS VERDELING (GROEP B) =====
         // Stokbrood ligt op twee soorten platen: 4-stuks (SETTINGS.plate4Stock in huis) en
@@ -2098,8 +2162,12 @@
                             batches: null // Will be calculated below
                         };
                     }
-                } else if (savedRecord) {
-                    // Load from saved data
+                } else if (savedRecord && !savedRecord.out_of_stock) {
+                    // Load from saved data. Een opgeslagen UIT-VOORRAAD-rij telt hier NIET
+                    // als plan: die staat per definitie op nul-platen. Wie het product deze
+                    // sessie terugzet op voorraad hoort de suggestie te krijgen, niet die
+                    // nullen (anders komt het terug met 0 platen). De OOS-tak hierboven is
+                    // al afgevangen, dus hier is het product altijd weer op voorraad.
                     displayData[p.id] = {
                         sug,
                         totaal: savedRecord.totaal,
@@ -2553,8 +2621,13 @@
                 // Going out of stock — pin to 0, remember via session override
                 planningData[productId] = { totaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0, outOfStock: true };
             } else {
-                // Coming back in stock — clear any pinning; suggestion will fill in
-                delete planningData[productId];
+                // Terug op voorraad — EXPLICIET false zetten, niet de sessie-invoer wissen.
+                // Bug 2026-08-12 (vr 14/08, tijger pistolet): met `delete` viel de render
+                // terug op de OPGESLAGEN rij, en die stond op out_of_stock → het product
+                // sprong meteen weer op "uit voorraad". Onherstelbaar via de UI; de rode
+                // opslaan-knop ging wel aan (markUnsaved), dus het leek alsof er iets
+                // gebeurde. Geen totaal meezetten: renderPlanning vult de suggestie in.
+                planningData[productId] = { outOfStock: false };
             }
             markUnsaved();
             renderPlanning();
@@ -3099,33 +3172,52 @@
             
             let gebakken = 0, breuk = 0;
             const stats = {};
-            PRODUCTS.forEach(p => stats[p.name] = { gebakken: 0, breuk: 0 });
+            PRODUCTS.forEach(p => stats[p.name] = { gebakken: 0, breuk: 0, omzet: 0, marge: 0 });
             
+            // Omzet en marge worden PER DAG opgeteld, niet pas op het totaal: de prijs per
+            // stuk verschilt tussen promo- en normale dagen, dus achteraf één prijs op de
+            // som loslaten zou promodagen tegen de volle prijs rekenen.
+            let promoDagen = 0;
             filteredData.forEach(d => {
                 const p = PRODUCTS.find(x => x.name === d.product);
                 if (p) {
                     const stuks = stuksOnDate(p, d.datum, d.totaal);
+                    const dagBreuk = d.breuk || 0;
+                    const verkochtDag = Math.max(0, stuks - dagBreuk);
+                    const prijsExcl = sellPerPieceExclOn(p, d.event);
                     stats[d.product].gebakken += stuks;
-                    stats[d.product].breuk += d.breuk || 0;
+                    stats[d.product].breuk += dagBreuk;
+                    stats[d.product].omzet += verkochtDag * prijsExcl * vatFactor(); // getoond incl btw
+                    stats[d.product].marge += verkochtDag * (prijsExcl - costPerPieceExcl(p));
                     gebakken += stuks;
-                    breuk += d.breuk || 0;
+                    breuk += dagBreuk;
+                    if (d.event === 'Promo') promoDagen++;
                 }
             });
-            
-            // Calculate total omzet
+
             let totalOmzet = 0;
+            let totalMarge = 0, totalBreukKost = 0;
             PRODUCTS.forEach(p => {
-                const verkocht = stats[p.name].gebakken - stats[p.name].breuk;
-                const price = p.group === 'A' ? SETTINGS.priceA : SETTINGS.priceB;
-                stats[p.name].omzet = verkocht * price;
                 totalOmzet += stats[p.name].omzet;
+                // Winst excl. btw: marge op wat verkocht is, min de inkoopwaarde van de breuk.
+                // Zonder ingevulde kostprijs blijft alles op 0 → de kolom toont dan '—'.
+                stats[p.name].breukKost = stats[p.name].breuk * costPerPieceExcl(p);
+                stats[p.name].winst     = stats[p.name].marge - stats[p.name].breukKost;
+                stats[p.name].heeftKost = hasCostPrice(p);
+                totalMarge     += stats[p.name].marge;
+                totalBreukKost += stats[p.name].breukKost;
             });
-            
+
             document.getElementById('stat-gebakken').textContent = gebakken.toLocaleString();
             document.getElementById('stat-breuk').textContent = breuk.toLocaleString();
             document.getElementById('stat-verkocht').textContent = (gebakken - breuk).toLocaleString();
             document.getElementById('stat-percentage').textContent = gebakken > 0 ? (breuk / gebakken * 100).toFixed(1) + '%' : '0%';
             document.getElementById('stat-omzet').textContent = '€' + totalOmzet.toFixed(2).replace('.', ',');
+            document.getElementById('stat-marge').textContent     = euro(totalMarge);
+            document.getElementById('stat-breukkost').textContent = '−' + euro(totalBreukKost);
+            document.getElementById('stat-winst').textContent     = euro(totalMarge - totalBreukKost);
+            const promoNoot = document.getElementById('winst-promo-noot');
+            if (promoNoot) promoNoot.style.display = promoDagen > 0 ? 'block' : 'none';
             
             // Week comparison — rollend venster van 5 kalenderweken, per dag én per product
             renderWeekComparison();
@@ -3133,32 +3225,36 @@
             
             // Build table with group totals
             let html = '';
-            let groupAGebakken = 0, groupABreuk = 0, groupAOmzet = 0;
-            let groupBGebakken = 0, groupBBreuk = 0, groupBOmzet = 0;
+            let groupAGebakken = 0, groupABreuk = 0, groupAOmzet = 0, groupAWinst = 0;
+            let groupBGebakken = 0, groupBBreuk = 0, groupBOmzet = 0, groupBWinst = 0;
+            // Zonder ingevulde kostprijs geen verzonnen winst — dan een streepje.
+            const winstCel = s => s.heeftKost
+                ? `<td style="color:${s.winst >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'}">${euro(s.winst)}</td>`
+                : `<td style="color:var(--text-muted)">—</td>`;
             
             // Group A products
             PRODUCTS.filter(p => p.group === 'A').forEach(p => {
                 const s = stats[p.name];
                 const verkocht = s.gebakken - s.breuk;
                 const pct = s.gebakken > 0 ? (s.breuk / s.gebakken * 100).toFixed(1) : 0;
-                groupAGebakken += s.gebakken; groupABreuk += s.breuk; groupAOmzet += s.omzet;
-                html += `<tr><td>${p.name}</td><td>${s.gebakken}</td><td style="color:var(--accent-green)">${verkocht}</td><td style="color:var(--accent-green)">€${s.omzet.toFixed(2)}</td><td style="color:var(--accent-red)">${s.breuk}</td><td>${pct}%</td></tr>`;
+                groupAGebakken += s.gebakken; groupABreuk += s.breuk; groupAOmzet += s.omzet; groupAWinst += s.winst;
+                html += `<tr><td>${p.name}</td><td>${s.gebakken}</td><td style="color:var(--accent-green)">${verkocht}</td><td style="color:var(--accent-green)">€${s.omzet.toFixed(2)}</td><td style="color:var(--accent-red)">${s.breuk}</td><td>${pct}%</td>${winstCel(s)}</tr>`;
             });
             const groupAVerkocht = groupAGebakken - groupABreuk;
             const groupAPct = groupAGebakken > 0 ? (groupABreuk / groupAGebakken * 100).toFixed(1) : 0;
-            html += `<tr style="background:var(--bg-card);font-weight:700;border-top:2px solid var(--border-color)"><td style="font-family:var(--font-sans)">Totaal Pistolets</td><td>${groupAGebakken}</td><td style="color:var(--accent-green)">${groupAVerkocht}</td><td style="color:var(--accent-green)">€${groupAOmzet.toFixed(2)}</td><td style="color:var(--accent-red)">${groupABreuk}</td><td>${groupAPct}%</td></tr>`;
+            html += `<tr style="background:var(--bg-card);font-weight:700;border-top:2px solid var(--border-color)"><td style="font-family:var(--font-sans)">Totaal Pistolets</td><td>${groupAGebakken}</td><td style="color:var(--accent-green)">${groupAVerkocht}</td><td style="color:var(--accent-green)">€${groupAOmzet.toFixed(2)}</td><td style="color:var(--accent-red)">${groupABreuk}</td><td>${groupAPct}%</td><td style="color:var(--accent-green)">${euro(groupAWinst)}</td></tr>`;
             
             // Group B products
             PRODUCTS.filter(p => p.group === 'B').forEach(p => {
                 const s = stats[p.name];
                 const verkocht = s.gebakken - s.breuk;
                 const pct = s.gebakken > 0 ? (s.breuk / s.gebakken * 100).toFixed(1) : 0;
-                groupBGebakken += s.gebakken; groupBBreuk += s.breuk; groupBOmzet += s.omzet;
-                html += `<tr><td>${p.name}</td><td>${s.gebakken}</td><td style="color:var(--accent-green)">${verkocht}</td><td style="color:var(--accent-green)">€${s.omzet.toFixed(2)}</td><td style="color:var(--accent-red)">${s.breuk}</td><td>${pct}%</td></tr>`;
+                groupBGebakken += s.gebakken; groupBBreuk += s.breuk; groupBOmzet += s.omzet; groupBWinst += s.winst;
+                html += `<tr><td>${p.name}</td><td>${s.gebakken}</td><td style="color:var(--accent-green)">${verkocht}</td><td style="color:var(--accent-green)">€${s.omzet.toFixed(2)}</td><td style="color:var(--accent-red)">${s.breuk}</td><td>${pct}%</td>${winstCel(s)}</tr>`;
             });
             const groupBVerkocht = groupBGebakken - groupBBreuk;
             const groupBPct = groupBGebakken > 0 ? (groupBBreuk / groupBGebakken * 100).toFixed(1) : 0;
-            html += `<tr style="background:var(--bg-card);font-weight:700;border-top:2px solid var(--border-color)"><td style="font-family:var(--font-sans)">Totaal Stokbrood</td><td>${groupBGebakken}</td><td style="color:var(--accent-green)">${groupBVerkocht}</td><td style="color:var(--accent-green)">€${groupBOmzet.toFixed(2)}</td><td style="color:var(--accent-red)">${groupBBreuk}</td><td>${groupBPct}%</td></tr>`;
+            html += `<tr style="background:var(--bg-card);font-weight:700;border-top:2px solid var(--border-color)"><td style="font-family:var(--font-sans)">Totaal Stokbrood</td><td>${groupBGebakken}</td><td style="color:var(--accent-green)">${groupBVerkocht}</td><td style="color:var(--accent-green)">€${groupBOmzet.toFixed(2)}</td><td style="color:var(--accent-red)">${groupBBreuk}</td><td>${groupBPct}%</td><td style="color:var(--accent-green)">${euro(groupBWinst)}</td></tr>`;
             
             document.getElementById('history-body').innerHTML = html;
             
@@ -3489,6 +3585,22 @@
                 `).join('');
             }
 
+            // Inkoopprijs per doos + live afgeleide prijs per stuk (meteen zichtbaar of
+            // de combinatie doosprijs/doosinhoud klopt).
+            const costEl = document.getElementById('cost-settings');
+            if (costEl) {
+                costEl.innerHTML = PRODUCTS.map(p => {
+                    const per = costPerPieceExcl(p);
+                    const marge = marginPerPiece(p);
+                    return `<div class="setting-row">
+                        <label style="font-size: 0.85rem;">${p.name}</label>
+                        <span style="color: var(--text-muted);">€</span>
+                        <input type="number" step="0.01" value="${p.costBox ?? 0}" data-id="${p.id}" data-field="costBox" onchange="updateCostSetting(this)" style="width: 72px;">
+                        <span style="font-size: 0.68rem; color: var(--text-muted); margin-left: 6px;">${per > 0 ? `= €${per.toFixed(4)}/st · marge €${marge.toFixed(2)}` : 'geen doosinhoud'}</span>
+                    </div>`;
+                }).join('');
+            }
+
             // Drempel settings
             document.getElementById('drempel-settings').innerHTML = PRODUCTS.map(p => `
                 <tr>
@@ -3518,6 +3630,29 @@
                 saveCloudSetting('products', productsToCloudConfig());
                 showToast('⚙️ Instelling opgeslagen');
             }
+        }
+
+        // Inkoopprijs per doos. Float (geen parseInt zoals updateProductSetting) — het zijn
+        // euro's met centen, en hij hertekent zodat de afgeleide prijs per stuk meteen klopt.
+        function updateCostSetting(input) {
+            const product = PRODUCTS.find(p => p.id === input.dataset.id);
+            if (!product) return;
+            product.costBox = parseFloat(input.value) || 0;
+            localStorage.setItem('bakkerij_products', JSON.stringify(PRODUCTS));
+            saveCloudSetting('products', productsToCloudConfig());
+            renderSettings();
+            showToast('💶 Inkoopprijs opgeslagen');
+        }
+
+        function saveVatSetting() {
+            SETTINGS.vatPct = parseFloat(document.getElementById('setting-vat').value) || 0;
+            SETTINGS.costInclVat = document.getElementById('setting-cost-incl-vat')?.checked || false;
+            SETTINGS.promoPriceA = parseFloat(document.getElementById('setting-promo-a')?.value) || 0;
+            SETTINGS.promoPriceB = parseFloat(document.getElementById('setting-promo-b')?.value) || 0;
+            localStorage.setItem('bakkerij_settings', JSON.stringify(SETTINGS));
+            saveCloudSetting('app', SETTINGS);
+            renderSettings();
+            showToast('⚙️ Btw-tarief opgeslagen');
         }
 
         function saveCapacitySettings() {
@@ -4066,6 +4201,7 @@
                         if (cfg.d3       !== undefined) p.d3      = cfg.d3;
                         if (cfg.price    !== undefined) p.price   = cfg.price;
                         if (cfg.box_size !== undefined) p.boxSize = cfg.box_size;
+                        if (cfg.cost_box !== undefined) p.costBox = cfg.cost_box;
                     });
                     localStorage.setItem('bakkerij_products', JSON.stringify(PRODUCTS));
                 }
@@ -4076,6 +4212,10 @@
                 if (el('setting-oven2'))     el('setting-oven2').value   = SETTINGS.oven2Max;
                 if (el('setting-batch-max')) el('setting-batch-max').value = SETTINGS.batchMax;
                 if (el('setting-plate4'))    el('setting-plate4').value   = SETTINGS.plate4Stock ?? 18;
+                if (el('setting-vat'))       el('setting-vat').value      = SETTINGS.vatPct ?? 6;
+                if (el('setting-cost-incl-vat')) el('setting-cost-incl-vat').checked = !!SETTINGS.costInclVat;
+                if (el('setting-promo-a'))   el('setting-promo-a').value  = SETTINGS.promoPriceA ?? 0;
+                if (el('setting-promo-b'))   el('setting-promo-b').value  = SETTINGS.promoPriceB ?? 0.995;
                 if (el('setting-price-a'))   el('setting-price-a').value = SETTINGS.priceA ?? 0.69;
                 if (el('setting-price-b'))   el('setting-price-b').value = SETTINGS.priceB ?? 1.59;
                 applySkipBToInputs();
@@ -4101,7 +4241,7 @@
         function productsToCloudConfig() {
             return Object.fromEntries(PRODUCTS.map(p => [p.id, {
                 ppp: p.ppp, ppp4: p.ppp4, bij0: p.bij0, d1: p.d1, d2: p.d2, d3: p.d3,
-                price: p.price, box_size: p.boxSize
+                price: p.price, box_size: p.boxSize, cost_box: p.costBox
             }]));
         }
 
@@ -4139,6 +4279,8 @@
                     if (p) {
                         p.ppp = saved.ppp ?? p.ppp;
                         p.ppp4 = saved.ppp4 ?? p.ppp4;
+                        p.boxSize = saved.boxSize ?? p.boxSize;
+                        p.costBox = saved.costBox ?? p.costBox;
                         p.bij0 = saved.bij0 ?? p.bij0;
                         p.d1 = saved.d1 ?? p.d1;
                         p.d2 = saved.d2 ?? p.d2;
@@ -4164,6 +4306,11 @@
             document.getElementById('setting-oven2').value = SETTINGS.oven2Max;
             document.getElementById('setting-batch-max').value = SETTINGS.batchMax;
             document.getElementById('setting-plate4').value = SETTINGS.plate4Stock ?? 18;
+            document.getElementById('setting-vat').value = SETTINGS.vatPct ?? 6;
+            const civ = document.getElementById('setting-cost-incl-vat');
+            if (civ) civ.checked = !!SETTINGS.costInclVat;
+            document.getElementById('setting-promo-a').value = SETTINGS.promoPriceA ?? 0;
+            document.getElementById('setting-promo-b').value = SETTINGS.promoPriceB ?? 0.995;
             const erk = document.getElementById('setting-extra-rijskast');
             if (erk) erk.checked = !!SETTINGS.extraRijskast;
             document.getElementById('setting-price-a').value = SETTINGS.priceA || 0.69;
