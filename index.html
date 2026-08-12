@@ -617,12 +617,11 @@
                 <div class="value" id="stat-omzet" style="font-size: 1.8rem; color: var(--accent-green);">€0.00</div>
             </div>
             <div class="stats-grid" style="margin-bottom: 4px;">
-                <div class="stat-card blue"><div class="label">Brutomarge</div><div class="value" id="stat-marge" style="font-size: 1.2rem;">€0,00</div></div>
-                <div class="stat-card red"><div class="label">Kost van breuk</div><div class="value" id="stat-breukkost" style="font-size: 1.2rem;">€0,00</div></div>
-                <div class="stat-card green"><div class="label">Winst</div><div class="value" id="stat-winst" style="font-size: 1.2rem;">€0,00</div></div>
+                <div class="stat-card blue"><div class="label">Brutomarge (verkocht, excl. btw)</div><div class="value" id="stat-marge" style="font-size: 1.2rem;">€0,00</div></div>
+                <div class="stat-card red"><div class="label">Kost van breuk (inkoop)</div><div class="value" id="stat-breukkost" style="font-size: 1.2rem;">€0,00</div></div>
+                <div class="stat-card green"><div class="label">Nettowinst (excl. btw − breuk)</div><div class="value" id="stat-winst" style="font-size: 1.2rem;">€0,00</div></div>
             </div>
-            <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 12px;">Winst = brutomarge − kost van breuk, allebei <b>excl. btw</b> (btw is geen omzet en geen kost — je draagt alleen het verschil af). Inkoopprijzen staan per doos in Instellingen → 💶 Inkoopprijzen.</p>
-            <p id="winst-promo-noot" style="display:none; font-size: 0.7rem; color: var(--accent-orange); margin-top:-8px; margin-bottom: 12px;">📢 Er zitten promodagen in deze periode. Die zijn gerekend tegen de <b>promoprijs per stuk</b> (alsof iedereen de actie pakte) — de winst hierboven is dus een <b>ondergrens</b>; de echte ligt hoger, want wie er één koopt betaalt de normale prijs.</p>
+            <p id="winst-promo-noot" style="display:none; font-size: 0.7rem; color: var(--accent-orange); margin-bottom: 12px;">📢 Bevat promodagen — gerekend alsof <b>iedereen</b> aan de promo kocht (<span id="winst-promo-prijs"></span>). De echte winst ligt dus hoger: wie er één koopt betaalt de normale prijs.</p>
 
             <div class="settings-section" style="margin-bottom: 12px;">
                 <h3 style="margin-bottom: 10px;">🥖 Per Product</h3>
@@ -705,11 +704,6 @@
                 </div>
             </div>
             <div class="settings-section">
-                <h3>💰 Prijzen</h3>
-                <div class="setting-row"><label>Groep A (Pistolets)</label><span style="color: var(--text-muted);">€</span><input type="number" step="0.01" id="setting-price-a" value="0.69" onchange="savePriceSettings()" style="width: 70px;"></div>
-                <div class="setting-row"><label>Groep B (Stokbrood)</label><span style="color: var(--text-muted);">€</span><input type="number" step="0.01" id="setting-price-b" value="1.59" onchange="savePriceSettings()" style="width: 70px;"></div>
-            </div>
-            <div class="settings-section">
                 <h3>🥖 Stuks per Plaat</h3>
                 <div id="ppp-settings"></div>
             </div>
@@ -790,15 +784,20 @@
                 <div id="box-size-settings"></div>
             </div>
             <div class="settings-section">
-                <h3>💶 Inkoopprijzen (per doos, excl. btw)</h3>
-                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Neem de doosprijs over van de leveranciersfactuur, <b>excl. btw</b>. Per stuk = doosprijs ÷ stuks per doos (zie 📦 Dozen hierboven). Wordt gebruikt voor winst en de kost van breuk in Historiek.</p>
+                <h3>💰 Verkoopprijzen (schapprijs, incl. btw)</h3>
+                <div class="setting-row"><label>Groep A (Pistolets)</label><span style="color: var(--text-muted);">€</span><input type="number" step="0.01" id="setting-price-a" value="0.69" onchange="savePriceSettings()" style="width: 70px;"></div>
+                <div class="setting-row"><label>Groep B (Stokbrood)</label><span style="color: var(--text-muted);">€</span><input type="number" step="0.01" id="setting-price-b" value="1.59" onchange="savePriceSettings()" style="width: 70px;"></div>
+            </div>
+            <div class="settings-section">
+                <h3>💶 Inkoopprijzen (per doos)</h3>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Doosprijs van de leveranciersfactuur. Per stuk = doosprijs ÷ stuks per doos (zie 📦 Dozen hierboven). Wordt gebruikt voor winst en de kost van breuk in Historiek.</p>
                 <div id="cost-settings"></div>
                 <div class="setting-row" style="margin-top: 8px;"><label>Btw-tarief %</label><input type="number" step="0.1" id="setting-vat" value="6" onchange="saveVatSetting()" style="width: 70px;"></div>
                 <div class="setting-row"><label>Doosprijzen zijn <b>incl.</b> btw</label><label class="toggle"><input type="checkbox" id="setting-cost-incl-vat" onchange="saveVatSetting()"><span class="toggle-slider"></span></label></div>
                 <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">🔎 <b>Controleer dit één keer op de factuur:</b> tel de WAARDE-kolom op en vergelijk met "TE BETALEN" onderaan. Is dat totaal 6% hóger → doosprijzen zijn excl. btw (laat de schakelaar uit). Is het gelijk → zet hem aan. Dit scheelt 5,7% op élke kostprijs.</p>
                 <div class="setting-row" style="margin-top: 8px;"><label>Promoprijs/stuk Groep A</label><span style="color: var(--text-muted);">€</span><input type="number" step="0.005" id="setting-promo-a" value="0" onchange="saveVatSetting()" style="width: 70px;"></div>
                 <div class="setting-row"><label>Promoprijs/stuk Groep B</label><span style="color: var(--text-muted);">€</span><input type="number" step="0.005" id="setting-promo-b" value="0.995" onchange="saveVatSetting()" style="width: 70px;"></div>
-                <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Prijs per stuk incl. btw op dagen met label <b>Promo</b>. Stokbrood "2 voor €1,99" = €0,995. 0 = geen promoprijs. Wie er één koopt betaalt de normale prijs, dus dit is de <b>ondergrens</b> van de winst — de echte ligt hoger.</p>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Prijs per stuk incl. btw op dagen met label <b>Promo</b>. Stokbrood "2 voor €1,99" = €0,995/stuk. 0 = geen promoprijs. Promodagen worden gerekend <b>alsof iedereen aan de promo kocht</b> — bewust een vaste ondergrens en geen schatting van hoeveel klanten er twee meenamen.</p>
                 <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 6px;">⚠️ Wijzig je een prijs, dan rekent de app de <b>volledige</b> historiek met de nieuwe prijs door — niet vanaf vandaag. Handig zolang de leverancier dezelfde blijft; na een echte leverancierswissel kloppen oude periodes dan niet meer.</p>
             </div>
             <div class="settings-section" style="margin-top: 20px; opacity: 0.7;">
@@ -1158,6 +1157,9 @@
         function marginPerPiece(p) { return sellPerPieceExcl(p) - costPerPieceExcl(p); }
         function hasCostPrice(p) { return costPerPieceExcl(p) > 0; }
         const euro = v => '€' + v.toFixed(2).replace('.', ',');
+        // Promoprijzen hebben vaak een derde decimaal (2 voor €1,99 = €0,995/stuk); die mag
+        // niet naar €0,99 afgerond worden in de uitleg. Trailing nul valt weg: 1,250 → 1,25.
+        const euro3 = v => '€' + v.toFixed(3).replace(/0$/, '').replace('.', ',');
 
         // ===== 4/5-PLAATS VERDELING (GROEP B) =====
         // Stokbrood ligt op twee soorten platen: 4-stuks (SETTINGS.plate4Stock in huis) en
@@ -3217,7 +3219,16 @@
             document.getElementById('stat-breukkost').textContent = '−' + euro(totalBreukKost);
             document.getElementById('stat-winst').textContent     = euro(totalMarge - totalBreukKost);
             const promoNoot = document.getElementById('winst-promo-noot');
-            if (promoNoot) promoNoot.style.display = promoDagen > 0 ? 'block' : 'none';
+            if (promoNoot) {
+                promoNoot.style.display = promoDagen > 0 ? 'block' : 'none';
+                const prijsEl = document.getElementById('winst-promo-prijs');
+                if (prijsEl) {
+                    const delen = [];
+                    if (SETTINGS.promoPriceA > 0) delen.push('pistolet ' + euro3(SETTINGS.promoPriceA) + '/st');
+                    if (SETTINGS.promoPriceB > 0) delen.push('stokbrood ' + euro3(SETTINGS.promoPriceB) + '/st');
+                    prijsEl.textContent = delen.join(' · ') || 'geen promoprijs ingesteld';
+                }
+            }
             
             // Week comparison — rollend venster van 5 kalenderweken, per dag én per product
             renderWeekComparison();
@@ -3596,7 +3607,9 @@
                         <label style="font-size: 0.85rem;">${p.name}</label>
                         <span style="color: var(--text-muted);">€</span>
                         <input type="number" step="0.01" value="${p.costBox ?? 0}" data-id="${p.id}" data-field="costBox" onchange="updateCostSetting(this)" style="width: 72px;">
-                        <span style="font-size: 0.68rem; color: var(--text-muted); margin-left: 6px;">${per > 0 ? `= €${per.toFixed(4)}/st · marge €${marge.toFixed(2)}` : 'geen doosinhoud'}</span>
+                        <span style="font-size: 0.68rem; color: var(--text-muted); margin-left: 6px;">${per > 0
+                            ? `= €${per.toFixed(4)}/st · <b style="color: var(--accent-orange);">marge €${marge.toFixed(2)} (${(marge / sellPerPieceExcl(p) * 100).toFixed(0)}%)</b>`
+                            : 'geen doosinhoud'}</span>
                     </div>`;
                 }).join('');
             }
