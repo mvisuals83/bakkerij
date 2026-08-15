@@ -242,6 +242,9 @@
         .planning-table td.product-name-cell { cursor: pointer; user-select: none; }
         .planning-table td.product-name-cell:hover { color: var(--accent-cyan); }
         .oos-badge { display: inline-block; font-size: 0.6rem; padding: 1px 5px; margin-left: 4px; background: var(--accent-red); color: white; border-radius: 3px; vertical-align: middle; font-weight: 600; letter-spacing: 0.3px; opacity: 1 !important; }
+        /* DEELS = voorraad raakte op, er is wél gebakken. Rij blijft gewoon actief en
+           bewerkbaar (anders kun je de 4 platen niet invullen); alleen de badge verschilt. */
+        .oos-badge.partial { background: var(--accent-orange); }
         .breuk-item.oos { opacity: 0.45; }
         .breuk-item.oos input { color: var(--text-muted); }
         .planning-table .total-row td.cell-over-capacity {
@@ -834,6 +837,11 @@
                 <span id="note-modal-date" style="font-size: 0.8rem; color: var(--text-secondary);"></span>
             </div>
             <textarea id="note-textarea" placeholder="Schrijf hier je notitie..." style="width: 100%; height: 100px; padding: 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-sans); font-size: 0.9rem; resize: none;"></textarea>
+            <div style="margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 10px;">
+                <div style="font-weight: 600; font-size: 0.85rem; margin-bottom: 2px;">📋 Grote bestellingen</div>
+                <p style="font-size: 0.68rem; color: var(--text-muted); margin-bottom: 8px;">Aantal <b>stuks</b> (niet platen, net als breuk) dat naar een losse bestelling ging. Blijft gewoon meetellen als omzet, maar telt <b>niet</b> mee als normale vraag — zo bakt de suggestie volgende week niet te veel.</p>
+                <div id="bestelling-inputs"></div>
+            </div>
             <div class="modal-buttons" style="margin-top: 12px;">
                 <button class="modal-btn confirm" id="note-save-btn" onclick="saveNote()">Opslaan</button>
                 <button class="modal-btn cancel" onclick="closeNoteModal()">Sluiten</button>
@@ -983,7 +991,9 @@
             for (let weeks = 1; weeks <= 4; weeks++) {
                 const rec = getSameWeekdayData(currentDate, weeks).find(d => d.product === product.name);
                 if (!rec) continue;
-                if (rec.out_of_stock) continue;
+                // Ook DEELS-dagen overslaan: daar was de voorraad op, dus breuk=0 zegt
+                // niets over de vraag — precies dezelfde reden als bij volledig uit voorraad.
+                if (rec.out_of_stock || rec.partial_oos) continue;
 
                 let sug = rec.totaal;
                 const breuk = rec.breuk || 0;
@@ -1278,7 +1288,7 @@
             PRODUCTS.forEach(o => {
                 if (o.id === p.id || o.group !== p.group) return;
                 const rec = historicalData.find(r => r.datum === dateISO && r.product === o.name);
-                if (!rec || rec.out_of_stock || rec.breuk === null || rec.breuk === undefined) return;
+                if (!rec || rec.out_of_stock || rec.partial_oos || rec.breuk === null || rec.breuk === undefined) return;
                 if ((rec.totaal || 0) <= 0) return;
                 restBreuk += rec.breuk;
                 restGebakken += stuksOnDate(o, dateISO, rec.totaal || 0);
@@ -1313,10 +1323,17 @@
             for (let i = 0; i < dates.length && out.length < 4; i++) {
                 const iso = dates[i];
                 const rec = historicalData.find(r => r.datum === iso && r.product === p.name);
-                if (!rec || rec.out_of_stock || rec.breuk === null || rec.breuk === undefined) continue;
+                // partial_oos = voorraad raakte op. Er is wél gebakken (dat telt in de omzet),
+                // maar de vraag was die dag afgeknepen door de voorraad, niet door de klant —
+                // als referentie dus even onbruikbaar als een volledig uitverkochte dag.
+                if (!rec || rec.out_of_stock || rec.partial_oos || rec.breuk === null || rec.breuk === undefined) continue;
                 const ctx = getDayContext(iso, promoSet);
                 if (ctx.feestdag || ctx.promo || ctx.snow) continue;
-                const gebakken = stuksOnDate(p, iso, rec.totaal || 0);
+                // Losse grote bestelling (bv. 52 pistolets voor één klant): wel gebakken en
+                // wel verkocht, maar het is geen terugkerende vraag. Eraf halen vóór de
+                // mediaan, anders bakt de motor volgende week structureel te veel.
+                const besteld = Math.max(0, rec.bestelling || 0);
+                const gebakken = Math.max(0, stuksOnDate(p, iso, rec.totaal || 0) - besteld);
                 if (gebakken <= 0) continue;
                 const soldout = rec.breuk === 0;
                 const f = contextFactor(ctx, p.group);
@@ -1446,7 +1463,7 @@
                 const target = new Date(dateObj);
                 target.setDate(target.getDate() - weeks * 7);
                 const rec = historicalData.find(d => d.datum === formatDateISO(target) && d.product === p.name);
-                if (!rec || rec.out_of_stock) continue;
+                if (!rec || rec.out_of_stock || rec.partial_oos) continue;
                 let sug = rec.totaal;
                 const breuk = rec.breuk || 0;
                 if (breuk === 0) sug += p.bij0;
@@ -1465,10 +1482,11 @@
             for (let i = 0; i < dates.length && out.length < 4; i++) {
                 const iso = dates[i];
                 const rec = historicalData.find(r => r.datum === iso && r.product === p.name);
-                if (!rec || rec.out_of_stock || rec.breuk === null || rec.breuk === undefined) continue;
+                if (!rec || rec.out_of_stock || rec.partial_oos || rec.breuk === null || rec.breuk === undefined) continue;
                 const ctx = getDayContext(iso, promoSet);
                 if (ctx.feestdag || ctx.promo || ctx.snow) continue;
-                const gebakken = stuksOnDate(p, iso, rec.totaal || 0);
+                const besteld = Math.max(0, rec.bestelling || 0);
+                const gebakken = Math.max(0, stuksOnDate(p, iso, rec.totaal || 0) - besteld);
                 if (gebakken <= 0) continue;
                 const soldout = rec.breuk === 0;
                 const bump = soldout ? selloutBumpPct(p, iso) : null;
@@ -1727,7 +1745,10 @@
                 r.datum >= cutoffISO && r.datum <= todayISO &&
                 r.suggestie !== null && r.suggestie !== undefined &&
                 r.breuk !== null && r.breuk !== undefined &&
-                !r.out_of_stock && (r.totaal || 0) > 0);
+                // DEELS-dagen scoren niet mee: er werd minder gebakken omdat de voorraad
+                // op was, niet omdat iemand de suggestie bewust naast zich neerlegde.
+                // Zo'n dag als "jullie kozen lager" tellen zou het scorebord vervuilen.
+                !r.out_of_stock && !r.partial_oos && (r.totaal || 0) > 0);
 
             const stats = {};
             PRODUCTS.forEach(p => stats[p.id] = { goed: 0, hoog: 0, laag: 0, cutSoldout: 0, laagRegenWarm: 0 });
@@ -2108,6 +2129,17 @@
                     planningData._note = recordWithNote.note;
                 }
             }
+            // Opgeslagen bestellingen terug in de sessie laden. Zonder dit zou opnieuw
+            // opslaan van een bewaarde dag ze wissen: savePlanning leest ze uit
+            // planningData._bestellingen, en dat is leeg als de notitie niet is geopend.
+            if (!planningData._bestellingen) {
+                const besteld = {};
+                savedDayData.forEach(d => {
+                    const p = PRODUCTS.find(x => x.name === d.product);
+                    if (p && d.bestelling) besteld[p.id] = d.bestelling;
+                });
+                if (Object.keys(besteld).length) planningData._bestellingen = besteld;
+            }
             updateNoteButton();
 
             // Dagtype NA het zetten van de event-dropdown bepalen: een feestdag op een
@@ -2140,6 +2172,15 @@
                 } else if (savedRecord?.out_of_stock) {
                     outOfStock = true;
                 }
+                // DEELS uitverkocht: wél gebakken, maar de voorraad raakte op. De rij blijft
+                // normaal bewerkbaar — alleen de badge en de motor behandelen hem anders.
+                let partialOos = false;
+                if (sessionEdit && sessionEdit.partialOos !== undefined) {
+                    partialOos = !!sessionEdit.partialOos;
+                } else if (savedRecord?.partial_oos) {
+                    partialOos = true;
+                }
+                if (outOfStock) partialOos = false;
 
                 // Out-of-stock pins totaal + all batches to 0
                 if (outOfStock) {
@@ -2190,6 +2231,8 @@
                         auto: true     // automatisch ingevuld — mag door capaciteits-trim krimpen
                     };
                 }
+                // DEELS raakt alleen de badge: de rij blijft verder een gewone rij.
+                displayData[p.id].partialOos = partialOos;
             });
 
             // Zondag/feestdag capaciteits-trim: past de AUTO-ingevulde totalen in 4 batches?
@@ -2449,7 +2492,9 @@
                     totals.totaal += data.totaal;
                     for (let i = 0; i < 5; i++) totals[`l${i+1}`] += data.batches[i];
 
-                    const nameCell = `<td class="product-name-cell" onclick="toggleOutOfStock('${p.id}')" title="Klik om uit/in voorraad te zetten">${p.short}${oos ? '<span class="oos-badge">UIT</span>' : ''}</td>`;
+                    const badge = oos ? '<span class="oos-badge">UIT</span>'
+                                : data.partialOos ? '<span class="oos-badge partial">DEELS</span>' : '';
+                    const nameCell = `<td class="product-name-cell" onclick="toggleOutOfStock('${p.id}')" title="Klik: normaal → UIT (niets gebakken) → DEELS (voorraad op, wél gebakken) → normaal">${p.short}${badge}</td>`;
 
                     html += `<tr class="${oos ? 'product-row-oos' : ''}">
                         ${nameCell}
@@ -2601,10 +2646,15 @@
                 const recordWithNote = weekData.find(d => d.note && d.note.length > 0);
                 const note = recordWithNote?.note || '';
                 const dateStr = weekData[0]?.datum;
-                const hasNote = note && note.length > 0;
+                // Een dag met alleen een grote bestelling (geen notitietekst) moet hier óók
+                // aanklikbaar zijn — anders is die bestelling in de terugblik onzichtbaar.
+                const bestelStuks = weekData.reduce((s, d) => s + (d.bestelling || 0), 0);
+                const hasNote = (note && note.length > 0) || bestelStuks > 0;
                 const iconClass = hasNote ? 'note-icon has-note' : 'note-icon';
                 const onclick = hasNote && dateStr ? `onclick="openNotePopup('${dateStr}', true)"` : '';
-                html += `<td colspan="2" style="text-align: center;"><span class="${iconClass}" ${onclick}>📝</span></td>`;
+                const icon = bestelStuks > 0 ? '📋' : '📝';
+                const titel = bestelStuks > 0 ? ` title="${bestelStuks} st besteld"` : '';
+                html += `<td colspan="2" style="text-align: center;"><span class="${iconClass}" ${onclick}${titel}>${icon}</span></td>`;
             }
             html += '</tr>';
 
@@ -2621,21 +2671,30 @@
             const savedRecord = historicalData.find(d => d.datum === dateStr && d.product === product.name);
 
             // Resolve current state: session edit wins over saved data
-            const sessionVal = planningData[productId]?.outOfStock;
-            const currentlyOos = (sessionVal !== undefined) ? !!sessionVal : !!savedRecord?.out_of_stock;
-            const newState = !currentlyOos;
+            // Drie standen, rondlopend bij elke tik op de productnaam:
+            //   normaal → UIT (rood, niets gebakken) → DEELS (oranje, wél gebakken maar
+            //   voorraad raakte op) → normaal.
+            // DEELS bestaat omdat "we hadden maar genoeg voor 4 van de 10 platen" vroeger
+            // als volledig uit voorraad werd geboekt: die 4 platen verdwenen dan uit de
+            // omzet. Nu tellen ze gewoon mee, terwijl de motor de dag nog steeds negeert
+            // als referentie — de vraag was die dag immers afgeknepen door de voorraad.
+            const sessOos = planningData[productId]?.outOfStock;
+            const sessPart = planningData[productId]?.partialOos;
+            const isOos  = (sessOos  !== undefined) ? !!sessOos  : !!savedRecord?.out_of_stock;
+            const isPart = (sessPart !== undefined) ? !!sessPart : !!savedRecord?.partial_oos;
 
-            if (newState) {
-                // Going out of stock — pin to 0, remember via session override
-                planningData[productId] = { totaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0, outOfStock: true };
+            if (!isOos && !isPart) {
+                // → UIT: alles op 0 pinnen
+                planningData[productId] = { totaal: 0, l1: 0, l2: 0, l3: 0, l4: 0, l5: 0, outOfStock: true, partialOos: false };
+            } else if (isOos) {
+                // → DEELS: rij weer actief en bewerkbaar. Geen totaal meezetten, dan vult
+                // renderPlanning de suggestie in en kan de eigenaar er 4 van maken.
+                planningData[productId] = { outOfStock: false, partialOos: true };
             } else {
-                // Terug op voorraad — EXPLICIET false zetten, niet de sessie-invoer wissen.
-                // Bug 2026-08-12 (vr 14/08, tijger pistolet): met `delete` viel de render
-                // terug op de OPGESLAGEN rij, en die stond op out_of_stock → het product
-                // sprong meteen weer op "uit voorraad". Onherstelbaar via de UI; de rode
-                // opslaan-knop ging wel aan (markUnsaved), dus het leek alsof er iets
-                // gebeurde. Geen totaal meezetten: renderPlanning vult de suggestie in.
-                planningData[productId] = { outOfStock: false };
+                // → normaal. EXPLICIET false zetten, niet de sessie-invoer wissen: met
+                // `delete` viel de render terug op de OPGESLAGEN rij en sprong het product
+                // meteen terug in zijn oude stand (bug vr 14/08, tijger pistolet).
+                planningData[productId] = { outOfStock: false, partialOos: false };
             }
             markUnsaved();
             renderPlanning();
@@ -2648,7 +2707,22 @@
             const row = input.closest('tr');
             
             if (!planningData[id]) planningData[id] = {};
-            
+
+            // De takken hieronder VERVANGEN planningData[id] volledig (dat moet: batches
+            // horen als geheel te resetten). Daarmee zou ook de voorraadstand sneuvelen.
+            // Bij UIT kon dat niet gebeuren — die velden staan op readonly — maar een
+            // DEELS-rij is juist wél bewerkbaar, en dat is nu net het geval waarin je het
+            // totaal aanpast (10 → 4). Zonder dit viel de oranje badge weg zodra je het
+            // aantal invulde, en werd de dag als een gewone dag opgeslagen.
+            const stand = {
+                outOfStock: planningData[id].outOfStock,
+                partialOos: planningData[id].partialOos
+            };
+            const herstelStand = () => {
+                if (stand.outOfStock !== undefined) planningData[id].outOfStock = stand.outOfStock;
+                if (stand.partialOos !== undefined) planningData[id].partialOos = stand.partialOos;
+            };
+
             if (field === 'totaal') {
                 // Totaal "gewijzigd" naar exact de som van de huidige batches? Dan is
                 // er niets te herverdelen — batches behouden. Vangt de val af waarbij
@@ -2663,6 +2737,7 @@
                     // User changed total - store it, batches will be recalculated
                     planningData[id] = { totaal: value };
                 }
+                herstelStand();
             } else {
                 // User changed a batch - update only totaal, keep all batches as user set them
                 const l1 = parseInt(row.querySelector('[data-field="l1"]').value) || 0;
@@ -2675,7 +2750,8 @@
                     totaal: l1 + l2 + l3 + l4 + l5,
                     l1, l2, l3, l4, l5
                 };
-                
+                herstelStand();
+
                 // Update only the totaal display for this row, don't re-render everything
                 const totaalInput = row.querySelector('[data-field="totaal"]');
                 totaalInput.value = planningData[id].totaal;
@@ -2960,6 +3036,22 @@
             textarea.readOnly = readOnly;
             textarea.style.opacity = readOnly ? '0.7' : '1';
             saveBtn.style.display = readOnly ? 'none' : 'inline-block';
+
+            // Grote bestellingen van deze dag: sessie-invoer wint van de opgeslagen rij,
+            // net als bij de notitie zelf.
+            const besteld = {};
+            historicalData.filter(d => d.datum === currentNoteDate).forEach(rec => {
+                const p = PRODUCTS.find(x => x.name === rec.product);
+                if (p && rec.bestelling) besteld[p.id] = rec.bestelling;
+            });
+            if (!dateStr && planningData._bestellingen) Object.assign(besteld, planningData._bestellingen);
+            document.getElementById('bestelling-inputs').innerHTML = PRODUCTS.map(p => `
+                <div class="setting-row" style="padding: 3px 0;">
+                    <label style="font-size: 0.8rem;">${p.short}</label>
+                    <input type="number" min="0" value="${besteld[p.id] || 0}" data-bestel-id="${p.id}"
+                           ${readOnly ? 'readonly' : ''} style="width: 64px;">
+                    <span style="font-size: 0.68rem; color: var(--text-muted);">st</span>
+                </div>`).join('');
             
             // Format date for display
             const d = new Date(currentNoteDate);
@@ -2970,10 +3062,19 @@
         
         function saveNote() {
             const note = document.getElementById('note-textarea').value.trim();
-            
+
             // Save note to planningData for current session
             planningData._note = note;
-            
+
+            // Grote bestellingen meenemen (stuks per product). Alleen niet-nul waarden
+            // bewaren, zodat een lege invoer geen rij met nullen achterlaat.
+            const bestellingen = {};
+            document.querySelectorAll('#bestelling-inputs input[data-bestel-id]').forEach(inp => {
+                const n = parseInt(inp.value) || 0;
+                if (n > 0) bestellingen[inp.dataset.bestelId] = n;
+            });
+            planningData._bestellingen = bestellingen;
+
             // Update note button appearance
             updateNoteButton();
             
@@ -2992,8 +3093,13 @@
             const dateStr = formatDateISO(currentDate);
             const dayData = historicalData.filter(d => d.datum === dateStr);
             const recordWithNote = dayData.find(d => d.note && d.note.length > 0);
-            const hasNote = (planningData._note && planningData._note.length > 0) || recordWithNote;
-            
+            // Ook oplichten bij een grote bestelling zonder notitietekst — anders zie je
+            // op de planning niet dat er een bestelling in die dag zit.
+            const heeftBestelling = dayData.some(d => d.bestelling > 0)
+                || Object.values(planningData._bestellingen || {}).some(v => v > 0);
+            const hasNote = (planningData._note && planningData._note.length > 0) || recordWithNote || heeftBestelling;
+
+
             if (hasNote) {
                 btn.classList.add('has-note');
             } else {
@@ -3855,10 +3961,12 @@
 
             let html = '';
             PRODUCTS.forEach(p => {
-                // Sum gebakken stuks in window, skipping out-of-stock days
+                // Sum gebakken stuks in window, skipping out-of-stock days.
+                // DEELS-dagen tellen ook niet mee: daar is minder verbruikt dan nodig was,
+                // dus meetellen zou de bestelling structureel te krap maken.
                 const myRecs = historicalData.filter(r =>
                     r.product === p.name &&
-                    !r.out_of_stock &&
+                    !r.out_of_stock && !r.partial_oos &&
                     r.datum <= todayStr &&
                     new Date(r.datum) >= cutoff
                 );
@@ -3911,11 +4019,18 @@
 
             historicalData = historicalData.filter(d => d.datum !== dateStr);
 
+            const bestellingen = planningData._bestellingen || {};
             PRODUCTS.forEach(p => {
                 const row = document.querySelector(`input[data-id="${p.id}"]`).closest('tr');
                 const oos = row.classList.contains('product-row-oos');
+                const partial = !oos && !!row.querySelector('.oos-badge.partial');
                 const data = {
                     datum: dateStr, product: p.name, event, weather, note,
+                    // Voorraad raakte op maar er is wél gebakken → telt mee in de omzet,
+                    // maar de motor slaat de dag over als referentie (vraag was afgeknepen).
+                    partial_oos: partial,
+                    // Stuks die naar een losse grote bestelling gingen: wel omzet, geen vraag.
+                    bestelling: bestellingen[p.id] || null,
                     // Suggestie mee opslaan: maakt achteraf "suggestie vs gebakken vs
                     // breuk" vergelijkbaar — de basis voor het natuningen van de motor.
                     suggestie: parseInt(row.querySelector('.sug-value')?.textContent) || null,
@@ -4191,10 +4306,32 @@
                     l1: rec.l1, l2: rec.l2, l3: rec.l3, l4: rec.l4, l5: rec.l5,
                     breuk: rec.breuk, event: rec.event, weather: rec.weather, note: rec.note,
                     out_of_stock: !!rec.out_of_stock,
-                    suggestie: rec.suggestie ?? null
+                    suggestie: rec.suggestie ?? null,
+                    partial_oos: !!rec.partial_oos,
+                    bestelling: rec.bestelling ?? null
                 }));
             if (!payload.length) return;
-            await supabaseClient.from('planning_data').upsert(payload, { onConflict: 'datum,product' });
+            const { error } = await supabaseClient.from('planning_data')
+                .upsert(payload, { onConflict: 'datum,product' });
+            if (!error) return;
+
+            // De kolommen partial_oos/bestelling bestaan pas na de migratie van 2026-08-13.
+            // Draait er nog een database zonder die kolommen, dan zou de héle save stil
+            // mislukken (supabase-js gooit niet, hij geeft een error terug — vroeger werd
+            // die genegeerd). Daarom: opnieuw proberen zonder de nieuwe velden, zodat de
+            // gewone planning in elk geval bewaard blijft, en het duidelijk melden.
+            const ontbrekendeKolom = /column|schema|bestelling|partial_oos/i.test(error.message || '');
+            if (ontbrekendeKolom) {
+                const kaal = payload.map(({ partial_oos, bestelling, ...rest }) => rest);
+                const retry = await supabaseClient.from('planning_data')
+                    .upsert(kaal, { onConflict: 'datum,product' });
+                if (!retry.error) {
+                    showToast('⚠️ Opgeslagen zonder bestelling/deels-voorraad — database mist die kolommen');
+                    return;
+                }
+            }
+            showToast('⚠️ Cloud-sync mislukt — lokaal wél opgeslagen');
+            console.warn('syncToSupabase failed', error);
         }
 
         // ===== CLOUD SETTINGS (app + product config stored in `settings` table) =====
