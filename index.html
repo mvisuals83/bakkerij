@@ -839,7 +839,8 @@
             <textarea id="note-textarea" placeholder="Schrijf hier je notitie..." style="width: 100%; height: 100px; padding: 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-sans); font-size: 0.9rem; resize: none;"></textarea>
             <div style="margin-top: 14px; border-top: 1px solid var(--border-color); padding-top: 10px;">
                 <div style="font-weight: 600; font-size: 0.85rem; margin-bottom: 2px;">📋 Grote bestellingen</div>
-                <p style="font-size: 0.68rem; color: var(--text-muted); margin-bottom: 8px;">Aantal <b>stuks</b> (niet platen, net als breuk) dat naar een losse bestelling ging. Blijft gewoon meetellen als omzet, maar telt <b>niet</b> mee als normale vraag — zo bakt de suggestie volgende week niet te veel.</p>
+                <p style="font-size: 0.7rem; color: var(--accent-orange); font-weight: 600; margin-bottom: 4px;">⚠️ De bestelling moet óók in de planning staan.</p>
+                <p style="font-size: 0.68rem; color: var(--text-muted); margin-bottom: 8px;">De suggestie negeert de bestelling, maar in de omzet telt hij wél mee. Invullen in <b>stuks</b>.</p>
                 <div id="bestelling-inputs"></div>
             </div>
             <div class="modal-buttons" style="margin-top: 12px;">
@@ -3047,10 +3048,10 @@
             if (!dateStr && planningData._bestellingen) Object.assign(besteld, planningData._bestellingen);
             document.getElementById('bestelling-inputs').innerHTML = PRODUCTS.map(p => `
                 <div class="setting-row" style="padding: 3px 0;">
-                    <label style="font-size: 0.8rem;">${p.short}</label>
+                    <label style="font-size: 0.8rem; flex: 1;">${p.short}</label>
                     <input type="number" min="0" value="${besteld[p.id] || 0}" data-bestel-id="${p.id}"
                            ${readOnly ? 'readonly' : ''} style="width: 64px;">
-                    <span style="font-size: 0.68rem; color: var(--text-muted);">st</span>
+                    <span style="font-size: 0.68rem; color: var(--text-muted); width: 18px; text-align: right;">st</span>
                 </div>`).join('');
             
             // Format date for display
@@ -3715,11 +3716,14 @@
                 costEl.innerHTML = PRODUCTS.map(p => {
                     const per = costPerPieceExcl(p);
                     const marge = marginPerPiece(p);
-                    return `<div class="setting-row">
-                        <label style="font-size: 0.85rem;">${p.name}</label>
+                    // label krijgt flex:1 zodat het invoerveld op élke rij op dezelfde
+                    // plek staat — met space-between drijft het anders mee met de
+                    // lengte van de productnaam.
+                    return `<div class="setting-row" style="flex-wrap: wrap;">
+                        <label style="font-size: 0.85rem; flex: 1;">${p.name}</label>
                         <span style="color: var(--text-muted);">€</span>
                         <input type="number" step="0.01" value="${p.costBox ?? 0}" data-id="${p.id}" data-field="costBox" onchange="updateCostSetting(this)" style="width: 72px;">
-                        <span style="font-size: 0.68rem; color: var(--text-muted); margin-left: 6px;">${per > 0
+                        <span style="font-size: 0.68rem; color: var(--text-muted); flex-basis: 100%; text-align: right; margin-top: 2px;">${per > 0
                             ? `= €${per.toFixed(4)}/st · <b style="color: var(--accent-orange);">marge €${marge.toFixed(2)} (${(marge / sellPerPieceExcl(p) * 100).toFixed(0)}%)</b>`
                             : 'geen doosinhoud'}</span>
                     </div>`;
