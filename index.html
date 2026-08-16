@@ -1329,7 +1329,20 @@
                 // als referentie dus even onbruikbaar als een volledig uitverkochte dag.
                 if (!rec || rec.out_of_stock || rec.partial_oos || rec.breuk === null || rec.breuk === undefined) continue;
                 const ctx = getDayContext(iso, promoSet);
-                if (ctx.feestdag || ctx.promo || ctx.snow) continue;
+                if (ctx.feestdag || ctx.snow) continue;
+                // Promo is een GROEP B-actie (stokbrood 2 voor €1,99), dus alleen voor B een
+                // reden om de dag als referentie weg te gooien. Gemeten op 272 dagen eigen
+                // data (2026-08-15, mediaan promo/normaal per weekdag): stok wit +60%, terwijl
+                // Groep A vlak blijft — pist wit +5%, pist bruin 0%. Tijger (−17%) en piccolo
+                // (−8%) lijken te dippen, maar dat is ruis: n=2..5 per weekdag, verschillen van
+                // 0-10 stuks en de tekens wisselen per weekdag (tijger za −17% maar zo +35%).
+                // Groep A uitsluiten kostte wél écht iets: 18% van alle dagen is promo, en het
+                // filter duwde de referentiereeks een volle week verder terug (5,0 i.p.v. 4,0
+                // weken voor 4 bruikbare dagen) — precies de traagheid die de juli-dip zo laat
+                // liet doorwerken. Voor A dus normaliseren i.p.v. uitsluiten, exact zoals weer
+                // al werkt (zie de regel over BBQ-dagen: uitsluiten = zomer zonder referenties).
+                // pPromoA in contextFactor doet die normalisatie al.
+                if (ctx.promo && p.group === 'B') continue;
                 // Losse grote bestelling (bv. 52 pistolets voor één klant): wel gebakken en
                 // wel verkocht, maar het is geen terugkerende vraag. Eraf halen vóór de
                 // mediaan, anders bakt de motor volgende week structureel te veel.
@@ -1485,7 +1498,8 @@
                 const rec = historicalData.find(r => r.datum === iso && r.product === p.name);
                 if (!rec || rec.out_of_stock || rec.partial_oos || rec.breuk === null || rec.breuk === undefined) continue;
                 const ctx = getDayContext(iso, promoSet);
-                if (ctx.feestdag || ctx.promo || ctx.snow) continue;
+                if (ctx.feestdag || ctx.snow) continue;
+                if (ctx.promo && p.group === 'B') continue;   // zie refDemands
                 const besteld = Math.max(0, rec.bestelling || 0);
                 const gebakken = Math.max(0, stuksOnDate(p, iso, rec.totaal || 0) - besteld);
                 if (gebakken <= 0) continue;
