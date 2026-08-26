@@ -426,9 +426,97 @@
             .save-btn span { display: none; }
             .planning-table { min-width: 360px; }
         }
+        /* ===== INLOGSCHERM ===== */
+        /* Verschijnt alleen als er geen geldige sessie is. Zolang je ingelogd
+           blijft (maandenlang) zie je dit scherm nooit. */
+        #login-overlay {
+            position: fixed; inset: 0; z-index: 9999;
+            background: var(--bg-darkest);
+            display: none;
+            align-items: center; justify-content: center;
+            padding: 24px;
+        }
+        #login-overlay.show { display: flex; }
+        .login-card {
+            width: 100%; max-width: 360px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 28px 24px;
+            box-shadow: var(--shadow);
+        }
+        .login-card h2 {
+            margin: 0 0 4px; font-size: 1.25rem; color: var(--text-primary);
+        }
+        .login-card .sub {
+            margin: 0 0 20px; font-size: 0.8rem; color: var(--text-secondary);
+        }
+        .login-card label {
+            display: block; font-size: 0.75rem; color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        .login-card input {
+            width: 100%; box-sizing: border-box;
+            background: var(--bg-input); color: var(--text-primary);
+            border: 1px solid var(--border-color); border-radius: var(--radius-sm);
+            padding: 12px 14px; font-size: 1rem; font-family: var(--font-sans);
+            margin-bottom: 14px;
+        }
+        .login-card input:focus {
+            outline: none; border-color: var(--accent-blue);
+        }
+        .login-card button {
+            width: 100%; padding: 13px;
+            background: var(--accent-blue); color: #fff;
+            border: none; border-radius: var(--radius-sm);
+            font-size: 1rem; font-weight: 600; font-family: var(--font-sans);
+            cursor: pointer;
+        }
+        .login-card button:disabled { opacity: 0.6; cursor: default; }
+        #login-error {
+            display: none; margin: 0 0 14px;
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid var(--accent-red);
+            color: var(--text-primary);
+            border-radius: var(--radius-sm);
+            padding: 10px 12px; font-size: 0.8rem;
+        }
+        #login-error.show { display: block; }
+        .login-offline {
+            margin: 16px 0 0; text-align: center;
+            font-size: 0.75rem; color: var(--text-muted);
+        }
+        .login-offline a { color: var(--accent-cyan); cursor: pointer; }
     </style>
 </head>
 <body>
+    <!-- Inlogscherm. Staat standaard verborgen en verschijnt alleen als er geen
+         geldige sessie is. De planning eronder is al ingeladen uit localStorage,
+         dus je kunt altijd nog kijken wat er gepland stond, ook zonder internet. -->
+    <div id="login-overlay">
+        <div class="login-card">
+            <h2>🥖 Bakkerij planning</h2>
+            <p class="sub">Even aanmelden om verder te gaan.</p>
+            <div id="login-error"></div>
+            <form id="login-form" autocomplete="on">
+                <label for="login-email">Gebruikersnaam</label>
+                <input type="text" id="login-email" name="username"
+                       autocomplete="username" required
+                       autocapitalize="none" spellcheck="false">
+                <label for="login-pass">Wachtwoord</label>
+                <input type="password" id="login-pass" name="password"
+                       autocomplete="current-password" required>
+                <button type="submit" id="login-btn">Aanmelden</button>
+            </form>
+            <p class="login-offline">
+                Geen internet?
+                <a id="login-skip">Verder zonder aanmelden</a><br>
+                Je ziet dan de laatst opgehaalde planning. Opslaan blijft op dit
+                toestel staan en gaat later alsnog naar de cloud.
+            </p>
+        </div>
+    </div>
+
     <nav class="tabs">
         <button class="tab active" data-page="planning">Planning</button>
         <button class="tab" data-page="breuk">Breuk</button>
@@ -813,6 +901,9 @@
                 <h3>☁️ Database Status</h3>
                 <div class="setting-row">
                     <span id="db-status">⚪ Controleren...</span>
+                </div>
+                <div class="setting-row">
+                    <button onclick="afmelden()" style="background: var(--bg-input); color: var(--text-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 8px 14px; font-size: 0.8rem; font-family: var(--font-sans); cursor: pointer;">Afmelden</button>
                 </div>
             </div>
         </div>
@@ -4259,19 +4350,163 @@
             }
             
             try {
-                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-                const { error } = await supabaseClient.from('planning_data').select('id').limit(1);
-                
-                if (error) {
-                    document.getElementById('db-status').textContent = '🔴 ' + error.message.substring(0, 40);
-                } else {
-                    document.getElementById('db-status').textContent = '🟢 Verbonden met cloud';
-                    await loadCloudSettings();
-                    await loadFromSupabase();
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+                    auth: {
+                        // Sessie in localStorage bewaren en het token automatisch
+                        // vernieuwen. Zo blijf je maandenlang ingelogd en krijgt de
+                        // collega het inlogscherm in de praktijk nooit te zien.
+                        persistSession: true,
+                        autoRefreshToken: true,
+                        storageKey: 'bakkerij_auth'
+                    }
+                });
+
+                // Meteen na het aanmaken van de client, zodat de knoppen en de
+                // sessie-bewaking werken in élk pad hieronder.
+                initLoginScherm();
+
+                const { data } = await supabaseClient.auth.getSession();
+                if (!data?.session) {
+                    // Niet aangemeld: inlogscherm tonen. De planning eronder staat
+                    // al op het scherm vanuit localStorage, dus er gaat niets verloren.
+                    setDbStatus('🔒 Niet aangemeld');
+                    toonLogin();
+                    return;
                 }
+
+                await naAanmelden();
             } catch (e) {
-                document.getElementById('db-status').textContent = '🔴 Connectie mislukt';
+                setDbStatus('🔴 Connectie mislukt');
             }
+        }
+
+        // Supabase kent alleen inloggen met een e-mailadres. Wij tonen een gewone
+        // gebruikersnaam en plakken er hier een vast domein achter. Er wordt nooit
+        // een mail verstuurd (de gebruiker is handmatig aangemaakt met "Auto Confirm"),
+        // dus dit adres hoeft niet te bestaan.
+        const LOGIN_DOMEIN = 'bakkerij.local';
+
+        function naarEmail(gebruikersnaam) {
+            const g = String(gebruikersnaam || '').trim().toLowerCase();
+            // Typt iemand tóch een volledig e-mailadres, dan laten we dat met rust.
+            return g.includes('@') ? g : `${g}@${LOGIN_DOMEIN}`;
+        }
+
+        function setDbStatus(tekst) {
+            const el = document.getElementById('db-status');
+            if (el) el.textContent = tekst;
+        }
+
+        // Herkent een rechten-/sessieprobleem, zodat we het inlogscherm kunnen tonen
+        // in plaats van een cryptische foutmelding.
+        function isAuthFout(error) {
+            if (!error) return false;
+            const code = String(error.code || '');
+            const msg  = String(error.message || '').toLowerCase();
+            return code === '42501' || code === 'PGRST301'
+                || msg.includes('jwt') || msg.includes('permission denied')
+                || msg.includes('not authorized') || msg.includes('unauthorized');
+        }
+
+        // Draait zodra er een geldige sessie is: data ophalen zoals vroeger.
+        async function naAanmelden() {
+            const { error } = await supabaseClient.from('planning_data').select('id').limit(1);
+            if (error) {
+                if (isAuthFout(error)) {
+                    setDbStatus('🔒 Aanmelden vereist');
+                    toonLogin('Je sessie is verlopen. Meld je opnieuw aan.');
+                } else {
+                    setDbStatus('🔴 ' + error.message.substring(0, 40));
+                }
+                return;
+            }
+            setDbStatus('🟢 Verbonden met cloud');
+            verbergLogin();
+            await loadCloudSettings();
+            await loadFromSupabase();
+        }
+
+        function toonLogin(melding) {
+            const ov = document.getElementById('login-overlay');
+            if (!ov) return;
+            ov.classList.add('show');
+            const fout = document.getElementById('login-error');
+            if (melding) { fout.textContent = melding; fout.classList.add('show'); }
+            else { fout.classList.remove('show'); }
+            const naam = document.getElementById('login-email');
+            if (naam && !naam.value) {
+                // Gebruikersnaam onthouden zodat alleen het wachtwoord nog nodig is.
+                naam.value = localStorage.getItem('bakkerij_laatste_email') || '';
+            }
+        }
+
+        function verbergLogin() {
+            const ov = document.getElementById('login-overlay');
+            if (ov) ov.classList.remove('show');
+        }
+
+        function initLoginScherm() {
+            const form = document.getElementById('login-form');
+            if (!form) return;
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const btn   = document.getElementById('login-btn');
+                const fout  = document.getElementById('login-error');
+                const naam  = document.getElementById('login-email').value.trim();
+                const email = naarEmail(naam);
+                const pass  = document.getElementById('login-pass').value;
+
+                btn.disabled = true;
+                btn.textContent = 'Bezig...';
+                fout.classList.remove('show');
+
+                try {
+                    const { error } = await supabaseClient.auth.signInWithPassword({
+                        email, password: pass
+                    });
+                    if (error) {
+                        // Geen technische Engelse tekst voor de collega.
+                        const msg = String(error.message || '').toLowerCase();
+                        fout.textContent = msg.includes('invalid')
+                            ? 'Gebruikersnaam of wachtwoord klopt niet.'
+                            : 'Aanmelden lukte niet. Heb je internet?';
+                        fout.classList.add('show');
+                        return;
+                    }
+                    localStorage.setItem('bakkerij_laatste_email', naam);
+                    document.getElementById('login-pass').value = '';
+                    await naAanmelden();
+                } catch (err) {
+                    fout.textContent = 'Aanmelden lukte niet. Heb je internet?';
+                    fout.classList.add('show');
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'Aanmelden';
+                }
+            });
+
+            // Noodklep: zonder internet toch de laatst bekende planning kunnen zien.
+            document.getElementById('login-skip').addEventListener('click', () => {
+                verbergLogin();
+                setDbStatus('🔒 Niet aangemeld — alleen dit toestel');
+                showToast('Je werkt offline. Opslaan blijft op dit toestel staan.');
+            });
+
+            // Vangt een verlopen sessie op terwijl de app openstaat.
+            supabaseClient?.auth.onAuthStateChange((event) => {
+                if (event === 'SIGNED_OUT') {
+                    setDbStatus('🔒 Niet aangemeld');
+                    toonLogin();
+                }
+            });
+        }
+
+        async function afmelden() {
+            if (!confirm('Afmelden? Je moet dan opnieuw je wachtwoord invullen.')) return;
+            try { await supabaseClient?.auth.signOut(); } catch (e) {}
+            setDbStatus('🔒 Niet aangemeld');
+            toonLogin();
         }
         
         async function loadFromSupabase() {
@@ -4347,6 +4582,14 @@
                     showToast('⚠️ Opgeslagen zonder bestelling/deels-voorraad — database mist die kolommen');
                     return;
                 }
+            }
+            // Na de beveiliging van 2026-08-26 kan een mislukte sync ook betekenen
+            // dat de sessie verlopen is. Dat is geen technische fout maar iets dat
+            // de gebruiker zelf kan oplossen, dus dat melden we apart.
+            if (isAuthFout(error)) {
+                showToast('🔒 Opgeslagen op dit toestel — meld je opnieuw aan voor de cloud');
+                toonLogin('Je sessie is verlopen. Meld je opnieuw aan om te synchroniseren.');
+                return;
             }
             showToast('⚠️ Cloud-sync mislukt — lokaal wél opgeslagen');
             console.warn('syncToSupabase failed', error);
