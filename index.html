@@ -4365,8 +4365,19 @@
                 // sessie-bewaking werken in élk pad hieronder.
                 initLoginScherm();
 
-                const { data } = await supabaseClient.auth.getSession();
-                if (!data?.session) {
+                // Eigen try: gaat het uitlezen van de bewaarde sessie mis (bijv. een
+                // beschadigde localStorage), dan mag dat niet in de grote catch
+                // belanden — daar zou je namelijk géén inlogscherm krijgen en dus
+                // ook niet meer binnen kunnen komen.
+                let sessie = null;
+                try {
+                    const { data } = await supabaseClient.auth.getSession();
+                    sessie = data?.session || null;
+                } catch (e) {
+                    sessie = null;
+                }
+
+                if (!sessie) {
                     // Niet aangemeld: inlogscherm tonen. De planning eronder staat
                     // al op het scherm vanuit localStorage, dus er gaat niets verloren.
                     setDbStatus('🔒 Niet aangemeld');
