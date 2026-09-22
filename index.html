@@ -550,6 +550,9 @@
                     <button class="note-btn" id="note-btn" onclick="openNotePopup()">📝</button>
                     <button class="save-btn" id="save-btn" onclick="savePlanning()">💾 <span>Opslaan</span></button>
                 </div>
+                <!-- Alleen weergave: valt deze dag in een bijzondere periode (Instellingen →
+                     📅 Bijzondere periodes)? Raakt de suggesties niet aan. -->
+                <div id="periode-badge" style="display:none;font-size:0.7rem;color:var(--text-muted);margin-top:6px;text-align:center;"></div>
             </div>
             
             <div class="group-card">
@@ -785,6 +788,21 @@
                 <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Stokbrood ligt liefst op 4-stuks platen (meer volume). Bruin krijgt ze eerst, wit de rest; wat niet meer past gaat op 5-stuks platen. Budget geldt per dag — de hele dag wordt in één keer klaargezet.</p>
             </div>
             <div class="settings-section">
+                <h3>📅 Bijzondere periodes</h3>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">
+                    Periodes waarin de vraag om een <em>externe</em> reden anders lag — concurrent op vakantie,
+                    wegenwerken, een school dicht. Je vult ze <strong>achteraf</strong> in, één keer per periode;
+                    je hoeft dus niets per dag te onthouden.
+                    <br><br>
+                    Dit verandert <strong>nu nog niets</strong> aan de suggesties — het legt alleen vast wat er aan de hand was.
+                    Vanaf ±17 nov 2026 is er één vol jaar data; dan kan de motor vorig jaar als referentie gebruiken,
+                    en moet hij wéten welke weken eenmalig waren. Zonder deze labels leert hij anders het verkeerde:
+                    dan zakt hij in september 2027 omlaag voor een concurrent die er dat jaar misschien gewoon is.
+                </p>
+                <div id="periodes-lijst"></div>
+                <button class="btn" style="margin-top: 8px;" onclick="periodeToevoegen()">➕ Periode toevoegen</button>
+            </div>
+            <div class="settings-section">
                 <h3>🔥 Weekend Strategie — Skip Groep B</h3>
                 <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">Wanneer Groep B wordt geskipt in een batch, krijgt Groep A daar ~2× volume. Volume van Groep B verschuift naar de niet-geskipte batches.</p>
                 <div style="display: flex; gap: 16px; flex-wrap: wrap;">
@@ -903,6 +921,9 @@
                     <span id="db-status">⚪ Controleren...</span>
                 </div>
                 <div class="setting-row">
+                    <span id="app-versie" style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);"></span>
+                </div>
+                <div class="setting-row">
                     <button onclick="afmelden()" style="background: var(--bg-input); color: var(--text-secondary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 8px 14px; font-size: 0.8rem; font-family: var(--font-sans); cursor: pointer;">Afmelden</button>
                 </div>
             </div>
@@ -981,6 +1002,16 @@
             // waard is: minstens 3 platen (Groep A) of 4 platen (Groep B). Kleinere
             // overloop blijft zichtbaar in L2 staan zodat de bakkers zelf beslissen.
             minL3A: 3, minL3B: 4,
+            // Bijzondere periodes: [{ naam, van, tot }] met van/tot als 'JJJJ-MM-DD'.
+            // ALLEEN VASTLEGGEN (2026-09-19) — de motor gebruikt ze nog nergens. Bedoeld
+            // voor de jaar-op-jaar-referentie die vanaf ~17-11-2026 mogelijk wordt: dan
+            // moet bekend zijn wélke weken eenmalig waren (concurrent op vakantie: aug 2026
+            // dicht → piek, sep 2026 terug → daling). Zonder dat label leert de motor in
+            // 2027 een seizoenspatroon dat er geen is.
+            // BEWUST GEEN referentie-uitsluiting: dagen uitsluiten duwt het 4-refs-venster
+            // verder terug, en dat kostte bij de promo-uitsluiting meetbaar nauwkeurigheid
+            // (5,0 i.p.v. 4,0 weken terug). Labelen ≠ weggooien.
+            perioden: [],
             // skipB: per-day list of batch numbers (1-5) where Group B is skipped.
             // Flexible by design — adding new batches or weekday entries needs no code changes
             // beyond the UI. e.g. { sat:[2,3], sun:[2,3,4], mon:[] } would all just work.
@@ -2195,7 +2226,57 @@
             }
         }
         
+        // ===== Uitgestelde re-render (bug gemeld + nagespeeld 2026-09-19) =====
+        // renderPlanning() vervangt de volledige innerHTML van beide groepstabellen.
+        // Typt iemand op dat moment een batchgetal in, dan is dat veld wég vóórdat haar
+        // `change`-event ooit vuurt: het ingetypte getal verdwijnt, de focus valt naar
+        // <body> (toetsenbord dicht) en de rij toont weer de verse motorverdeling.
+        // Vanuit de bakker gezien: "ik pas een batch aan en hij herverdeelt het totaal".
+        //
+        // De renders die dit veroorzaken komen NIET uit haar eigen handeling maar uit een
+        // async callback: de weersvoorspelling die 1-3 s na het openen van de dag binnenkomt
+        // (updateWeather), de cloud-herlaad bij het wakker worden van het toestel, en
+        // loadCloudSettings. Daarom zag het ene toestel het voortdurend en het andere nooit —
+        // het is een race met de netwerklatentie, geen vaste fout. De collega gebruikt de app
+        // veel intensiever en begint meteen te typen, dus zij zat steeds in dat venster.
+        //
+        // Regel: een render die de gebruiker niet zelf uitlokt wacht tot het invoerveld
+        // verlaten is. Renders uit een eigen handeling (totaal wijzigen, UIT/DEELS, datum,
+        // instellingen) blijven direct — daar is de invoer al vastgelegd in planningData.
+        let renderUitgesteld = false;
+        let renderUitgesteldTimer = null;
+
+        function planningVeldActief() {
+            const el = document.activeElement;
+            return !!(el && el.dataset && el.dataset.id && el.dataset.field
+                      && el.closest('#group-a-body, #group-b-body'));
+        }
+
+        // BEWUST pollen en niet op een focusout-event wachten: dat event is niet
+        // gegarandeerd (achtergrondtab, en mobiele toetsenborden verplaatsen de focus
+        // soms zonder het te melden). Mist het event, dan zou een verse voorspelling
+        // definitief nooit op het scherm komen. De poller stopt vanzelf zodra het veld
+        // vrij is, dus hij loopt alleen tijdens het typen.
+        function renderPlanningUitgesteld() {
+            if (!planningVeldActief()) { renderPlanning(); return; }
+            renderUitgesteld = true;
+            if (renderUitgesteldTimer) return;
+            renderUitgesteldTimer = setInterval(() => {
+                if (planningVeldActief()) return;
+                clearInterval(renderUitgesteldTimer);
+                renderUitgesteldTimer = null;
+                if (renderUitgesteld) renderPlanning();
+            }, 400);
+        }
+
         function renderPlanning() {
+            renderUitgesteld = false;
+            // Onthoud waar de cursor stond; onderaan deze functie wordt hij hersteld.
+            const focusHerstel = (() => {
+                const el = document.activeElement;
+                if (!planningVeldActief()) return null;
+                return { id: el.dataset.id, field: el.dataset.field, start: el.selectionStart };
+            })();
             const batchMax = SETTINGS.batchMax;
             const dateStr = formatDateISO(currentDate);
             
@@ -2443,6 +2524,16 @@
             //   - Never reduce a product's L1 to 0 — that empties it for the morning;
             //     L2 only bakes for noon. So require L1 > 1 before a shift.
             //   - If only the priority product has slack, shift from it as a last resort.
+            //   - Alleen VERS BEREKENDE rijen mogen platen afstaan (recalcIds). Opgeslagen
+            //     of handmatig gezette batches blijven onaangeroerd — zelfde owner-regel
+            //     als bij de weekend-remainder-pass. Bug gemeld 19/09/26 door de collega:
+            //     zij zette de batches van stokbrood wit met de hand, wijzigde daarna het
+            //     totaal van een ander product, en deze lus pikte háár rij (de grootste L1)
+            //     om een plaat van af te schuiven — de app "herverdeelde" dus na een
+            //     batch-edit. Vuurt ook na een re-render die zij niet zelf uitlokt (verse
+            //     weersvoorspelling roept renderPlanning aan). Groep B had bovendien géén
+            //     prioriteitsbescherming: de skip is hardcoded op pistolet_wit, dus binnen
+            //     Groep B was élke rij kandidaat, ook een handmatige.
             if (!weekend) {
                 ['A', 'B'].forEach(group => {
                     const products = PRODUCTS.filter(p => p.group === group);
@@ -2452,11 +2543,11 @@
                     while (sumL1 > cap && safety-- > 0) {
                         // Prefer non-priority candidates with L1 > 1
                         let candidates = products.filter(p =>
-                            p.id !== 'pistolet_wit' && displayData[p.id].batches[0] > 1
+                            recalcIds.has(p.id) && p.id !== 'pistolet_wit' && displayData[p.id].batches[0] > 1
                         );
                         // Fallback: priority itself, if everything else is at minimum
                         if (candidates.length === 0) {
-                            candidates = products.filter(p => displayData[p.id].batches[0] > 1);
+                            candidates = products.filter(p => recalcIds.has(p.id) && displayData[p.id].batches[0] > 1);
                         }
                         if (candidates.length === 0) break; // nothing left to shift
                         // Pick the product with the largest L1 (most room to give)
@@ -2488,11 +2579,14 @@
                     if (sumL2 - cap < minL3) return; // geen of te kleine overloop
                     let safety = 50;
                     while (sumL2 > cap && safety-- > 0) {
+                        // Zelfde recalcIds-bescherming als de L1-rebalance hierboven: deze
+                        // lus mag nooit een handmatig gezette L2 leeghalen en er stilletjes
+                        // een 3e lading voor openen.
                         let candidates = products.filter(p =>
-                            p.id !== 'pistolet_wit' && displayData[p.id].batches[1] > 1
+                            recalcIds.has(p.id) && p.id !== 'pistolet_wit' && displayData[p.id].batches[1] > 1
                         );
                         if (candidates.length === 0) {
-                            candidates = products.filter(p => displayData[p.id].batches[1] > 1);
+                            candidates = products.filter(p => recalcIds.has(p.id) && displayData[p.id].batches[1] > 1);
                         }
                         if (candidates.length === 0) break;
                         candidates.sort((a, b) => displayData[b.id].batches[1] - displayData[a.id].batches[1]);
@@ -2644,6 +2738,19 @@
 
             renderReference();
             renderPlanningScoreboard();
+            updatePeriodeBadge();
+
+            // Stond de cursor in een invoerveld toen deze render begon, zet hem terug.
+            // Zonder dit valt de focus naar <body> en klapt op een telefoon het
+            // toetsenbord dicht midden in het invullen.
+            if (focusHerstel) {
+                const terug = document.querySelector(
+                    `input[data-id="${focusHerstel.id}"][data-field="${focusHerstel.field}"]`);
+                if (terug && !terug.readOnly) {
+                    terug.focus();
+                    try { terug.setSelectionRange(focusHerstel.start, focusHerstel.start); } catch (e) {}
+                }
+            }
         }
 
         // Simple distribution for single product
@@ -3889,6 +3996,89 @@
             showToast('⚙️ Btw-tarief opgeslagen');
         }
 
+        // ===== Bijzondere periodes (alleen vastleggen, 2026-09-19) =====
+        // Eén regel per periode i.p.v. de event-dropdown per dag: die kent maar één
+        // waarde per dag (promo én concurrent-dicht kan dus niet) en niemand onthoudt
+        // hem drie weken lang. Een datumreeks vul je achteraf in één keer in — ook voor
+        // een periode die al voorbij is, wat voor 2026 precies nodig is.
+        // De motor raakt dit nog NIET aan; zie de opmerking bij SETTINGS.perioden.
+
+        function periodenLijst() {
+            if (!Array.isArray(SETTINGS.perioden)) SETTINGS.perioden = [];
+            return SETTINGS.perioden;
+        }
+
+        // Klaar voor november: geeft de periodes terug waar een datum in valt.
+        // Nog nergens aangeroepen door de motor — bewust.
+        function periodenVoor(dateISO) {
+            return periodenLijst().filter(p => p.van && p.tot && dateISO >= p.van && dateISO <= p.tot);
+        }
+
+        function renderPeriodes() {
+            const box = document.getElementById('periodes-lijst');
+            if (!box) return;
+            const lijst = periodenLijst();
+            if (!lijst.length) {
+                box.innerHTML = '<p style="font-size:0.75rem;color:var(--text-muted);">Nog geen periodes ingevuld.</p>';
+                return;
+            }
+            box.innerHTML = lijst.map((p, i) => `
+                <div class="setting-row" style="gap:6px;flex-wrap:wrap;">
+                    <input type="text" value="${(p.naam || '').replace(/"/g, '&quot;')}" placeholder="bv. Concurrent dicht"
+                           style="flex:1;min-width:120px;" onchange="periodeWijzig(${i},'naam',this.value)">
+                    <input type="date" value="${p.van || ''}" onchange="periodeWijzig(${i},'van',this.value)">
+                    <input type="date" value="${p.tot || ''}" onchange="periodeWijzig(${i},'tot',this.value)">
+                    <button class="btn" style="padding:4px 8px;" onclick="periodeVerwijder(${i})" title="Verwijderen">🗑️</button>
+                </div>`).join('');
+        }
+
+        function periodeToevoegen() {
+            const vandaag = formatDateISO(new Date());
+            periodenLijst().push({ naam: '', van: vandaag, tot: vandaag });
+            renderPeriodes();
+            savePeriodes();
+        }
+
+        function periodeWijzig(i, veld, waarde) {
+            const lijst = periodenLijst();
+            if (!lijst[i]) return;
+            lijst[i][veld] = waarde;
+            // Einddatum vóór begindatum? Trek het ANDERE veld mee in plaats van de twee
+            // om te wisselen. Wisselen lijkt slimmer maar gaat mis zodra je ze één voor
+            // één invult: zet je eerst van=30/09 (terwijl tot nog op vandaag staat), dan
+            // wisselt hij, en de tot=05/10 die je daarna typt levert een reeks op die een
+            // week te vroeg begint. Meetrekken doet altijd wat je verwacht.
+            if (lijst[i].van && lijst[i].tot && lijst[i].van > lijst[i].tot) {
+                if (veld === 'van') lijst[i].tot = lijst[i].van;
+                else                lijst[i].van = lijst[i].tot;
+                renderPeriodes();
+            }
+            savePeriodes();
+        }
+
+        function periodeVerwijder(i) {
+            periodenLijst().splice(i, 1);
+            renderPeriodes();
+            savePeriodes();
+        }
+
+        function savePeriodes() {
+            localStorage.setItem('bakkerij_settings', JSON.stringify(SETTINGS));
+            saveCloudSetting('app', SETTINGS);
+            updatePeriodeBadge();
+            showToast('📅 Periodes opgeslagen');
+        }
+
+        // Kleine leesbevestiging op de planning-tab: valt de getoonde dag in een periode,
+        // zeg dat dan. Puur weergave — het verandert geen enkele suggestie.
+        function updatePeriodeBadge() {
+            const el = document.getElementById('periode-badge');
+            if (!el) return;
+            const namen = periodenVoor(formatDateISO(currentDate)).map(p => p.naam || 'periode');
+            el.textContent = namen.length ? '📅 ' + namen.join(' · ') : '';
+            el.style.display = namen.length ? '' : 'none';
+        }
+
         function saveCapacitySettings() {
             SETTINGS.oven1Max = parseInt(document.getElementById('setting-oven1').value) || 16;
             SETTINGS.oven2Max = parseInt(document.getElementById('setting-oven2').value) || 15;
@@ -4277,9 +4467,11 @@
                     }
 
                     // Advanced mode: verse forecast kan de suggesties wijzigen (BBQ/sneeuw).
-                    // Re-render is veilig: handmatige invoer zit in planningData en blijft staan.
+                    // Uitgesteld renderen: deze callback landt 1-3 s na het openen van de dag,
+                    // precies wanneer de bakker de eerste batchgetallen intypt. Direct renderen
+                    // gooide haar invoer weg (zie renderPlanningUitgesteld).
                     if (SETTINGS.advancedMode && dateStr === formatDateISO(currentDate)) {
-                        renderPlanning();
+                        renderPlanningUitgesteld();
                     }
                 } else {
                     badge.innerHTML = '❓';
@@ -4389,6 +4581,30 @@
             } catch (e) {
                 setDbStatus('🔴 Connectie mislukt');
             }
+        }
+
+        // ===== VERSIE =====
+        // Handmatig ophogen bij elke wijziging. Samen met de datum van het bestand
+        // zelf zie je in Instellingen meteen of je telefoon de nieuwe versie al
+        // binnen heeft, of dat je nog even op de cache moet wachten.
+        const APP_VERSIE = 'v2026-09-19.1';
+
+        function toonVersie() {
+            const el = document.getElementById('app-versie');
+            if (!el) return;
+            // document.lastModified = wanneer dit bestand voor het laatst gewijzigd is.
+            // Op GitHub Pages is dat het moment van uploaden.
+            let bestand = '';
+            try {
+                const d = new Date(document.lastModified);
+                if (!isNaN(d)) {
+                    bestand = ' · bestand ' + d.toLocaleString('nl-BE', {
+                        day: '2-digit', month: '2-digit', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                    });
+                }
+            } catch (e) {}
+            el.textContent = APP_VERSIE + bestand;
         }
 
         // Supabase kent alleen inloggen met een e-mailadres. Wij tonen een gewone
@@ -4553,7 +4769,7 @@
                 });
                 
                 localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
-                renderPlanning();
+                renderPlanningUitgesteld(); // niet midden in andermans invoer (zie boven)
             }
         }
         
@@ -4648,7 +4864,8 @@
                 if (el('setting-price-b'))   el('setting-price-b').value = SETTINGS.priceB ?? 1.59;
                 applySkipBToInputs();
                 applyAdvancedToInputs();
-                renderPlanning(); // suggesties kunnen wijzigen door cloud-instellingen
+                renderPeriodes();
+                renderPlanningUitgesteld(); // suggesties kunnen wijzigen door cloud-instellingen
             } catch (e) {
                 console.warn('Cloud settings load failed — using local', e);
             }
@@ -4745,6 +4962,7 @@
             document.getElementById('setting-price-b').value = SETTINGS.priceB || 1.59;
             applySkipBToInputs();
             applyAdvancedToInputs();
+            renderPeriodes();
             
             // Update product prices from settings
             PRODUCTS.forEach(p => {
@@ -4754,6 +4972,7 @@
             updateHeader();
             renderPlanning();
             updateWeather();
+            toonVersie();
             await initSupabase();
         }
 
