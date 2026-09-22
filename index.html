@@ -252,6 +252,22 @@
             color: white;
             font-weight: 700;
         }
+        /* Bovenste plaat in gebruik: de lading zit op de fysieke ovengrens, niet erboven.
+           Geen fout — een bewuste keuze bij hoge vraag — maar wel het melden waard, want
+           die plaat droogt uit in de rijskast en wordt vaker breuk dan verkoop. */
+        .planning-table .total-row td.cell-top-plate {
+            background: var(--accent-orange);
+            color: #1a1a1a;
+            font-weight: 700;
+        }
+        /* Totaal automatisch teruggebracht t.o.v. de suggestie (zondag/feestdag past niet
+           in 4 ladingen). Dit gebeurde stilletjes: je ziet een getal staan en neemt aan dat
+           het de suggestie is. Nu zichtbaar, met de uitleg in de tooltip. */
+        .planning-table input.totaal-getrimd {
+            border-color: var(--accent-orange);
+            color: var(--accent-orange);
+            font-weight: 700;
+        }
         
         .planning-table input {
             width: 34px; padding: 5px 2px;
@@ -806,6 +822,8 @@
                 <div class="setting-row"><label>Batch max</label><input type="number" id="setting-batch-max" value="31" onchange="saveCapacitySettings()"></div>
                 <div class="setting-row"><label>3e rijskast (5e batch op zo/feestdag)</label><label class="toggle"><input type="checkbox" id="setting-extra-rijskast" onchange="saveCapacitySettings()"><span class="toggle-slider"></span></label></div>
                 <div class="setting-row"><label>4-stuks stokbroodplaten in huis</label><input type="number" id="setting-plate4" value="18" onchange="saveCapacitySettings()"></div>
+                <div class="setting-row"><label>Bovenste plaat vrijhouden</label><label class="toggle"><input type="checkbox" id="setting-top-plaat" onchange="saveCapacitySettings()"><span class="toggle-slider"></span></label></div>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">De luchtstroom in de rijskast droogt de bovenste plaat uit — die wordt vaker breuk dan verkoop. Staat dit aan, dan plant de app één plaat per oven minder in. Je kunt die plaat altijd nog zelf bijzetten voor een drukke dag: hij kleurt dan oranje, niet rood.</p>
                 <p style="font-size: 0.7rem; color: var(--text-muted); margin-top: 4px;">Stokbrood ligt liefst op 4-stuks platen (meer volume). Bruin krijgt ze eerst, wit de rest; wat niet meer past gaat op 5-stuks platen. Budget geldt per dag — de hele dag wordt in één keer klaargezet.</p>
             </div>
             <div class="settings-section">
@@ -1022,6 +1040,19 @@
             // niet per lading: de hele dag wordt in één sessie vooruit ingepland, dus een
             // plaat blijft de hele dag bezet. Uitbreiding = altijd 4-platen bijkopen.
             plate4Stock: 18,
+            // Bovenste plaat vrijhouden (eigenaar-regel 2026-09-23). De luchtstroom in de
+            // rijskast droogt de bovenste plaat uit: meer dan de helft wordt breuk in plaats
+            // van verkoop. De collega hield die plaat daarom elk weekend met de hand leeg
+            // (gemeten: 28 van de 236 gevulde Groep B-ladingen stonden op precies 16).
+            //
+            // BELANGRIJK - dit zijn TWEE verschillende getallen, niet één:
+            //   PLANGRENS  = oven − 1  → wat de automatische verdeling maximaal inplant
+            //   FYSIEKE GRENS = oven   → wat er écht in kan, en dus pas een waarschuwing
+            // Daarom niet gewoon oven1Max op 15 zetten: dan zou een bewust ingetypte 16e
+            // plaat (drukke feestdag, grote bestelling) als FOUT oplichten, terwijl het een
+            // afweging is die zij zelf maken. Nu: 16 kleurt oranje ("je gebruikt de topplaat"),
+            // pas 17+ is rood.
+            topPlaatVrij: true,
             showScoreboard: true,    // 🥊 scorebord-kaart op de Planning-tab
             extraRijskast: false,    // 3e rijskast aanwezig → 5e batch mag op zo/feestdag
             // Weekdag 3e batch (eigenaar-regel 2026-07-03): past een groep niet in
@@ -2148,6 +2179,20 @@
             return Array.isArray(arr) ? arr : [];
         }
 
+        // ===== Plangrens vs fysieke grens =====
+        // planOvenCap/planBatchCap = waar de AUTOMATISCHE verdeling op mikt (topplaat vrij).
+        // SETTINGS.oven1Max/oven2Max/batchMax blijven de FYSIEKE grens en worden gebruikt
+        // voor de waarschuwingskleuren — anders zou een bewust ingetypte 16e plaat rood
+        // oplichten alsof het een fout is. Zie de opmerking bij SETTINGS.topPlaatVrij.
+        // Een batch met beide ovens verliest twee topplaten, vandaar −2 op batchMax.
+        function planOvenCap(isGroupA) {
+            const vol = isGroupA ? SETTINGS.oven1Max : SETTINGS.oven2Max;
+            return Math.max(1, vol - (SETTINGS.topPlaatVrij ? 1 : 0));
+        }
+        function planBatchCap() {
+            return Math.max(1, SETTINGS.batchMax - (SETTINGS.topPlaatVrij ? 2 : 0));
+        }
+
         function getGroupBatchLimits(isGroupA, isWeekendDay, skipBatches) {
             // Returns max plates per batch for a group on a weekend day.
             // Caps are driven by SETTINGS so changing oven sizes flows through automatically.
@@ -2159,9 +2204,9 @@
             }
             const skip = (b) => skipBatches.includes(b);
             if (isGroupA) {
-                return [1,2,3,4,5].map(b => skip(b) ? SETTINGS.batchMax : SETTINGS.oven1Max);
+                return [1,2,3,4,5].map(b => skip(b) ? planBatchCap() : planOvenCap(true));
             } else {
-                return [1,2,3,4,5].map(b => skip(b) ? 0 : SETTINGS.oven2Max);
+                return [1,2,3,4,5].map(b => skip(b) ? 0 : planOvenCap(false));
             }
         }
         
@@ -2470,6 +2515,11 @@
                         if (!cands.length) break;
                         cands.sort((a, b) => displayData[b.id].totaal - displayData[a.id].totaal);
                         displayData[cands[0].id].totaal--;
+                        // Onthouden dat wíj dit getal verlaagd hebben. Zonder markering
+                        // gebeurt dit stil: je ziet een totaal staan en gaat ervan uit dat
+                        // het de suggestie is (eigenaar 2026-09-23: "op zondag komt het
+                        // volume niet overeen met de suggestie, maar dat valt me niet op").
+                        displayData[cands[0].id].getrimd = true;
                         total--;
                     }
                 });
@@ -2564,7 +2614,7 @@
             if (!weekend) {
                 ['A', 'B'].forEach(group => {
                     const products = PRODUCTS.filter(p => p.group === group);
-                    const cap = group === 'A' ? SETTINGS.oven1Max : SETTINGS.oven2Max;
+                    const cap = planOvenCap(group === 'A');   // plangrens, niet de fysieke
                     let sumL1 = products.reduce((s, p) => s + (displayData[p.id].batches[0] || 0), 0);
                     let safety = 50; // can't realistically need more shifts than this
                     while (sumL1 > cap && safety-- > 0) {
@@ -2600,7 +2650,7 @@
             if (!weekend) {
                 ['A', 'B'].forEach(group => {
                     const products = PRODUCTS.filter(p => p.group === group);
-                    const cap = group === 'A' ? SETTINGS.oven1Max : SETTINGS.oven2Max;
+                    const cap = planOvenCap(group === 'A');   // plangrens, niet de fysieke
                     const minL3 = group === 'A' ? SETTINGS.minL3A : SETTINGS.minL3B;
                     let sumL2 = products.reduce((s, p) => s + (displayData[p.id].batches[1] || 0), 0);
                     if (sumL2 - cap < minL3) return; // geen of te kleine overloop
@@ -2674,19 +2724,27 @@
                         const lateG = batchGroupTotals(late);
                         for (let early = 0; early < late; early++) {
                             const earlyG = batchGroupTotals(early);
-                            const room = batchMax - combinedTotals[early];
+                            const room = planBatchCap() - combinedTotals[early];
                             if (room < combinedTotals[late]) continue;
+                            // Nooit Groep B in een lading schuiven waar B juist GESKIPT is.
+                            // Die skip is het halve punt van de weekendstrategie: Groep A
+                            // krijgt daar ~2× volume omdat stokbrood er niet staat.
+                            // Deze pass keek alleen naar ovencapaciteit en kon er dus toch
+                            // stokbrood in leggen (gevonden 23-09-26: zaterdag 2 platen in
+                            // L2). Bestond al langer, maar viel pas op met de topplaat-regel,
+                            // omdat er sindsdien vaker een restje van 1-3 platen overblijft.
+                            if (lateG.b > 0 && skipBatches.includes(early + 1)) continue;
 
                             const newA = earlyG.a + lateG.a;
                             const newB = earlyG.b + lateG.b;
                             // Groep B bakt NOOIT boven zijn eigen oven — ook niet "alleen
                             // in de batch" (getGroupBatchLimits plant B ook nooit hoger;
                             // owner 12/07/26: stokbrood max = oven 2, punt).
-                            if (newB > SETTINGS.oven2Max) continue;
+                            if (newB > planOvenCap(false)) continue;
                             // Groep A boven zijn eigen oven kan alleen als A alleen in de
                             // batch zit (dan zijn beide ovens beschikbaar, cap = batchMax
                             // via de room-check hierboven).
-                            if (newB > 0 && newA > SETTINGS.oven1Max) continue;
+                            if (newB > 0 && newA > planOvenCap(true)) continue;
 
                             PRODUCTS.forEach(p => {
                                 if (displayData[p.id].batches[late] > 0) {
@@ -2726,7 +2784,10 @@
                     html += `<tr class="${oos ? 'product-row-oos' : ''}">
                         ${nameCell}
                         <td class="sug-value">${data.sug}</td>
-                        <td class="totaal-col"><input type="number" value="${data.totaal}" data-id="${p.id}" data-field="totaal" onchange="onInput(this)" ${ro}></td>
+                        <td class="totaal-col"><input type="number" value="${data.totaal}" data-id="${p.id}" data-field="totaal" onchange="onInput(this)" ${ro}${
+                            data.getrimd
+                            ? ` class="totaal-getrimd" title="Suggestie ${data.sug} → ${data.totaal} ingepland: past niet in 4 ladingen vóór sluitingstijd. De Sug-kolom toont wat er écht gevraagd werd."`
+                            : ''}></td>
                         <td><input type="number" value="${data.batches[0]}" data-id="${p.id}" data-field="l1" onchange="onInput(this)" ${ro}></td>
                         <td><input type="number" value="${data.batches[1]}" data-id="${p.id}" data-field="l2" onchange="onInput(this)" ${ro}></td>
                         <td><input type="number" value="${data.batches[2]}" data-id="${p.id}" data-field="l3" onchange="onInput(this)" ${ro}></td>
@@ -3125,11 +3186,23 @@
                     // A alleen in een batch mag beide ovens gebruiken (batchMax);
                     // B is ALTIJD op zijn eigen oven gecapt — 19 stokbrood in L4
                     // bleef op 11/07/26 onterecht zonder rode markering.
+                    // FYSIEKE grens, bewust niet de plangrens: een 16e plaat die iemand
+                    // zelf intypt voor een drukke dag is een afweging, geen fout, en mag
+                    // dus niet rood oplichten. Rood = past er echt niet in.
                     const max = g === 'B' ? ownOven
                               : (otherVal > 0 ? ownOven : SETTINGS.batchMax);
+                    // Oranje = je zit exact op de fysieke grens en gebruikt dus de topplaat
+                    // die in de rijskast uitdroogt. Alleen tonen als we hem juist vrijhouden.
+                    const planMax = g === 'B' ? planOvenCap(false)
+                                  : (otherVal > 0 ? planOvenCap(true) : planBatchCap());
                     const cell = cells[3 + i];
-                    if (thisVal > max) cell.classList.add('cell-over-capacity');
-                    else cell.classList.remove('cell-over-capacity');
+                    cell.classList.toggle('cell-over-capacity', thisVal > max);
+                    cell.classList.toggle('cell-top-plate',
+                        SETTINGS.topPlaatVrij && thisVal <= max && thisVal > planMax);
+                    cell.title = thisVal > max ? 'Past niet in de oven'
+                               : (SETTINGS.topPlaatVrij && thisVal > planMax
+                                   ? 'Bovenste plaat in gebruik — die droogt uit in de rijskast'
+                                   : '');
                 }
             });
         }
@@ -4112,6 +4185,7 @@
             SETTINGS.batchMax = parseInt(document.getElementById('setting-batch-max').value) || 31;
             SETTINGS.extraRijskast = document.getElementById('setting-extra-rijskast')?.checked || false;
             SETTINGS.plate4Stock = parseInt(document.getElementById('setting-plate4')?.value) || 0;
+            SETTINGS.topPlaatVrij = document.getElementById('setting-top-plaat')?.checked ?? true;
             localStorage.setItem('bakkerij_settings', JSON.stringify(SETTINGS));
             saveCloudSetting('app', SETTINGS);
             planningData = {}; // Reset manual overrides so new settings apply
@@ -4614,7 +4688,7 @@
         // Handmatig ophogen bij elke wijziging. Samen met de datum van het bestand
         // zelf zie je in Instellingen meteen of je telefoon de nieuwe versie al
         // binnen heeft, of dat je nog even op de cache moet wachten.
-        const APP_VERSIE = 'v2026-09-22.1';
+        const APP_VERSIE = 'v2026-09-23.1';
 
         function toonVersie() {
             const el = document.getElementById('app-versie');
@@ -4941,6 +5015,7 @@
                 if (el('setting-oven2'))     el('setting-oven2').value   = SETTINGS.oven2Max;
                 if (el('setting-batch-max')) el('setting-batch-max').value = SETTINGS.batchMax;
                 if (el('setting-plate4'))    el('setting-plate4').value   = SETTINGS.plate4Stock ?? 18;
+                if (el('setting-top-plaat')) el('setting-top-plaat').checked = SETTINGS.topPlaatVrij !== false;
                 if (el('setting-vat'))       el('setting-vat').value      = SETTINGS.vatPct ?? 6;
                 if (el('setting-cost-incl-vat')) el('setting-cost-incl-vat').checked = !!SETTINGS.costInclVat;
                 if (el('setting-promo-a'))   el('setting-promo-a').value  = SETTINGS.promoPriceA ?? 0;
@@ -5040,6 +5115,8 @@
             document.getElementById('setting-oven2').value = SETTINGS.oven2Max;
             document.getElementById('setting-batch-max').value = SETTINGS.batchMax;
             document.getElementById('setting-plate4').value = SETTINGS.plate4Stock ?? 18;
+            const tp = document.getElementById('setting-top-plaat');
+            if (tp) tp.checked = SETTINGS.topPlaatVrij !== false;
             document.getElementById('setting-vat').value = SETTINGS.vatPct ?? 6;
             const civ = document.getElementById('setting-cost-incl-vat');
             if (civ) civ.checked = !!SETTINGS.costInclVat;
