@@ -406,7 +406,28 @@
         .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-light); }
         .setting-row:last-child { border-bottom: none; }
         .setting-row input[type="number"] { width: 70px; padding: 6px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-mono); text-align: center; }
-        
+        /* Tekst- en datumvelden kregen alleen de browserstandaard (wit op licht) en vielen
+           daardoor uit de donkere stijl. Zelfde opmaak als de getalvelden hierboven. */
+        .setting-row input[type="text"],
+        .setting-row input[type="date"] { padding: 6px 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 0.8rem; }
+        .setting-row input[type="text"] { font-family: var(--font-sans); }
+        .setting-row input[type="date"] { font-family: var(--font-mono); }
+        /* Het kalendericoon van de browser is standaard bijna zwart - onzichtbaar op een
+           donkere achtergrond. Omkeren maakt het weer leesbaar. */
+        .setting-row input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.75); cursor: pointer; }
+        .setting-row input[type="text"]:focus,
+        .setting-row input[type="date"]:focus { outline: none; border-color: var(--accent-cyan); }
+
+        /* Inklapbare instellingen: de lijst is lang geworden en je scrollt je suf om
+           iets terug te vinden. Kop aanklikken vouwt een blok open/dicht; de stand
+           wordt per blok onthouden. Database Status blijft altijd open - dat is juist
+           het blok waar je even snel naar kijkt. */
+        .settings-section h3 { cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; }
+        .settings-section h3::before { content: '▾'; font-size: 0.8em; color: var(--text-muted); transition: transform 0.15s; }
+        .settings-section.ingeklapt h3 { margin-bottom: 0; }
+        .settings-section.ingeklapt h3::before { transform: rotate(-90deg); }
+        .settings-section.ingeklapt > *:not(h3) { display: none; }
+
         .toggle { position: relative; width: 46px; height: 26px; }
         .toggle input { opacity: 0; width: 0; height: 0; }
         .toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg-input); border-radius: 26px; transition: 0.3s; }
@@ -919,6 +940,12 @@
                 <h3>☁️ Database Status</h3>
                 <div class="setting-row">
                     <span id="db-status">⚪ Controleren...</span>
+                </div>
+                <!-- Laatste backup. Wordt door de GitHub Actions-backup in de settings-tabel
+                     geschreven; de app leest het alleen. Reden dat dit hier staat: de backup
+                     lag van 26-08 tot 19-09 stil zonder dat iemand het merkte. -->
+                <div class="setting-row">
+                    <span id="backup-status" style="font-size: 0.75rem;">⚪ Backup onbekend</span>
                 </div>
                 <div class="setting-row">
                     <span id="app-versie" style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);"></span>
@@ -4587,7 +4614,7 @@
         // Handmatig ophogen bij elke wijziging. Samen met de datum van het bestand
         // zelf zie je in Instellingen meteen of je telefoon de nieuwe versie al
         // binnen heeft, of dat je nog even op de cache moet wachten.
-        const APP_VERSIE = 'v2026-09-19.1';
+        const APP_VERSIE = 'v2026-09-22.1';
 
         function toonVersie() {
             const el = document.getElementById('app-versie');
@@ -4823,12 +4850,70 @@
         }
 
         // ===== CLOUD SETTINGS (app + product config stored in `settings` table) =====
+        // ===== Laatste backup tonen (alleen weergave) =====
+        // De backup draait op GitHub, niet in de app; hij schrijft na elke geslaagde run
+        // `backup_status` in de settings-tabel. De app leest dat alleen uit. Bewust geen
+        // backup-knop hier: dat zou een kopie op een telefoon zetten, de slechtste plek.
+        // Aanleiding: de backup lag van 26-08 tot 19-09-2026 stil en niemand merkte het.
+        function toonBackupStatus(st) {
+            const el = document.getElementById('backup-status');
+            if (!el) return;
+            if (!st || !st.gemaakt_op) {
+                el.textContent = '⚪ Backup: nog geen melding ontvangen';
+                el.style.color = 'var(--text-muted)';
+                return;
+            }
+            const d = new Date(st.gemaakt_op);
+            if (isNaN(d)) { el.textContent = '⚪ Backup: datum onleesbaar'; return; }
+            const urenGeleden = (Date.now() - d.getTime()) / 36e5;
+            const wanneer = d.toLocaleString('nl-BE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+            const rijen = st.aantal ? ` · ${st.aantal} rijen` : '';
+            // Hij hoort elke nacht te draaien. Tot 48u stil is nog te verklaren (tijdzone,
+            // een overgeslagen run); daarna is er echt iets mis en moet het opvallen.
+            if (urenGeleden > 48) {
+                el.textContent = `🔴 Laatste backup: ${wanneer}${rijen} — dat is ${Math.floor(urenGeleden / 24)} dagen geleden!`;
+                el.style.color = 'var(--accent-red, #ff6b6b)';
+            } else if (urenGeleden > 26) {
+                el.textContent = `🟠 Laatste backup: ${wanneer}${rijen}`;
+                el.style.color = 'var(--accent-orange, #ffa94d)';
+            } else {
+                el.textContent = `🟢 Laatste backup: ${wanneer}${rijen}`;
+                el.style.color = 'var(--text-muted)';
+            }
+        }
+
+        // ===== Inklapbare instellingenblokken =====
+        // De instellingenlijst is uitgegroeid tot eindeloos scrollen. Kop aanklikken
+        // vouwt open/dicht, de stand blijft per blok bewaard. Standaard alles dicht,
+        // zodat je eerst een korte inhoudsopgave ziet — behalve Database Status, want
+        // dat is precies het blok waar je even snel naar kijkt.
+        function initInklapbareInstellingen() {
+            const pagina = document.getElementById('page-instellingen');
+            if (!pagina) return;
+            let stand = {};
+            try { stand = JSON.parse(localStorage.getItem('bakkerij_instellingen_open') || '{}'); } catch (e) {}
+            pagina.querySelectorAll('.settings-section').forEach((sec, i) => {
+                const h3 = sec.querySelector('h3');
+                if (!h3) return;
+                const sleutel = h3.textContent.trim().slice(0, 40);
+                const altijdOpen = /Database Status/i.test(sleutel);
+                const open = altijdOpen || (stand[sleutel] === true);
+                sec.classList.toggle('ingeklapt', !open);
+                h3.addEventListener('click', () => {
+                    const nuDicht = sec.classList.toggle('ingeklapt');
+                    stand[sleutel] = !nuDicht;
+                    try { localStorage.setItem('bakkerij_instellingen_open', JSON.stringify(stand)); } catch (e) {}
+                });
+            });
+        }
+
         async function loadCloudSettings() {
             if (!supabaseClient) return;
             try {
                 const { data, error } = await supabaseClient.from('settings').select('key, value');
                 if (error || !data) return;
                 const byKey = Object.fromEntries(data.map(r => [r.key, r.value]));
+                toonBackupStatus(byKey.backup_status);
                 if (byKey.app) {
                     SETTINGS = { ...SETTINGS, ...byKey.app };
                     localStorage.setItem('bakkerij_settings', JSON.stringify(SETTINGS));
@@ -4907,6 +4992,10 @@
         
         // ===== INIT =====
         async function init() {
+            // Vroeg genoeg: de instellingenpagina staat statisch in de HTML, dus de
+            // blokken kunnen meteen ingeklapt worden - geen zichtbare sprong later.
+            initInklapbareInstellingen();
+
             // Load historical data
             const saved = localStorage.getItem('bakkerij_data');
             historicalData = saved ? JSON.parse(saved) : [...INITIAL_DATA];
