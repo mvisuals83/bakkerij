@@ -737,6 +737,8 @@
                     </div>
                 </div>
             </div>
+            <!-- Waarschuwing als er in de gekozen periode dagen zonder breuk zitten (2026-09-23) -->
+            <div id="hist-breuk-noot" style="display:none; background: rgba(245,158,11,0.12); border: 1px solid var(--accent-orange); border-radius: var(--radius-sm); padding: 8px 10px; margin-bottom: 10px; font-size: 0.75rem; color: var(--accent-orange);"></div>
             <div class="stats-grid">
                 <div class="stat-card green"><div class="label">Totaal Gebakken</div><div class="value" id="stat-gebakken">0</div></div>
                 <div class="stat-card blue"><div class="label">Verkocht</div><div class="value" id="stat-verkocht">0</div></div>
@@ -872,7 +874,11 @@
                         <span class="collapse-icon">▶</span>
                     </div>
                     <div class="collapsible-content" style="display: none;">
-                        <div class="setting-row"><label>Doel breuk %</label><input type="number" id="setting-target-breuk" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>Doel breuk % (pistolets)</label><input type="number" id="setting-target-breuk" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>🥖 Doel breuk % stokbrood</label><input type="number" id="setting-target-breuk-b" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); margin: 0 0 8px;">Stokbrood apart: een weggegooid stokbrood kost €0,73 (3,5× een pistolet), en een uitverkocht stokbrood vangt de bake-off grotendeels op. Negatief mag: −5 = bewust iets onder de verwachte verkoop plannen. Getest 23-09: 5 → 0 → −5 → −10 werd telkens goedkoper.</div>
+                        <div class="setting-row"><label>📉 Daling-rem: max −%</label><input type="number" id="setting-p-daling-rem" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); margin: 0 0 8px;">Verkochten de laatste 7 dagen (alle weekdagen) minder dan verwacht voor dát weer, dan gaat de suggestie vandaag mee omlaag, hoogstens dit %. Alleen omlaag. 0 = uit.</div>
                         <div class="setting-row"><label>📢 Promo: Groep B +%</label><input type="number" id="setting-p-promo-b" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                         <div class="setting-row"><label>📢 Promo: Groep A +%</label><input type="number" id="setting-p-promo-a" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                         <div class="setting-row"><label>☀️ BBQ-weer: Groep B +%</label><input type="number" id="setting-p-bbq-b" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
@@ -1091,6 +1097,18 @@
             //   feestdag → ~65-80% van een zondag
             advancedMode: true,
             targetBreuk: 5,          // doel breuk % — plan = verwachte verkoop / (1 - doel)
+            // Stokbrood apart (audit 2026-09-23). Een weggegooid stokbrood kost €0,73 inkoop,
+            // een uitverkocht premium-stokbrood kost alleen het margeverschil met de bake-off
+            // die de klant dan pakt (~€0,24). Bij zo'n scheve verhouding ligt het optimum
+            // ONDER de verwachte verkoop, dus negatief mag. Gemeten over mrt-sep, 5 periodes:
+            // 5 → 0 → −5 → −10 werd in ELKE periode goedkoper (−10: −25% foutkost Groep B).
+            // Invoeren in fases: start 0 (veilig, ook als uitverkopen de volle marge zou kosten),
+            // daarna −5, dan −10, telkens een week meten met het 📈 rapport.
+            targetBreukB: 0,
+            // Daling-rem (audit 2026-09-23, eigenaar-akkoord). Zie dalingRemFactor().
+            // Max % dat de suggestie omlaag mag als de laatste 7 dagen onder verwachting
+            // verkochten. 0 = uit.
+            pDalingRem: 10,
             pPromoB: 50, pPromoA: 5, // promo verhoging %
             pBbqB: 50, pBbqA: 5,     // BBQ-weer verhoging %
             pWarmB: 20,              // warm weer verhoging % (alleen B)
@@ -1562,6 +1580,78 @@
             return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
         }
 
+        // ===== GROTE BESTELLING OP DE PLANDAG (bugfix 2026-09-23) =====
+        // Referentiedagen trekken een bestelling al af (geen terugkerende vraag). Maar op de
+        // dag zélf telde de suggestie hem niet mee: de bakker moest er zelf platen bijtellen,
+        // en het scorebord gaf daar dan een punt voor ("verhoogd → en dat was nodig", zo
+        // gebeurd op 14-08 en 28-08). Nu: suggestie = gewone vraag + de bestelling erbovenop.
+        function bestellingOpDatum(p, dateISO) {
+            return Math.max(0, historicalData.find(r => r.datum === dateISO && r.product === p.name)?.bestelling || 0);
+        }
+        // Zoveel platen erbij tot de bestelde stuks er volledig bovenop passen.
+        function platesMetBestelling(p, plates, besteld, free4) {
+            const nodig = stuksFromPlates(p, plates, free4) + besteld;
+            let n = plates;
+            while (stuksFromPlates(p, n, free4) < nodig && n < plates + 100) n++;
+            return n;
+        }
+        // Vanaf deze datum zit een bestelling IN de opgeslagen suggestie; daarvóór niet
+        // (het scorebord telt hem voor oudere dagen er zelf bij).
+        const BESTELLING_IN_SUGGESTIE_VANAF = '2026-09-24';
+
+        // Doel-breuk per groep: stokbrood heeft sinds 2026-09-23 een eigen knop.
+        function doelBreuk(p) {
+            const b = SETTINGS.targetBreukB;
+            return (p.group === 'B' && b !== undefined && b !== null) ? b : SETTINGS.targetBreuk;
+        }
+
+        // ===== DALING-REM (audit 2026-09-23) =====
+        // Het zwakke punt van de mediaan: hij kijkt alleen naar DEZELFDE weekdag, dus het
+        // nieuwste wat hij ziet is een week oud, en bij een aanhoudende daling loopt hij ~2
+        // weken achter (dat kost dan volledig breuk). De bakkers zien gisteren wél.
+        // Deze rem kijkt naar de laatste 7 dagen (alle weekdagen) van de hele groep:
+        //   werkelijk verkocht ÷ wat de motor voor die dagen verwachtte.
+        // Die verwachting bevat het weer en de events van díe dag, dus een koude dag na een
+        // hete wordt niet als "daling" gezien: hij verwachtte al minder.
+        // Onder 1 → vandaag mee omlaag, hoogstens pDalingRem%. Alleen OMLAAG, bewust:
+        //   - stijgingen vangt de uitverkocht-bijtelling al op; dalingen niet (§8b.1);
+        //   - op een uitverkochte dag weet je niet hoeveel méér er verkocht had kunnen
+        //     worden, dus een stijg-signaal is onbetrouwbaar;
+        //   - gemeten: ook-omhoog (5 varianten, ook met "alleen bij gelijk weer" en "alleen
+        //     als 5 van 7 dagen hoger zaten") was in elke vorm slechter. Alleen-omlaag
+        //     verbeterde Groep A −6%, Groep B −15%, in geen enkele periode slechter.
+        // Som over 7 dagen i.p.v. "tel de dalende dagen": één rare dag verschuift de som
+        // maar 1/7; een regel "minstens 4-5 van 7 dagen lager" reageerde te laat (getest).
+        // Uitverkocht telt als gebakken + pSellout% (vraag was minstens dat).
+        let remCache = new Map();
+        function dalingRemFactor(group, dateObj, promoSet) {
+            const max = SETTINGS.pDalingRem || 0;
+            if (max <= 0) return { f: 1, act: 0, exp: 0 };
+            const key = `${formatDateISO(dateObj)}|${group}`;
+            if (remCache.has(key)) return remCache.get(key);
+            let act = 0, exp = 0;
+            for (let i = 1; i <= 7; i++) {
+                const d = new Date(dateObj); d.setDate(d.getDate() - i);
+                const iso = formatDateISO(d);
+                PRODUCTS.filter(q => q.group === group).forEach(q => {
+                    const rec = historicalData.find(r => r.datum === iso && r.product === q.name);
+                    if (!rec || rec.out_of_stock || rec.partial_oos || rec.breuk === null || rec.breuk === undefined) return;
+                    if ((rec.totaal || 0) <= 0 || rec.event === 'Feestdag') return;
+                    if (group === 'B' && getDayContext(iso, promoSet).promo) return;
+                    const gebakken = stuksOnDate(q, iso, rec.totaal) - Math.max(0, rec.bestelling || 0);
+                    if (gebakken <= 0) return;
+                    const verwacht = diagnoseProduct(q, d, { zonderRem: true, promoSet });
+                    if (verwacht.fellBack || !(verwacht.demandFinal > 0)) return;
+                    act += rec.breuk === 0 ? gebakken * (1 + SETTINGS.pSellout / 100) : Math.max(0, gebakken - rec.breuk);
+                    exp += verwacht.demandFinal;
+                });
+            }
+            const R = exp > 0 ? act / exp : 1;
+            const res = { f: R < 1 ? Math.max(1 - max / 100, R) : 1, act, exp };
+            remCache.set(key, res);
+            return res;
+        }
+
         // Hoofdberekening. Geeft aantal platen, of null (→ terugvallen op klassiek).
         function calculateSuggestionAdvanced(p) {
             const promoSet = buildPromoDateSet();
@@ -1604,9 +1694,13 @@
             if (ctx.feestdag) demand *= SETTINGS.pFeestdag / 100;
             demand *= contextFactor(ctx, p.group);
 
+            // Daling-rem: verkochten de laatste 7 dagen minder dan verwacht → mee omlaag.
+            demand *= dalingRemFactor(p.group, currentDate, promoSet).f;
+
             // Plan met buffer richting doel-breuk, afgerond naar platen,
-            // maar nooit onder de verwachte vraag zelf.
-            const planStuks = demand / (1 - SETTINGS.targetBreuk / 100);
+            // maar nooit onder de verwachte vraag zelf. (Die "+1 plaat"-regel hieronder
+            // blijft ook bij een negatief stokbrood-doel staan — zo is het getest.)
+            const planStuks = demand / (1 - doelBreuk(p) / 100);
             const free4 = free4ForPlan(p);
             let plates = platesFromStuks(p, planStuks, free4);
             if (stuksFromPlates(p, plates, free4) < demand) plates++;
@@ -1708,8 +1802,10 @@
 
         // Volledige diagnose voor één product op een datum. Spiegelt
         // calculateSuggestionAdvanced() stap voor stap en geeft een breakdown-object terug.
-        function diagnoseProduct(p, dateObj) {
-            const promoSet = buildPromoDateSet();
+        // opts.zonderRem: gebruikt door de daling-rem zelf (die wil de verwachting ZONDER
+        // rem van eerdere dagen — anders zou de rem op zichzelf terugkoppelen).
+        function diagnoseProduct(p, dateObj, opts = {}) {
+            const promoSet = opts.promoSet || buildPromoDateSet();
             const planISO = formatDateISO(dateObj);
             const ctx = getDayContext(planISO, promoSet);
             const dow = ctx.feestdag ? 0 : dateObj.getDay();
@@ -1745,9 +1841,11 @@
             let feestdagFactor = null;
             if (ctx.feestdag) { feestdagFactor = SETTINGS.pFeestdag / 100; demand *= feestdagFactor; }
             demand *= cf;
-            const demandFinal = demand;
+            const demandFinal = demand;   // verwachting vóór de daling-rem
+            const rem = opts.zonderRem ? { f: 1 } : dalingRemFactor(p.group, dateObj, promoSet);
+            demand *= rem.f;
 
-            const planStuks = demand / (1 - SETTINGS.targetBreuk / 100);
+            const planStuks = demand / (1 - doelBreuk(p) / 100);
             const free4 = free4ForDate(p, dateObj);
             let plates = platesFromStuks(p, planStuks, free4);
             if (stuksFromPlates(p, plates, free4) < demand) plates++;
@@ -1775,9 +1873,13 @@
                 if (plates > capPlates) plates = capPlates;
             }
 
+            // Grote bestelling op die dag komt bovenop de suggestie (zie renderPlanning).
+            const besteld = opts.zonderRem ? 0 : bestellingOpDatum(p, planISO);
+            const metBestelling = besteld > 0 ? platesMetBestelling(p, plates, besteld, free4) : plates;
+
             return { ctx, cf, fellBack: false, fallbackDow, refs, baseDemand, selloutStreak,
-                     feestdagFactor, demandFinal, planStuks, platesRaw, vangrail, groeirem,
-                     finalPlates: plates, floorApplied, floorTo };
+                     feestdagFactor, demandFinal, rem, demandNaRem: demand, planStuks, platesRaw, vangrail, groeirem,
+                     besteld, finalPlates: metBestelling, platesZonderBestelling: plates, floorApplied, floorTo };
         }
 
         // Bouwt de leesbare lijst van actieve dag-buffs (chips) uit een context.
@@ -1815,6 +1917,7 @@
         }
 
         function renderSuggestionDiagnose() {
+            remCache = new Map();
             const out = document.getElementById('diag-output');
             if (!out) return;
             const inp = document.getElementById('diag-date');
@@ -1877,9 +1980,12 @@
                     cfParts.forEach(pt => steps.push(`${pt.icon} ${pt.label}: ×${pt.factor.toFixed(2)}`));
                     if (cfParts.length > 1) steps.push(`= Dag-multiplier totaal (${p.group}): ×${d.cf.toFixed(2)}`);
                     steps.push(`→ Verwachte vraag: <b>${d.demandFinal.toFixed(0)}st</b>`);
-                    steps.push(`Plan ÷ ${(1 - SETTINGS.targetBreuk / 100).toFixed(2)} (doel ${SETTINGS.targetBreuk}% breuk) = ${d.planStuks.toFixed(0)}st → <b>${d.platesRaw}pl</b>`);
+                    if (d.rem && d.rem.f < 1) steps.push(`📉 Daling-rem: laatste 7 dagen ${d.rem.act.toFixed(0)} verkocht / ${d.rem.exp.toFixed(0)} verwacht → ×${d.rem.f.toFixed(2)} = ${d.demandNaRem.toFixed(0)}st`);
+                    const doel = doelBreuk(p);
+                    steps.push(`Plan ÷ ${(1 - doel / 100).toFixed(2)} (doel ${doel}% breuk${p.group === 'B' ? ', stokbrood' : ''}) = ${d.planStuks.toFixed(0)}st → <b>${d.platesRaw}pl</b>`);
                     if (d.vangrail && d.vangrail.applied) steps.push(`🛡️ Vangrail klem naar ${d.vangrail.lo}–${d.vangrail.hi}pl`);
                     if (d.groeirem && d.groeirem.applied) steps.push(`📈 Groeirem cap: max ${d.groeirem.capPlates}pl`);
+                    if (d.besteld > 0) steps.push(`📋 Bestelling +${d.besteld}st: ${d.platesZonderBestelling} → ${d.finalPlates}pl`);
                     steps.push(`<b style="color:${groupColor};">Suggestie: ${d.finalPlates} platen</b>`);
                     detail = `<div style="font-size:0.72rem; color:var(--text-secondary); line-height:1.5;">
                         <div style="margin-bottom:4px; color:var(--text-muted);">Referenties (${d.refs.length}):</div>
@@ -1953,7 +2059,7 @@
             // triggerhappy bijstellen.
             const log = [];
             const note = (r, p, winner, reason) => log.push({
-                datum: r.datum, short: p.short, sug: r.suggestie, tot: r.totaal,
+                datum: r.datum, short: p.short, sug: r._sugPl ?? r.suggestie, tot: r.totaal,
                 breuk: r.breuk, winner, reason });
             let scored = 0;
             rows.forEach(r => {
@@ -1965,20 +2071,26 @@
                 const verkocht = Math.max(0, gebStuks - r.breuk);
                 // De suggestie omgerekend naar stuks moet dezelfde plaatverdeling volgen als
                 // wat er echt gebakken is, anders vergelijk je 4-platen met 5-platen.
-                const sugStuks = stuksFromPlates(p, r.suggestie, free4);
+                // Vóór BESTELLING_IN_SUGGESTIE_VANAF zat een grote bestelling niet in de
+                // opgeslagen suggestie → hier alsnog bijtellen, anders lijkt de suggestie te
+                // laag en krijgt wie voor de bestelling bijbakte een onverdiend punt.
+                const oudeBestelling = r.datum < BESTELLING_IN_SUGGESTIE_VANAF ? Math.max(0, r.bestelling || 0) : 0;
+                const sugPl = oudeBestelling > 0 ? platesMetBestelling(p, r.suggestie, oudeBestelling, free4) : r.suggestie;
+                const sugStuks = stuksFromPlates(p, sugPl, free4);
+                const rr = { ...r, _sugPl: sugPl };
                 // "Meer dan één plaat breuk" = de plaat die je écht had weggelaten, dus de
                 // LAATSTE in de verdeling (een 5-plaat bij overloop, anders een 4-plaat).
                 const plaatStuks = gebStuks - stuksFromPlates(p, Math.max(0, r.totaal - 1), free4);
                 const soldOut = r.breuk === 0;
-                const duelDag = Math.abs(r.suggestie - r.totaal) >= 2;
+                const duelDag = Math.abs(sugPl - r.totaal) >= 2;
                 scored++;
-                if (sugStuks < verkocht || (soldOut && r.suggestie <= r.totaal)) {
+                if (sugStuks < verkocht || (soldOut && sugPl <= r.totaal)) {
                     s.laag++;
                     // Alleen bereikbaar met suggestie ≤ verkoop: bij een verlaging kan dit
                     // niet, dus een duel hier = verhoogd én (minstens) terecht.
                     if (duelDag) {
                         duel.jullie++;
-                        note(r, p, 'jullie', soldOut ? 'verhoogd → tóch uitverkocht' : 'verhoogd → en dat was nodig');
+                        note(rr, p, 'jullie', soldOut ? 'verhoogd → tóch uitverkocht' : 'verhoogd → en dat was nodig');
                     }
                     // Signaal voor de lucht-kwaliteit-instelling: te laag op een warme
                     // regen-/onweersdag wijst naar een te strenge 🌧️ Regen %-korting.
@@ -1991,7 +2103,7 @@
                     s.cutSoldout++;
                     if (duelDag) {
                         duel.motor++;
-                        note(r, p, 'suggestie', 'verlaagd → tóch uitverkocht');
+                        note(rr, p, 'suggestie', 'verlaagd → tóch uitverkocht');
                     }
                 } else {
                     const hypBreuk = sugStuks - verkocht;
@@ -2001,7 +2113,7 @@
                         s.hoog++;
                         // Suggestie volgen had duidelijk breuk gegeven: wie lager zat wint.
                         if (duelDag) {
-                            if (r.totaal < r.suggestie) {
+                            if (r.totaal < sugPl) {
                                 // Eigenaar-regel 2026-07-30: een punt verdien je door het
                                 // te HALEN, niet door minder fout te zitten. Bleef er ook
                                 // na de verlaging fors breuk over, dan zaten suggestie én
@@ -2009,14 +2121,14 @@
                                 // (12 van de 18 jullie-punten in juni+juli waren dit.)
                                 if (actPct > SETTINGS.targetBreuk * 2) {
                                     duel.onbeslist++;
-                                    note(r, p, 'onbeslist', 'allebei te hoog — nog lager kon');
+                                    note(rr, p, 'onbeslist', 'allebei te hoog — nog lager kon');
                                 } else {
                                     duel.jullie++;
-                                    note(r, p, 'jullie', 'verlaagd → suggestie had breuk gegeven');
+                                    note(rr, p, 'jullie', 'verlaagd → suggestie had breuk gegeven');
                                 }
                             } else {
                                 duel.motor++;
-                                note(r, p, 'suggestie', 'verhoogd → eindigde in breuk');
+                                note(rr, p, 'suggestie', 'verhoogd → eindigde in breuk');
                             }
                         }
                     } else {
@@ -2024,12 +2136,12 @@
                         // Suggestie was prima; een verhoging die in echte breuk eindigde
                         // verliest, anders onbeslist (beide waren ok geweest).
                         if (duelDag) {
-                            if (r.totaal > r.suggestie && actPct > SETTINGS.targetBreuk * 2) {
+                            if (r.totaal > sugPl && actPct > SETTINGS.targetBreuk * 2) {
                                 duel.motor++;
-                                note(r, p, 'suggestie', 'verhoogd → onnodig, gaf breuk');
+                                note(rr, p, 'suggestie', 'verhoogd → onnodig, gaf breuk');
                             } else {
                                 duel.onbeslist++;
-                                note(r, p, 'onbeslist', 'beide waren ok geweest');
+                                note(rr, p, 'onbeslist', 'beide waren ok geweest');
                             }
                         }
                     }
@@ -2343,6 +2455,7 @@
 
         function renderPlanning() {
             renderUitgesteld = false;
+            remCache = new Map();   // daling-rem opnieuw berekenen met de verse data
             // Onthoud waar de cursor stond; onderaan deze functie wordt hij hersteld.
             const focusHerstel = (() => {
                 const el = document.activeElement;
@@ -2421,6 +2534,8 @@
                     const adv = calculateSuggestionAdvanced(p);
                     if (adv !== null) sug = adv;
                 }
+                const besteldVandaag = Math.max(0, planningData._bestellingen?.[p.id] || 0);
+                if (besteldVandaag > 0) sug = platesMetBestelling(p, sug, besteldVandaag, free4ForPlan(p));
                 const savedRecord = savedDayData.find(d => d.product === p.name);
                 const sessionEdit = planningData[p.id];
 
@@ -3393,6 +3508,8 @@
             
             markUnsaved();
             closeNoteModal();
+            // Een bestelling verandert de suggestie van vandaag → meteen tonen.
+            renderPlanning();
             showToast('📝 Notitie opgeslagen');
         }
         
@@ -3542,7 +3659,7 @@
                 if (rec) rec.breuk = parseInt(inp.value) || 0;
             });
             localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
-            if (supabaseClient) syncToSupabase(dateStr);
+            syncToSupabase(dateStr);   // onthoudt de dag zelf als het versturen niet lukt
 
             // Rebuild dropdown (updates ✅ checkmarks), then try to advance to next calendar day
             renderBreukPage();
@@ -3605,6 +3722,21 @@
             // stuk verschilt tussen promo- en normale dagen, dus achteraf één prijs op de
             // som loslaten zou promodagen tegen de volle prijs rekenen.
             let promoDagen = 0;
+            // Dagen zonder ingevulde breuk tellen wél mee (je wilt zien wat je bakt), maar
+            // dan als "alles verkocht" — dat maakt omzet te hoog en breuk-% te laag. Toon dat.
+            const zonderBreuk = [...new Set(filteredData
+                .filter(d => !d.out_of_stock && (d.totaal || 0) > 0 && (d.breuk === null || d.breuk === undefined))
+                .map(d => d.datum))].sort();
+            const noot = document.getElementById('hist-breuk-noot');
+            if (noot) {
+                if (zonderBreuk.length) {
+                    const toon = zonderBreuk.slice(-5).map(iso => formatDate(new Date(iso + 'T00:00:00')).slice(0, 5)).join(', ');
+                    noot.innerHTML = `⚠️ Niet exact: bij <b>${zonderBreuk.length} dag${zonderBreuk.length > 1 ? 'en' : ''}</b> is de breuk nog niet ingevuld (${toon}${zonderBreuk.length > 5 ? ', …' : ''}). Die tellen als volledig verkocht → omzet en winst iets te hoog, breuk-% te laag.`;
+                    noot.style.display = 'block';
+                } else {
+                    noot.style.display = 'none';
+                }
+            }
             filteredData.forEach(d => {
                 const p = PRODUCTS.find(x => x.name === d.product);
                 if (p) {
@@ -4202,6 +4334,9 @@
             const sb = document.getElementById('setting-scoreboard');
             if (sb) SETTINGS.showScoreboard = sb.checked;
             SETTINGS.targetBreuk = Math.min(30, Math.max(0, num('setting-target-breuk', 5)));
+            // Stokbrood mag negatief (−20..30): zie opmerking bij SETTINGS.targetBreukB.
+            SETTINGS.targetBreukB = Math.min(30, Math.max(-20, num('setting-target-breuk-b', 0)));
+            SETTINGS.pDalingRem = Math.min(30, Math.max(0, num('setting-p-daling-rem', 10)));
             SETTINGS.pPromoB = num('setting-p-promo-b', 50);
             SETTINGS.pPromoA = num('setting-p-promo-a', 5);
             SETTINGS.pBbqB = num('setting-p-bbq-b', 50);
@@ -4236,6 +4371,8 @@
             el('setting-advanced').checked = !!SETTINGS.advancedMode;
             if (el('setting-scoreboard')) el('setting-scoreboard').checked = SETTINGS.showScoreboard !== false;
             el('setting-target-breuk').value = SETTINGS.targetBreuk;
+            if (el('setting-target-breuk-b')) el('setting-target-breuk-b').value = SETTINGS.targetBreukB;
+            if (el('setting-p-daling-rem')) el('setting-p-daling-rem').value = SETTINGS.pDalingRem;
             el('setting-p-promo-b').value = SETTINGS.pPromoB;
             el('setting-p-promo-a').value = SETTINGS.pPromoA;
             el('setting-p-bbq-b').value = SETTINGS.pBbqB;
@@ -4276,6 +4413,8 @@
                 pBbqB: 50, pBbqA: 5, pWarmB: 20, pSnow: 38, pFeestdag: 80, pRondFeestdag: 20,
                 tempBbq: 23, tempWarm: 18, pSellout: 10, pSelloutStreak: 15, pMaxGroei: 25,
                 pSubstitutie: 15, skySunPct: 100, skyPcloudPct: 85, skyCloudPct: 65, skyRainPct: 20,
+                // Audit 2026-09-23: stokbrood-doel apart (fase 1 = 0) + daling-rem 10%
+                targetBreukB: 0, pDalingRem: 10,
                 // Weekdag 3e-batch drempels + scorebord-toggle (eigenaar 2026-07-03)
                 minL3A: 3, minL3B: 4, showScoreboard: true, extraRijskast: false };
             Object.entries(advDefaults).forEach(([k, v]) => {
@@ -4407,7 +4546,15 @@
         function savePlanning() {
             const dateStr = formatDateISO(currentDate);
             const event = document.getElementById('event-select').value;
-            const weather = document.getElementById('weather-badge').innerHTML;
+            // Alleen echt weer opslaan (met een temperatuur). Staat de badge nog op ⏳
+            // (voorspelling onderweg), ❌ of 📅 --, dan zou die tekst voorgoed in de dag
+            // blijven staan: de motor mist dan de temperatuur van die referentiedag, en
+            // updateWeather() haalde nooit opnieuw op (bug gevonden 2026-09-23).
+            const badgeWeer = document.getElementById('weather-badge').innerHTML;
+            const heeftTemp = w => !!w && /\d/.test(w);
+            const weather = heeftTemp(badgeWeer) ? badgeWeer
+                : heeftTemp(weatherCache[dateStr]) ? weatherCache[dateStr]
+                : (historicalData.find(d => d.datum === dateStr && heeftTemp(d.weather))?.weather || null);
             const note = planningData._note || '';
             
             // Snapshot existing breuk per product so a re-save of past planning
@@ -4448,7 +4595,7 @@
             
             historicalData.sort((a, b) => b.datum.localeCompare(a.datum));
             localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
-            if (supabaseClient) syncToSupabase(dateStr);
+            syncToSupabase(dateStr);   // onthoudt de dag zelf als het versturen niet lukt
             if (event === 'Promo') backfillPromoWeek(dateStr);
             markSaved();
             showToast(`✅ Planning voor ${formatDate(currentDate)} opgeslagen!`);
@@ -4481,9 +4628,13 @@
             // voor een oudere dag verouderde aantallen hebben staan — dan overschrijf je
             // de nieuwere invoer van de collega (zie de waarschuwing bij syncToSupabase).
             // Alleen de event-kolom patchen, en alleen waar hij nog op 'Normal' staat.
+            // LET OP (bug gevonden 2026-09-23): een supabase-query zonder await/.then()
+            // wordt NOOIT verstuurd — de bibliotheek start het verzoek pas bij .then().
+            // Hier stond vroeger niets achter, dus deze aanvulling bereikte de cloud nooit.
             if (supabaseClient) {
                 supabaseClient.from('planning_data')
-                    .update({ event: 'Promo' }).in('datum', gewijzigd).eq('event', 'Normal');
+                    .update({ event: 'Promo' }).in('datum', gewijzigd).eq('event', 'Normal')
+                    .then(({ error }) => { if (error) console.warn('Promo-label naar cloud mislukt', error); });
             }
             showToast(`📢 Promo-label aangevuld voor ${gewijzigd.length} dag(en) in deze week`);
         }
@@ -4520,7 +4671,8 @@
             
             // Check if we have saved weather for this date
             const savedDayData = historicalData.filter(d => d.datum === dateStr);
-            if (savedDayData.length > 0 && savedDayData[0].weather) {
+            // Alleen opgeslagen weer MET temperatuur telt; ⏳/❌ uit een oude save → opnieuw ophalen.
+            if (savedDayData.length > 0 && savedDayData[0].weather && /\d/.test(savedDayData[0].weather)) {
                 badge.innerHTML = savedDayData[0].weather;
                 checkSnowWarning(savedDayData[0].weather);
                 return;
@@ -4688,7 +4840,7 @@
         // Handmatig ophogen bij elke wijziging. Samen met de datum van het bestand
         // zelf zie je in Instellingen meteen of je telefoon de nieuwe versie al
         // binnen heeft, of dat je nog even op de cache moet wachten.
-        const APP_VERSIE = 'v2026-09-23.1';
+        const APP_VERSIE = 'v2026-09-23.2';
 
         function toonVersie() {
             const el = document.getElementById('app-versie');
@@ -4839,16 +4991,23 @@
         
         async function loadFromSupabase() {
             if (!supabaseClient) return;
+            // Eerst wat nog niet in de cloud raakte alsnog versturen (zie syncToSupabase).
+            await syncOpenstaande();
             // Supabase geeft max 1000 rijen per request — pagineer tot alles binnen is,
             // anders verdwijnt de oudste historiek stilletjes zodra de tabel groeit.
             const data = [];
+            let mislukt = false;
             for (let from = 0; ; from += 1000) {
                 const { data: page, error } = await supabaseClient.from('planning_data')
                     .select('*').order('datum', { ascending: false }).range(from, from + 999);
-                if (error || !page?.length) break;
+                if (error) { mislukt = true; break; }
+                if (!page?.length) break;
                 data.push(...page);
                 if (page.length < 1000) break;
             }
+            // Halverwege mislukt (bv. netwerkhapering op pagina 2)? Dan NIET vervangen:
+            // anders houd je lokaal maar de nieuwste 1000 rijen over.
+            if (mislukt) return;
             if (data?.length) {
                 // Merge with localStorage to preserve fields that might not be in Supabase
                 const localData = JSON.parse(localStorage.getItem('bakkerij_data') || '[]');
@@ -4860,14 +5019,19 @@
                 });
                 
                 // Merge: use Supabase data but preserve local weather/note if Supabase doesn't have them
-                historicalData = data.map(rec => {
+                // Dagen die nog op versturen wachten: de LOKALE versie wint. Die is hier
+                // bewust opgeslagen en de app beloofde "lokaal wél opgeslagen" — vroeger
+                // overschreef deze herlaad ze met de (oudere of ontbrekende) cloud-versie.
+                const open = new Set(openstaandeSync());
+                historicalData = data.filter(rec => !open.has(rec.datum)).map(rec => {
                     const localRec = localMap[`${rec.datum}-${rec.product}`];
                     return {
                         ...rec,
                         weather: rec.weather || localRec?.weather,
                         note: rec.note || localRec?.note
                     };
-                });
+                }).concat(localData.filter(rec => open.has(rec.datum)))
+                  .sort((a, b) => b.datum.localeCompare(a.datum));
                 
                 localStorage.setItem('bakkerij_data', JSON.stringify(historicalData));
                 renderPlanningUitgesteld(); // niet midden in andermans invoer (zie boven)
@@ -4878,8 +5042,33 @@
         // Vroeger werd de volledige historiek (1200+ rijen) één voor één geüpload bij
         // elke save — traag, en een toestel met verouderde lokale data kon daarmee
         // nieuwere saves van de collega overschrijven. Daarom: nooit meer full-sync.
-        async function syncToSupabase(dateStr) {
-            if (!supabaseClient || !dateStr) return;
+        // ===== Nog-niet-verstuurde dagen (bugfix 2026-09-23) =====
+        // Mislukt het versturen (geen internet, sessie verlopen, "Verder zonder aanmelden"),
+        // dan zegt de app "lokaal wél opgeslagen". Maar de volgende herlaad uit de cloud
+        // verving vroeger de hele lokale historiek — en die dag was weg. Nu onthouden we
+        // welke dagen nog moeten, sturen ze bij de volgende gelegenheid alsnog, en laat de
+        // herlaad ze tot dan met rust.
+        function openstaandeSync() {
+            try { return JSON.parse(localStorage.getItem('bakkerij_sync_open') || '[]'); } catch (e) { return []; }
+        }
+        function zetOpenstaand(dateStr, open) {
+            const set = new Set(openstaandeSync());
+            if (open) set.add(dateStr); else set.delete(dateStr);
+            try { localStorage.setItem('bakkerij_sync_open', JSON.stringify([...set])); } catch (e) {}
+        }
+        async function syncOpenstaande() {
+            const open = openstaandeSync();
+            if (!open.length || !supabaseClient) return;
+            let gelukt = 0;
+            for (const d of open) { if (await syncToSupabase(d, true)) gelukt++; }
+            if (gelukt) showToast(`☁️ ${gelukt} eerder opgeslagen dag(en) alsnog naar de cloud gestuurd`);
+        }
+
+        // Geeft true terug als de dag in de cloud staat. stil = geen meldingen (herkansing).
+        async function syncToSupabase(dateStr, stil = false) {
+            if (!dateStr) return false;
+            zetOpenstaand(dateStr, true);          // pas weg als het echt gelukt is
+            if (!supabaseClient) return false;
             const payload = historicalData
                 .filter(rec => rec.datum === dateStr)
                 .map(rec => ({
@@ -4891,10 +5080,13 @@
                     partial_oos: !!rec.partial_oos,
                     bestelling: rec.bestelling ?? null
                 }));
-            if (!payload.length) return;
-            const { error } = await supabaseClient.from('planning_data')
-                .upsert(payload, { onConflict: 'datum,product' });
-            if (!error) return;
+            if (!payload.length) { zetOpenstaand(dateStr, false); return true; }
+            let error;
+            try {
+                ({ error } = await supabaseClient.from('planning_data')
+                    .upsert(payload, { onConflict: 'datum,product' }));
+            } catch (e) { error = { message: String(e) }; }
+            if (!error) { zetOpenstaand(dateStr, false); return true; }
 
             // De kolommen partial_oos/bestelling bestaan pas na de migratie van 2026-08-13.
             // Draait er nog een database zonder die kolommen, dan zou de héle save stil
@@ -4907,20 +5099,23 @@
                 const retry = await supabaseClient.from('planning_data')
                     .upsert(kaal, { onConflict: 'datum,product' });
                 if (!retry.error) {
-                    showToast('⚠️ Opgeslagen zonder bestelling/deels-voorraad — database mist die kolommen');
-                    return;
+                    zetOpenstaand(dateStr, false);
+                    if (!stil) showToast('⚠️ Opgeslagen zonder bestelling/deels-voorraad — database mist die kolommen');
+                    return true;
                 }
             }
+            if (stil) return false;
             // Na de beveiliging van 2026-08-26 kan een mislukte sync ook betekenen
             // dat de sessie verlopen is. Dat is geen technische fout maar iets dat
             // de gebruiker zelf kan oplossen, dus dat melden we apart.
             if (isAuthFout(error)) {
                 showToast('🔒 Opgeslagen op dit toestel — meld je opnieuw aan voor de cloud');
                 toonLogin('Je sessie is verlopen. Meld je opnieuw aan om te synchroniseren.');
-                return;
+                return false;
             }
-            showToast('⚠️ Cloud-sync mislukt — lokaal wél opgeslagen');
+            showToast('⚠️ Cloud-sync mislukt — lokaal wél opgeslagen, wordt later opnieuw verstuurd');
             console.warn('syncToSupabase failed', error);
+            return false;
         }
 
         // ===== CLOUD SETTINGS (app + product config stored in `settings` table) =====
@@ -4988,6 +5183,14 @@
                 if (error || !data) return;
                 const byKey = Object.fromEntries(data.map(r => [r.key, r.value]));
                 toonBackupStatus(byKey.backup_status);
+                // Eerst lokale wijzigingen die de cloud nog niet haalden opnieuw sturen;
+                // lukt dat niet, dan de cloud-versie van die sleutel NIET overnemen.
+                for (const key of openstaandeInstellingen()) {
+                    const lokaal = key === 'app' ? SETTINGS : key === 'products' ? productsToCloudConfig() : null;
+                    if (!lokaal) { zetInstellingOpen(key, false); continue; }
+                    if (await saveCloudSetting(key, lokaal, true)) byKey[key] = lokaal;
+                    else delete byKey[key];
+                }
                 if (byKey.app) {
                     SETTINGS = { ...SETTINGS, ...byKey.app };
                     localStorage.setItem('bakkerij_settings', JSON.stringify(SETTINGS));
@@ -5031,16 +5234,40 @@
             }
         }
 
-        async function saveCloudSetting(key, value) {
-            if (!supabaseClient) return;
+        // Bugfix 2026-09-23: supabase GOOIT geen fout, hij geeft er een terug — die werd
+        // genegeerd. Bij een verlopen sessie leek een instelling dus bewaard, en de volgende
+        // cloud-herlaad (loadCloudSettings) zette stilletjes de oude waarde terug.
+        // Nu: mislukt → melden + onthouden; loadCloudSettings stuurt hem eerst opnieuw en
+        // overschrijft de lokale waarde niet zolang hij nog openstaat.
+        function openstaandeInstellingen() {
+            try { return JSON.parse(localStorage.getItem('bakkerij_settings_open') || '[]'); } catch (e) { return []; }
+        }
+        function zetInstellingOpen(key, open) {
+            const set = new Set(openstaandeInstellingen());
+            if (open) set.add(key); else set.delete(key);
+            try { localStorage.setItem('bakkerij_settings_open', JSON.stringify([...set])); } catch (e) {}
+        }
+        async function saveCloudSetting(key, value, stil = false) {
+            zetInstellingOpen(key, true);
+            if (!supabaseClient) return false;
+            let error;
             try {
-                await supabaseClient.from('settings').upsert(
+                ({ error } = await supabaseClient.from('settings').upsert(
                     { key, value, updated_at: new Date().toISOString() },
                     { onConflict: 'key' }
-                );
-            } catch (e) {
-                console.warn(`Cloud save of ${key} failed — kept local only`, e);
+                ));
+            } catch (e) { error = { message: String(e) }; }
+            if (!error) { zetInstellingOpen(key, false); return true; }
+            console.warn(`Cloud save of ${key} failed — kept local only`, error);
+            if (!stil) {
+                if (isAuthFout(error)) {
+                    showToast('🔒 Instelling alleen op dit toestel bewaard — meld je opnieuw aan');
+                    toonLogin('Je sessie is verlopen. Meld je opnieuw aan om te synchroniseren.');
+                } else {
+                    showToast('⚠️ Instelling niet naar de cloud — wordt later opnieuw verstuurd');
+                }
             }
+            return false;
         }
 
         function productsToCloudConfig() {
