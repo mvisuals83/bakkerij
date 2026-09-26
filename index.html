@@ -877,6 +877,8 @@
                         <div class="setting-row"><label>Doel breuk % (pistolets)</label><input type="number" id="setting-target-breuk" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                         <div class="setting-row"><label>🥖 Doel breuk % stokbrood</label><input type="number" id="setting-target-breuk-b" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                         <div style="font-size: 0.7rem; color: var(--text-muted); margin: 0 0 8px;">Stokbrood apart: een weggegooid stokbrood kost €0,73 (3,5× een pistolet), en een uitverkocht stokbrood vangt de bake-off grotendeels op. Negatief mag: −5 = bewust iets onder de verwachte verkoop plannen. Getest 23-09: 5 → 0 → −5 → −10 werd telkens goedkoper.</div>
+                        <div class="setting-row"><label>🔀 Stokbrood: restje doorschuiven</label><label class="toggle"><input type="checkbox" id="setting-rest-b" onchange="saveAdvancedSettings()"><span class="toggle-slider"></span></label></div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); margin: 0 0 8px;">Stokbrood wit en bruin samen afronden: niet elk apart een plaat erbij, maar het restje van de plaat van bruin gaat naar wit. Bruin raakt iets vaker op, klanten pakken dan wit. Staat dit aan, dan werkt de doel-breuk stokbrood preciezer: stap voorzichtig.</div>
                         <div class="setting-row"><label>📉 Daling-rem: max −%</label><input type="number" id="setting-p-daling-rem" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                         <div style="font-size: 0.7rem; color: var(--text-muted); margin: 0 0 8px;">Verkochten de laatste 7 dagen (alle weekdagen) minder dan verwacht voor dát weer, dan gaat de suggestie vandaag mee omlaag, hoogstens dit %. Alleen omlaag. 0 = uit.</div>
                         <div class="setting-row"><label>📢 Promo: Groep B +%</label><input type="number" id="setting-p-promo-b" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
@@ -1109,6 +1111,8 @@
             // Max % dat de suggestie omlaag mag als de laatste 7 dagen onder verwachting
             // verkochten. 0 = uit.
             pDalingRem: 10,
+            // Restje doorschuiven in Groep B (eigenaar-idee 2026-09-26). Zie restDoorschuivenB().
+            restDoorschuivenB: true,
             pPromoB: 50, pPromoA: 5, // promo verhoging %
             pBbqB: 50, pBbqA: 5,     // BBQ-weer verhoging %
             pWarmB: 20,              // warm weer verhoging % (alleen B)
@@ -1653,7 +1657,9 @@
         }
 
         // Hoofdberekening. Geeft aantal platen, of null (→ terugvallen op klassiek).
-        function calculateSuggestionAdvanced(p) {
+        // uit (optioneel): wordt gevuld met planStuks + de vangrail/groeirem-grenzen, zodat
+        // restDoorschuivenB() de groep opnieuw kan afronden binnen dezelfde vangrails.
+        function calculateSuggestionAdvanced(p, uit) {
             const promoSet = buildPromoDateSet();
             const ctx = getPlanDayContext(promoSet);
 
@@ -1709,11 +1715,13 @@
             // Vangrail: blijf in de buurt van de klassieke suggestie × dagfactor.
             // Feestdagen uitgezonderd (daar is de klassieke referentie per definitie fout).
             const simple = calculateSuggestion(p);
+            let vgLo = 1, vgHi = Infinity, groeiCap = Infinity;
             if (!ctx.feestdag && simple > 1) {
                 const f = contextFactor(ctx, p.group);
                 const lo = Math.max(1, Math.floor(simple * f * 0.5));
                 const hi = Math.max(lo, Math.ceil(simple * f * 2));
                 plates = Math.min(hi, Math.max(lo, plates));
+                vgLo = lo; vgHi = hi;
             }
 
             // Groeirem (eigenaar-regel 2026-06-12): max +pMaxGroei% per week t.o.v. wat
@@ -1726,9 +1734,48 @@
                 const capStuks = refs[0].gebNorm * fToday * (1 + SETTINGS.pMaxGroei / 100);
                 const capPlates = Math.max(1, platesFromStuks(p, capStuks, free4));
                 if (plates > capPlates) plates = capPlates;
+                groeiCap = capPlates;
             }
 
+            if (uit) Object.assign(uit, { planStuks, vgLo, vgHi, groeiCap });
             return plates;
+        }
+
+        // ===== RESTJE DOORSCHUIVEN — GROEP B (eigenaar-idee 2026-09-26) =====
+        // Elk product apart naar boven afronden stapelt: stokbrood bruin (1-2 platen) krijgt
+        // bijna altijd een plaat "voor de zekerheid" erbij. Maar stokbrood wit en bruin zijn
+        // elkaars vervanger: is bruin op, dan pakt de klant wit. Dus:
+        //   - producten van KLEIN naar GROOT (verwachte vraag) afronden naar BENEDEN,
+        //   - het restje van de plaat gaat mee naar het volgende product,
+        //   - het laatste (= grootste, stokbrood wit) rondt gewoon af (≥ halve plaat → omhoog),
+        //   - elk product minstens 1 plaat.
+        // Gemeten mrt-sep (5 periodes): Groep B −12,5% foutkost, in alle periodes beter,
+        // beter dan doel −5 (§8f). Stokbrood bruin raakt vaker uit, dat is de bedoeling.
+        // BEWUST NIET voor Groep A: daar raakten de kleine producten op de helft van de
+        // dagen uit, en met €0,50 marge tegen €0,20 breuk kost dat meer dan het oplevert.
+        // Vangrail + groeirem van elk product blijven gelden (ze kunnen het alleen begrenzen).
+        // items: [{ p, planStuks, vgLo, vgHi, groeiCap }] — enkel producten OP VOORRAAD.
+        function restDoorschuivenB(items) {
+            const volgorde = [...items].sort((a, b) => a.planStuks - b.planStuks);
+            const platen = {};
+            let rest = 0;
+            volgorde.forEach((it, k) => {
+                const p = it.p;
+                // 4-platen: wie vóór ons in de rij staat (p4rank) en al berekend is, telt mee.
+                const free4 = free4For(p, o => platen[o.id] ?? 0);
+                const nodig = it.planStuks + rest;
+                let n = 0;
+                while (stuksFromPlates(p, n + 1, free4) <= nodig && n < 500) n++;       // naar beneden
+                if (k === volgorde.length - 1) {
+                    const onder = stuksFromPlates(p, n, free4), boven = stuksFromPlates(p, n + 1, free4);
+                    if ((nodig - onder) / (boven - onder) >= 0.5) n++;                    // laatste: afronden
+                }
+                n = Math.max(1, n);
+                n = Math.min(it.vgHi, it.groeiCap, Math.max(it.vgLo, n));
+                rest = nodig - stuksFromPlates(p, n, free4);
+                platen[p.id] = n;
+            });
+            return platen;
         }
 
         // ===== SUGGESTIE-DIAGNOSE (read-only) =====
@@ -1933,9 +1980,31 @@
             ).join('');
 
             const num = (v, d = 0) => (v === null || v === undefined) ? '—' : v.toFixed(d);
+            // Restje doorschuiven Groep B: zelfde groepsafronding als op de planning.
+            const diags = {};
+            PRODUCTS.forEach(p => { diags[p.id] = diagnoseProduct(p, dateObj, { promoSet }); });
+            const restMap = {};
+            if (SETTINGS.advancedMode && SETTINGS.restDoorschuivenB) {
+                const groepB = PRODUCTS.filter(p => p.group === 'B' && !isProductOOSOnDate(p, iso));
+                if (groepB.length > 1 && groepB.every(p => !diags[p.id].fellBack)) {
+                    Object.assign(restMap, restDoorschuivenB(groepB.map(p => {
+                        const d = diags[p.id];
+                        return { p, planStuks: d.planStuks,
+                                 vgLo: d.vangrail ? d.vangrail.lo : 1, vgHi: d.vangrail ? d.vangrail.hi : Infinity,
+                                 groeiCap: d.groeirem ? d.groeirem.capPlates : Infinity };
+                    })));
+                }
+            }
             let rows = '';
             PRODUCTS.forEach(p => {
-                const d = diagnoseProduct(p, dateObj);
+                const d = diags[p.id];
+                if (restMap[p.id] !== undefined) {
+                    d.restVan = d.platesZonderBestelling;
+                    d.platesZonderBestelling = restMap[p.id];
+                    d.finalPlates = d.besteld > 0
+                        ? platesMetBestelling(p, restMap[p.id], d.besteld, free4ForDate(p, dateObj))
+                        : restMap[p.id];
+                }
                 const rec = historicalData.find(r => r.datum === iso && r.product === p.name);
                 const oos = !!rec?.out_of_stock;
                 const gebakken = rec ? rec.totaal : null;
@@ -1985,6 +2054,7 @@
                     steps.push(`Plan ÷ ${(1 - doel / 100).toFixed(2)} (doel ${doel}% breuk${p.group === 'B' ? ', stokbrood' : ''}) = ${d.planStuks.toFixed(0)}st → <b>${d.platesRaw}pl</b>`);
                     if (d.vangrail && d.vangrail.applied) steps.push(`🛡️ Vangrail klem naar ${d.vangrail.lo}–${d.vangrail.hi}pl`);
                     if (d.groeirem && d.groeirem.applied) steps.push(`📈 Groeirem cap: max ${d.groeirem.capPlates}pl`);
+                    if (d.restVan !== undefined && d.restVan !== d.platesZonderBestelling) steps.push(`🔀 Restje doorschuiven (stokbrood samen afgerond): ${d.restVan} → ${d.platesZonderBestelling}pl`);
                     if (d.besteld > 0) steps.push(`📋 Bestelling +${d.besteld}st: ${d.platesZonderBestelling} → ${d.finalPlates}pl`);
                     steps.push(`<b style="color:${groupColor};">Suggestie: ${d.finalPlates} platen</b>`);
                     detail = `<div style="font-size:0.72rem; color:var(--text-secondary); line-height:1.5;">
@@ -2528,12 +2598,28 @@
             // Build display data for each product
             const displayData = {};
 
+            // Suggesties eerst voor alle producten, zodat Groep B samen afgerond kan worden.
+            const sugMap = {}, detail = {};
             PRODUCTS.forEach(p => {
                 let sug = calculateSuggestion(p);
                 if (SETTINGS.advancedMode) {
-                    const adv = calculateSuggestionAdvanced(p);
-                    if (adv !== null) sug = adv;
+                    const uit = {};
+                    const adv = calculateSuggestionAdvanced(p, uit);
+                    if (adv !== null) { sug = adv; detail[p.id] = uit; }
                 }
+                sugMap[p.id] = sug;
+            });
+            if (SETTINGS.advancedMode && SETTINGS.restDoorschuivenB) {
+                const groepB = PRODUCTS.filter(p => p.group === 'B' && !isProductOOSToday(p));
+                // Alleen als de slimme motor voor alle B-producten een getal gaf (geen terugval).
+                if (groepB.length > 1 && groepB.every(p => detail[p.id])) {
+                    const platen = restDoorschuivenB(groepB.map(p => ({ p, ...detail[p.id] })));
+                    groepB.forEach(p => { sugMap[p.id] = platen[p.id]; });
+                }
+            }
+
+            PRODUCTS.forEach(p => {
+                let sug = sugMap[p.id];
                 const besteldVandaag = Math.max(0, planningData._bestellingen?.[p.id] || 0);
                 if (besteldVandaag > 0) sug = platesMetBestelling(p, sug, besteldVandaag, free4ForPlan(p));
                 const savedRecord = savedDayData.find(d => d.product === p.name);
@@ -2637,6 +2723,36 @@
                         displayData[cands[0].id].getrimd = true;
                         total--;
                     }
+
+                    // Bug 2026-09-26 (eigenaar): de markering verscheen alleen op nog NIET
+                    // opgeslagen dagen. Na opslaan (zondag 27/09 stond al klaar) zijn de totalen
+                    // niet meer "auto", de trim hierboven slaat ze over, en de rand viel weg —
+                    // terwijl de vraag nog steeds hoger was dan wat er in 4 ladingen past.
+                    // Daarom: dezelfde trim nog eens "op papier" op de SUGGESTIES, met alle
+                    // producten op voorraad. Wie daar ingekort zou worden, is door capaciteit
+                    // beperkt. Staat zo'n opgeslagen/handmatig totaal onder zijn suggestie,
+                    // dan krijgt hij ook de rand. Bewust niet bij gewone handmatige verlagingen
+                    // (product dat niet door capaciteit ingekort zou worden) — anders licht de
+                    // halve tabel op en leer je het negeren.
+                    const hyp = {};
+                    products.forEach(p => { hyp[p.id] = displayData[p.id].outOfStock ? 0 : displayData[p.id].sug; });
+                    const opVoorraad = products.filter(p => !displayData[p.id].outOfStock);
+                    let hypTotal = opVoorraad.reduce((s, p) => s + hyp[p.id], 0);
+                    const capBeperkt = new Set();
+                    let veilig = 300;
+                    while (hypTotal > cap && veilig-- > 0) {
+                        let cands = opVoorraad.filter(p => p.id !== prioId && hyp[p.id] > 1);
+                        if (!cands.length) cands = opVoorraad.filter(p => hyp[p.id] > 1);
+                        if (!cands.length) break;
+                        cands.sort((a, b) => hyp[b.id] - hyp[a.id]);
+                        hyp[cands[0].id]--;
+                        capBeperkt.add(cands[0].id);
+                        hypTotal--;
+                    }
+                    products.forEach(p => {
+                        const d = displayData[p.id];
+                        if (!d.getrimd && !d.outOfStock && capBeperkt.has(p.id) && d.totaal < d.sug) d.getrimd = true;
+                    });
                 });
             }
             
@@ -4337,6 +4453,8 @@
             // Stokbrood mag negatief (−20..30): zie opmerking bij SETTINGS.targetBreukB.
             SETTINGS.targetBreukB = Math.min(30, Math.max(-20, num('setting-target-breuk-b', 0)));
             SETTINGS.pDalingRem = Math.min(30, Math.max(0, num('setting-p-daling-rem', 10)));
+            const restB = document.getElementById('setting-rest-b');
+            if (restB) SETTINGS.restDoorschuivenB = restB.checked;
             SETTINGS.pPromoB = num('setting-p-promo-b', 50);
             SETTINGS.pPromoA = num('setting-p-promo-a', 5);
             SETTINGS.pBbqB = num('setting-p-bbq-b', 50);
@@ -4373,6 +4491,7 @@
             el('setting-target-breuk').value = SETTINGS.targetBreuk;
             if (el('setting-target-breuk-b')) el('setting-target-breuk-b').value = SETTINGS.targetBreukB;
             if (el('setting-p-daling-rem')) el('setting-p-daling-rem').value = SETTINGS.pDalingRem;
+            if (el('setting-rest-b')) el('setting-rest-b').checked = SETTINGS.restDoorschuivenB !== false;
             el('setting-p-promo-b').value = SETTINGS.pPromoB;
             el('setting-p-promo-a').value = SETTINGS.pPromoA;
             el('setting-p-bbq-b').value = SETTINGS.pBbqB;
@@ -4414,7 +4533,7 @@
                 tempBbq: 23, tempWarm: 18, pSellout: 10, pSelloutStreak: 15, pMaxGroei: 25,
                 pSubstitutie: 15, skySunPct: 100, skyPcloudPct: 85, skyCloudPct: 65, skyRainPct: 20,
                 // Audit 2026-09-23: stokbrood-doel apart (fase 1 = 0) + daling-rem 10%
-                targetBreukB: 0, pDalingRem: 10,
+                targetBreukB: 0, pDalingRem: 10, restDoorschuivenB: true,
                 // Weekdag 3e-batch drempels + scorebord-toggle (eigenaar 2026-07-03)
                 minL3A: 3, minL3B: 4, showScoreboard: true, extraRijskast: false };
             Object.entries(advDefaults).forEach(([k, v]) => {
@@ -4840,7 +4959,7 @@
         // Handmatig ophogen bij elke wijziging. Samen met de datum van het bestand
         // zelf zie je in Instellingen meteen of je telefoon de nieuwe versie al
         // binnen heeft, of dat je nog even op de cache moet wachten.
-        const APP_VERSIE = 'v2026-09-23.2';
+        const APP_VERSIE = 'v2026-09-26.2';
 
         function toonVersie() {
             const el = document.getElementById('app-versie');
