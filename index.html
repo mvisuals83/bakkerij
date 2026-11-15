@@ -835,13 +835,31 @@
                     wegenwerken, een school dicht. Je vult ze <strong>achteraf</strong> in, één keer per periode;
                     je hoeft dus niets per dag te onthouden.
                     <br><br>
-                    Dit verandert <strong>nu nog niets</strong> aan de suggesties — het legt alleen vast wat er aan de hand was.
-                    Vanaf ±17 nov 2026 is er één vol jaar data; dan kan de motor vorig jaar als referentie gebruiken,
-                    en moet hij wéten welke weken eenmalig waren. Zonder deze labels leert hij anders het verkeerde:
-                    dan zakt hij in september 2027 omlaag voor een concurrent die er dat jaar misschien gewoon is.
+                    <strong>Zonder percentages</strong> is een periode alleen een label: het verandert niets aan de suggesties.
+                    <br><br>
+                    <strong>Mét percentages</strong> rekenen de suggesties ermee, per dagsoort (weekdag / zaterdag / zondag).
+                    −10 = 10% minder verwacht op die dagen. De kleine schommelingen pikt de motor zelf op;
+                    dit is bedoeld voor de <em>grote</em> sprongen die je vooraf kent.
+                    Gemeten in 2026 (de motor vangt zelf al een deel op, vul daarom ongeveer de helft in):
+                    zomerweekend 4/7 → 16/8 pistolets za −20 / zo −20, stokbrood −15 ·
+                    concurrent dicht: pistolets weekdagen +12, stokbrood +20 ·
+                    schoolvakantie van 1-2 weken: pistolets weekdagen +5 tot +18.
+                    <br><br>
+                    <strong>Elk jaar herhalen</strong> = zelfde dag en maand, elk jaar opnieuw (zomer).
+                    Laat dat UIT voor iets eenmaligs zoals de concurrent.
                 </p>
                 <div id="periodes-lijst"></div>
                 <button class="btn" style="margin-top: 8px;" onclick="periodeToevoegen()">➕ Periode toevoegen</button>
+                <div style="margin-top: 18px; margin-bottom: 6px; font-size: 0.95rem; font-weight: 700; color: var(--text-primary);">🎄 Speciale dagen</div>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">
+                    Dagen die elk jaar op dezelfde datum vallen en op geen enkele gewone dag lijken, zoals kerstavond.
+                    De suggestie neemt dan de <strong>mediaan van de laatste 4 gewone zaterdagen</strong> en rekent daar dit % van:
+                    50 = de helft van een zaterdag, 250 = twee en een half keer een zaterdag.
+                    Valt de datum zelf op zaterdag of zondag, dan blijft het een gewone weekenddag.
+                    De getallen komen uit één kerst (2025) — pas ze aan zodra je meer weet.
+                </p>
+                <div id="speciaal-lijst"></div>
+                <button class="btn" style="margin-top: 8px;" onclick="speciaalToevoegen()">➕ Speciale dag toevoegen</button>
             </div>
             <div class="settings-section">
                 <h3>🔥 Weekend Strategie — Skip Groep B</h3>
@@ -891,9 +909,17 @@
                         <div class="setting-row"><label>⛅ Half bewolkt %</label><input type="number" id="setting-sky-pcloud" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                         <div class="setting-row"><label>🌥️ Bewolkt %</label><input type="number" id="setting-sky-cloud" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                         <div class="setting-row"><label>🌧️ Regen %</label><input type="number" id="setting-sky-rain" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
-                        <div class="setting-row"><label>❄️ Sneeuw: verlaging %</label><input type="number" id="setting-p-snow" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
-                        <div class="setting-row"><label>🎉 Feestdag: % van zondag</label><input type="number" id="setting-p-feestdag" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
-                        <div class="setting-row"><label>🎉 Dag vóór/na feestdag +%</label><input type="number" id="setting-p-rond-feestdag" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>❄️ Sneeuw (label): verlaging %</label><input type="number" id="setting-p-snow" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>❄️ Sneeuw-icoon in voorspelling: −%</label><input type="number" id="setting-p-snow-icoon" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); margin: 0 0 8px;">Staat er alleen een sneeuw-icoon in de voorspelling (geen label Sneeuw gekozen), dan geldt dit kleinere getal. Gemeten 2026: op zulke dagen werd 84-95% van normaal verkocht. Sneeuwt het echt de hele dag → kies zelf het label Sneeuw.</div>
+                        <div class="setting-row"><label>🎉 Feestdag ma-vr, pistolets: % van zondag</label><input type="number" id="setting-p-feestdag-a" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>🎉 Feestdag ma-vr, stokbrood: % van zondag</label><input type="number" id="setting-p-feestdag-b" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>🎉 Feestdag in het weekend: % van zondag</label><input type="number" id="setting-p-feestdag" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>🎉 Dag vóór feestdag +%</label><input type="number" id="setting-p-voor-feestdag" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div class="setting-row"><label>🎉 Dag ná feestdag +%</label><input type="number" id="setting-p-na-feestdag" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); margin: 0 0 8px;">Gemeten 2026 (weinig gevallen, bijstellen zodra er meer zijn): feestdag op een weekdag = pistolets 59-75% van een zondag, stokbrood 5 van 6 keer uitverkocht. Dag ná een feestdag +25..+68%, dag ervóór −9..+30%.</div>
+                        <div class="setting-row"><label>🥖 Pistolets: afronden naar dichtstbijzijnde plaat</label><label class="toggle"><input type="checkbox" id="setting-afronden-a" onchange="saveAdvancedSettings()"><span class="toggle-slider"></span></label></div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); margin: 0 0 8px;">AAN = gewoon afronden. UIT = de oude regel: altijd een plaat erbij als het plan onder de verwachte verkoop komt (gaf bij de kleine pistolets vaak een plaat te veel).</div>
                         <div class="setting-row"><label>☀️ BBQ vanaf °C</label><input type="number" id="setting-temp-bbq" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                         <div class="setting-row"><label>🌤️ Warm vanaf °C</label><input type="number" id="setting-temp-warm" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
                         <div class="setting-row"><label>🔥 Uitverkocht: +%</label><input type="number" id="setting-p-sellout" onchange="saveAdvancedSettings()" style="width: 60px;"></div>
@@ -1116,10 +1142,28 @@
             pPromoB: 50, pPromoA: 5, // promo verhoging %
             pBbqB: 50, pBbqA: 5,     // BBQ-weer verhoging %
             pWarmB: 20,              // warm weer verhoging % (alleen B)
-            pSnow: 38,               // sneeuw verlaging %
-            pFeestdag: 80,           // feestdag = % van zondag-baseline
-            pRondFeestdag: 20,       // weekdag vóór/na een feestdag: verhoging %
-                                     // (gemeten +20..62%, brugdag-effect; weekend ~0%)
+            pSnow: 38,               // sneeuw verlaging % (dag met het label Sneeuw)
+            // Jaar-audit 2026-11-14 — sneeuw-ICOON in de voorspelling zonder label: gemeten
+            // verkoop 84-95% van normaal (n=3), terwijl −38% werd toegepast (zo 15-02: 34 platen
+            // voorgesteld, 53 nodig). Eigenaar koos de middenweg: de helft van de volle verlaging.
+            pSnowIcoon: 19,
+            // Feestdag = % van de zondag-baseline. Sinds de jaar-audit 2026-11-14 per groep
+            // voor feestdagen op MAANDAG-VRIJDAG (6 gevallen in 2026):
+            //   pistolets 59-75% van zondag (mediaan 68)      → 70
+            //   stokbrood 5 van 6 keer uitverkocht, ≈95-120%  → 100
+            // pFeestdag zelf geldt nu alleen nog voor een feestdag in het WEEKEND (n=2, door de
+            // eigenaar geparkeerd op 02-11-2026 → gedrag daar bewust ongewijzigd).
+            pFeestdag: 80, pFeestdagA: 70, pFeestdagB: 100,
+            // Weekdag vóór / ná een feestdag. Gemeten 2026: dag ná +25..+68% (typisch +35),
+            // dag vóór −9..+30% (typisch +15). Eén getal voor beide (pRondFeestdag 20) was
+            // te weinig erna en te veel ervoor. pRondFeestdag blijft staan maar wordt niet
+            // meer gelezen (alleen nog nuttig om terug te kunnen naar een oude versie).
+            pRondFeestdag: 20, pVoorFeestdag: 15, pNaFeestdag: 35,
+            // Pistolets afronden naar de dichtstbijzijnde plaat i.p.v. "altijd een plaat erbij
+            // als het plan onder de verwachte vraag komt". Gemeten over 2026: kleine pistolets
+            // −9% foutkost, beter in 4 van 4 kwartalen; pistolet wit ongewijzigd. Stokbrood
+            // houdt de oude regel (loopt toch via restje doorschuiven).
+            afrondenA: true,
             tempBbq: 23, tempWarm: 18, // °C drempels
             pSellout: 10,            // bijtelling % als referentiedag uitverkocht was
             pSelloutStreak: 15,      // extra % bovenop als 2 recentste referenties uitverkocht waren
@@ -1246,7 +1290,10 @@
             if (dow === 0 || dow === 6) return false;
             const prev = new Date(date); prev.setDate(prev.getDate() - 1);
             const next = new Date(date); next.setDate(next.getDate() + 1);
-            return isBelgianHoliday(prev) || isBelgianHoliday(next);
+            // 'na' wint als de dag tussen twee feestdagen ligt (aanvullen na sluiting weegt zwaarder).
+            if (isBelgianHoliday(prev)) return 'na';
+            if (isBelgianHoliday(next)) return 'voor';
+            return false;
         }
 
         // Promo loopt altijd woensdag t/m dinsdag. Eén gelabelde dag in zo'n week is
@@ -1295,9 +1342,12 @@
             const feestdag = event === 'Feestdag';
             return {
                 feestdag,
-                rondFeestdag: !feestdag && isRondFeestdag(new Date(dateISO + 'T00:00:00')),
+                rondFeestdag: !feestdag && !rondFeestdagUit(dateISO) && isRondFeestdag(new Date(dateISO + 'T00:00:00')),
+                speciaal: speciaalVoor(dateISO),
                 promo: event === 'Promo' || promoSet.has(dateISO),
                 snow: event === 'Sneeuw' || w.snow,
+                snowIcoon: event !== 'Sneeuw' && w.snow,   // alleen het icoon in de voorspelling
+                iso: dateISO,
                 bbq: event === 'BBQ' || (w.temp !== null && w.temp >= SETTINGS.tempBbq),
                 warm: w.temp !== null && w.temp >= SETTINGS.tempWarm && w.temp < SETTINGS.tempBbq,
                 bbqQuality: skyQualityForDate(dateISO)
@@ -1313,9 +1363,12 @@
             const feestdag = sel === 'Feestdag';
             return {
                 feestdag,
-                rondFeestdag: !feestdag && isRondFeestdag(currentDate),
+                rondFeestdag: !feestdag && !rondFeestdagUit(dateISO) && isRondFeestdag(currentDate),
+                speciaal: speciaalVoor(dateISO),
                 promo: sel === 'Promo' || promoSet.has(dateISO),
                 snow: sel === 'Sneeuw' || w.snow,
+                snowIcoon: sel !== 'Sneeuw' && w.snow,
+                iso: dateISO,
                 bbq: sel === 'BBQ' || (w.temp !== null && w.temp >= SETTINGS.tempBbq),
                 warm: w.temp !== null && w.temp >= SETTINGS.tempWarm && w.temp < SETTINGS.tempBbq,
                 bbqQuality: skyQualityForDate(dateISO)
@@ -1329,12 +1382,69 @@
             const sky = ctx.bbqQuality ?? 1;
             let f = 1;
             if (ctx.promo) f *= 1 + (group === 'B' ? SETTINGS.pPromoB : SETTINGS.pPromoA) / 100;
-            if (ctx.rondFeestdag) f *= 1 + SETTINGS.pRondFeestdag / 100;
-            if (ctx.snow) f *= 1 - SETTINGS.pSnow / 100;
+            if (ctx.rondFeestdag) f *= 1 + rondFeestdagPct(ctx) / 100;
+            if (ctx.snow) f *= 1 - sneeuwPct(ctx) / 100;
             else if (ctx.bbq) f *= 1 + (group === 'B' ? SETTINGS.pBbqB : SETTINGS.pBbqA) / 100 * sky;
             else if (ctx.warm && group === 'B') f *= 1 + SETTINGS.pWarmB / 100 * sky;
+            // Voorgeprogrammeerde periodes (zomerweekend, concurrent dicht…). Zit hier, zodat
+            // referentiedagen BINNEN een periode erdoor gedeeld worden en de plandag ermee
+            // vermenigvuldigd: zowel het begin als het einde van een periode klopt dan meteen,
+            // en binnen een lange periode blijft de mediaan gewoon bijsturen.
+            // Een speciale dag (kerstavond…) heeft zijn eigen totaal-% en stapelt niet met een periode.
+            if (!ctx.speciaal) f *= periodeFactor(ctx.iso, group);
             return f;
         }
+
+        // ===== SPECIALE DAGEN (eigenaar 14-11-2026) =====
+        // Dagen die elk jaar op dezelfde datum vallen en zich als geen andere dag gedragen
+        // (kerstavond: stokbrood ×2-3 van een zaterdag, pistolets de helft). Vergelijken met de
+        // eigen weekdag of met een zondag werkt niet; de eigenaar wil de MEDIAAN VAN DE LAATSTE
+        // GEWONE ZATERDAGEN als basis, maal een % per groep. Elk jaar bij te stellen.
+        // SETTINGS.speciaal = [{ naam, md: 'MM-DD', a: % pistolets, b: % stokbrood }].
+        // Geldt alleen op maandag-vrijdag: valt de datum in het weekend, dan is er geen meting
+        // en blijft het een gewone weekenddag (kerstavond op zondag = pas in 2028 → dan opnieuw
+        // bekijken). Het label Feestdag doet er op zo'n dag niet toe voor de suggestie.
+        function speciaalVoor(dateISO) {
+            if (!dateISO || !Array.isArray(SETTINGS.speciaal) || !SETTINGS.speciaal.length) return null;
+            const dw = new Date(dateISO + 'T00:00:00').getDay();
+            if (dw === 0 || dw === 6) return null;
+            const md = dateISO.slice(5);
+            return SETTINGS.speciaal.find(x => x.md === md && (Number(x.a) > 0 || Number(x.b) > 0)) || null;
+        }
+        function speciaalPct(p, sp) {
+            const v = Number(p.group === 'B' ? sp.b : sp.a);
+            return v > 0 ? v : 100;
+        }
+        // Dag vóór/ná feestdag telt niet op een speciale dag en niet in een periode die dat
+        // zelf al meet (kerstweek): anders telt hetzelfde effect dubbel.
+        function rondFeestdagUit(dateISO) {
+            return !!speciaalVoor(dateISO) || periodenVoor(dateISO).some(p => p.geenRondFeestdag);
+        }
+        // Welke weekdag levert de referenties? Speciale dag → zaterdag, feestdag → zondag.
+        function basisDow(ctx, dateObj) { return ctx.speciaal ? 6 : ctx.feestdag ? 0 : dateObj.getDay(); }
+        // % van die basis. null = gewone dag (geen factor).
+        function dagPct(p, ctx) {
+            return ctx.speciaal ? speciaalPct(p, ctx.speciaal) : ctx.feestdag ? feestdagPct(p, ctx) : null;
+        }
+
+        // --- Kleine helpers (jaar-audit 2026-11-14): welk % geldt voor deze dag? ---
+        function rondFeestdagPct(ctx) {
+            const v = ctx.rondFeestdag === 'na' ? SETTINGS.pNaFeestdag : SETTINGS.pVoorFeestdag;
+            return (v === undefined || v === null) ? (SETTINGS.pRondFeestdag || 0) : v;
+        }
+        function sneeuwPct(ctx) {
+            const v = ctx.snowIcoon ? SETTINGS.pSnowIcoon : SETTINGS.pSnow;
+            return (v === undefined || v === null) ? SETTINGS.pSnow : v;
+        }
+        // Feestdag als % van zondag: ma-vr per groep, weekend het oude getal (geparkeerd).
+        function feestdagPct(p, ctx) {
+            const dw = ctx.iso ? new Date(ctx.iso + 'T00:00:00').getDay() : 1;
+            if (dw === 0 || dw === 6) return SETTINGS.pFeestdag;
+            const v = p.group === 'B' ? SETTINGS.pFeestdagB : SETTINGS.pFeestdagA;
+            return (v === undefined || v === null) ? SETTINGS.pFeestdag : v;
+        }
+        // Pistolets: gewoon afronden (zie SETTINGS.afrondenA). Stokbrood: nooit onder de vraag.
+        function nooitOnderVraag(p) { return p.group !== 'A' || SETTINGS.afrondenA === false; }
 
         // Laatste n datums (ISO) met dezelfde weekdag als `dow`, strikt vóór fromDate.
         function lastDatesOfDow(fromDate, dow, n) {
@@ -1531,7 +1641,7 @@
                 // als referentie dus even onbruikbaar als een volledig uitverkochte dag.
                 if (!rec || rec.out_of_stock || rec.partial_oos || rec.breuk === null || rec.breuk === undefined) continue;
                 const ctx = getDayContext(iso, promoSet);
-                if (ctx.feestdag || ctx.snow) continue;
+                if (ctx.feestdag || ctx.snow || ctx.speciaal) continue;
                 // Promo is een GROEP B-actie (stokbrood 2 voor €1,99), dus alleen voor B een
                 // reden om de dag als referentie weg te gooien. Gemeten op 272 dagen eigen
                 // data (2026-08-15, mediaan promo/normaal per weekdag): stok wit +60%, terwijl
@@ -1640,7 +1750,7 @@
                 PRODUCTS.filter(q => q.group === group).forEach(q => {
                     const rec = historicalData.find(r => r.datum === iso && r.product === q.name);
                     if (!rec || rec.out_of_stock || rec.partial_oos || rec.breuk === null || rec.breuk === undefined) return;
-                    if ((rec.totaal || 0) <= 0 || rec.event === 'Feestdag') return;
+                    if ((rec.totaal || 0) <= 0 || rec.event === 'Feestdag' || speciaalVoor(iso)) return;
                     if (group === 'B' && getDayContext(iso, promoSet).promo) return;
                     const gebakken = stuksOnDate(q, iso, rec.totaal) - Math.max(0, rec.bestelling || 0);
                     if (gebakken <= 0) return;
@@ -1667,9 +1777,9 @@
             // Venster: tot 9 weken terug, maar refDemands stopt bij de eerste 4 bruikbare
             // NORMALE dagen (promo/feestdag/sneeuw uitgesloten) en de 2 recentste tellen
             // dubbel — verder terug gebeurt dus alleen als specials het venster vervuilen.
-            const dow = ctx.feestdag ? 0 : currentDate.getDay();
+            const dow = basisDow(ctx, currentDate);
             let refs = refDemands(p, lastDatesOfDow(currentDate, dow, 9), promoSet);
-            if (!refs.length && ctx.feestdag) {
+            if (!refs.length && (ctx.feestdag || ctx.speciaal)) {
                 // Geen zondag-data → val terug op eigen weekdag
                 refs = refDemands(p, lastDatesOfDow(currentDate, currentDate.getDay(), 9), promoSet);
             }
@@ -1697,7 +1807,8 @@
                 demand *= 1 + SETTINGS.pSelloutStreak / 100;
             }
 
-            if (ctx.feestdag) demand *= SETTINGS.pFeestdag / 100;
+            const dPct = dagPct(p, ctx);
+            if (dPct !== null) demand *= dPct / 100;
             demand *= contextFactor(ctx, p.group);
 
             // Daling-rem: verkochten de laatste 7 dagen minder dan verwacht → mee omlaag.
@@ -1709,14 +1820,14 @@
             const planStuks = demand / (1 - doelBreuk(p) / 100);
             const free4 = free4ForPlan(p);
             let plates = platesFromStuks(p, planStuks, free4);
-            if (stuksFromPlates(p, plates, free4) < demand) plates++;
+            if (nooitOnderVraag(p) && stuksFromPlates(p, plates, free4) < demand) plates++;
             plates = Math.max(1, plates);
 
             // Vangrail: blijf in de buurt van de klassieke suggestie × dagfactor.
             // Feestdagen uitgezonderd (daar is de klassieke referentie per definitie fout).
             const simple = calculateSuggestion(p);
             let vgLo = 1, vgHi = Infinity, groeiCap = Infinity;
-            if (!ctx.feestdag && simple > 1) {
+            if (dPct === null && simple > 1) {
                 const f = contextFactor(ctx, p.group);
                 const lo = Math.max(1, Math.floor(simple * f * 0.5));
                 const hi = Math.max(lo, Math.ceil(simple * f * 2));
@@ -1730,7 +1841,7 @@
             // de suggestie stijgen, maar in vertrouwde stappen i.p.v. schokken — volgende
             // week schuift de lat vanzelf mee omhoog.
             if (SETTINGS.pMaxGroei > 0 && refs[0].gebNorm > 0) {
-                const fToday = contextFactor(ctx, p.group) * (ctx.feestdag ? SETTINGS.pFeestdag / 100 : 1);
+                const fToday = contextFactor(ctx, p.group) * (dPct !== null ? dPct / 100 : 1);
                 const capStuks = refs[0].gebNorm * fToday * (1 + SETTINGS.pMaxGroei / 100);
                 const capPlates = Math.max(1, platesFromStuks(p, capStuks, free4));
                 if (plates > capPlates) plates = capPlates;
@@ -1819,7 +1930,7 @@
                 const rec = historicalData.find(r => r.datum === iso && r.product === p.name);
                 if (!rec || rec.out_of_stock || rec.partial_oos || rec.breuk === null || rec.breuk === undefined) continue;
                 const ctx = getDayContext(iso, promoSet);
-                if (ctx.feestdag || ctx.snow) continue;
+                if (ctx.feestdag || ctx.snow || ctx.speciaal) continue;
                 if (ctx.promo && p.group === 'B') continue;   // zie refDemands
                 const besteld = Math.max(0, rec.bestelling || 0);
                 const gebakken = Math.max(0, stuksOnDate(p, iso, rec.totaal || 0) - besteld);
@@ -1855,10 +1966,10 @@
             const promoSet = opts.promoSet || buildPromoDateSet();
             const planISO = formatDateISO(dateObj);
             const ctx = getDayContext(planISO, promoSet);
-            const dow = ctx.feestdag ? 0 : dateObj.getDay();
+            const dow = basisDow(ctx, dateObj);
             let refs = diagRefDemands(p, lastDatesOfDow(dateObj, dow, 9), promoSet, planISO);
             let fallbackDow = false;
-            if (!refs.length && ctx.feestdag) {
+            if (!refs.length && (ctx.feestdag || ctx.speciaal)) {
                 refs = diagRefDemands(p, lastDatesOfDow(dateObj, dateObj.getDay(), 9), promoSet, planISO);
                 fallbackDow = true;
             }
@@ -1886,7 +1997,8 @@
                 selloutStreak = true;
             }
             let feestdagFactor = null;
-            if (ctx.feestdag) { feestdagFactor = SETTINGS.pFeestdag / 100; demand *= feestdagFactor; }
+            const dPct = dagPct(p, ctx);
+            if (dPct !== null) { feestdagFactor = dPct / 100; demand *= feestdagFactor; }
             demand *= cf;
             const demandFinal = demand;   // verwachting vóór de daling-rem
             const rem = opts.zonderRem ? { f: 1 } : dalingRemFactor(p.group, dateObj, promoSet);
@@ -1895,14 +2007,14 @@
             const planStuks = demand / (1 - doelBreuk(p) / 100);
             const free4 = free4ForDate(p, dateObj);
             let plates = platesFromStuks(p, planStuks, free4);
-            if (stuksFromPlates(p, plates, free4) < demand) plates++;
+            if (nooitOnderVraag(p) && stuksFromPlates(p, plates, free4) < demand) plates++;
             plates = Math.max(1, plates);
             const platesRaw = plates;
 
             // Vangrail
             const simple = diagClassic(p, dateObj);
             let vangrail = null;
-            if (!ctx.feestdag && simple > 1) {
+            if (dPct === null && simple > 1) {
                 const lo = Math.max(1, Math.floor(simple * cf * 0.5));
                 const hi = Math.max(lo, Math.ceil(simple * cf * 2));
                 const clamped = Math.min(hi, Math.max(lo, plates));
@@ -1913,7 +2025,7 @@
             // Groeirem
             let groeirem = null;
             if (SETTINGS.pMaxGroei > 0 && refs[0].gebNorm > 0) {
-                const fToday = cf * (ctx.feestdag ? SETTINGS.pFeestdag / 100 : 1);
+                const fToday = cf * (dPct !== null ? dPct / 100 : 1);
                 const capStuks = refs[0].gebNorm * fToday * (1 + SETTINGS.pMaxGroei / 100);
                 const capPlates = Math.max(1, platesFromStuks(p, capStuks, free4));
                 groeirem = { capPlates, applied: plates > capPlates };
@@ -1936,11 +2048,17 @@
             const w = weatherInfoForDate(dateISO);
             if (w.temp !== null) chips.push({ icon: '🌡️', label: `${w.temp}°`, color: 'var(--text-secondary)' });
             if (ctx.promo) chips.push({ icon: '📢', label: `Promo (B +${SETTINGS.pPromoB}% / A +${SETTINGS.pPromoA}%)`, color: 'var(--accent-orange)' });
-            if (ctx.feestdag) chips.push({ icon: '🎉', label: `Feestdag (×${SETTINGS.pFeestdag}% v. zondag)`, color: 'var(--accent-orange)' });
-            if (ctx.rondFeestdag) chips.push({ icon: '🎉', label: `Rond feestdag (+${SETTINGS.pRondFeestdag}%)`, color: 'var(--accent-orange)' });
+            if (ctx.speciaal) {
+                chips.push({ icon: '🎄', label: `${ctx.speciaal.naam || 'Speciale dag'} (pistolets ${speciaalPct({ group: 'A' }, ctx.speciaal)}% / stokbrood ${speciaalPct({ group: 'B' }, ctx.speciaal)}% v. zaterdag)`, color: 'var(--accent-orange)' });
+            } else if (ctx.feestdag) {
+                const pA = feestdagPct({ group: 'A' }, ctx), pB = feestdagPct({ group: 'B' }, ctx);
+                chips.push({ icon: '🎉', label: pA === pB ? `Feestdag (×${pA}% v. zondag)` : `Feestdag (pistolets ×${pA}% / stokbrood ×${pB}% v. zondag)`, color: 'var(--accent-orange)' });
+            }
+            if (ctx.rondFeestdag) chips.push({ icon: '🎉', label: `Dag ${ctx.rondFeestdag === 'na' ? 'ná' : 'vóór'} feestdag (+${rondFeestdagPct(ctx)}%)`, color: 'var(--accent-orange)' });
+            if (!ctx.speciaal) periodenVoor(dateISO).filter(periodeRekentMee).forEach(pr => chips.push({ icon: '📅', label: `${pr.naam || 'Periode'} (pistolets ${pctTekst(periodePct(pr, 'A', dateISO))} / stokbrood ${pctTekst(periodePct(pr, 'B', dateISO))})`, color: 'var(--accent-blue)' }));
             const skyPct = Math.round((ctx.bbqQuality ?? 1) * 100);
             const skyTxt = skyPct !== 100 ? ` × lucht ${skyPct}%` : '';
-            if (ctx.snow) chips.push({ icon: '❄️', label: `Sneeuw (−${SETTINGS.pSnow}%)`, color: 'var(--accent-cyan)' });
+            if (ctx.snow) chips.push({ icon: '❄️', label: `${ctx.snowIcoon ? 'Sneeuw-icoon' : 'Sneeuw'} (−${sneeuwPct(ctx)}%)`, color: 'var(--accent-cyan)' });
             else if (ctx.bbq) chips.push({ icon: '☀️', label: `BBQ (B +${SETTINGS.pBbqB}% / A +${SETTINGS.pBbqA}%)${skyTxt}`, color: 'var(--accent-orange)' });
             else if (ctx.warm) chips.push({ icon: '🌤️', label: `Warm (B +${SETTINGS.pWarmB}%)${skyTxt}`, color: 'var(--accent-orange)' });
             if (!chips.length || (chips.length === 1 && chips[0].icon === '🌡️'))
@@ -1956,10 +2074,12 @@
             const skyNote = sky !== 1 ? ` <span style="color:var(--text-muted);">[lucht-kwal. ${Math.round(sky * 100)}%]</span>` : '';
             const parts = [];
             if (ctx.promo) parts.push({ icon: '📢', label: `Promo (${group})`, factor: 1 + (group === 'B' ? SETTINGS.pPromoB : SETTINGS.pPromoA) / 100 });
-            if (ctx.rondFeestdag) parts.push({ icon: '🎉', label: 'Rond feestdag', factor: 1 + SETTINGS.pRondFeestdag / 100 });
-            if (ctx.snow) parts.push({ icon: '❄️', label: 'Sneeuw', factor: 1 - SETTINGS.pSnow / 100 });
+            if (ctx.rondFeestdag) parts.push({ icon: '🎉', label: ctx.rondFeestdag === 'na' ? 'Dag ná feestdag' : 'Dag vóór feestdag', factor: 1 + rondFeestdagPct(ctx) / 100 });
+            if (ctx.snow) parts.push({ icon: '❄️', label: ctx.snowIcoon ? 'Sneeuw-icoon' : 'Sneeuw', factor: 1 - sneeuwPct(ctx) / 100 });
             else if (ctx.bbq) parts.push({ icon: '☀️', label: `BBQ (${group})${skyNote}`, factor: 1 + (group === 'B' ? SETTINGS.pBbqB : SETTINGS.pBbqA) / 100 * sky });
             else if (ctx.warm && group === 'B') parts.push({ icon: '🌤️', label: `Warm (B)${skyNote}`, factor: 1 + SETTINGS.pWarmB / 100 * sky });
+            const pf = ctx.speciaal ? 1 : periodeFactor(ctx.iso, group);
+            if (pf !== 1) parts.push({ icon: '📅', label: 'Periode', factor: pf });
             return parts;
         }
 
@@ -2044,7 +2164,7 @@
                     steps.push(`Basis (gewogen mediaan): <b>${d.baseDemand.toFixed(0)}st</b>`);
                     if (d.floorApplied) steps.push(`↑ uitverkocht-vloer naar ${d.floorTo.toFixed(0)}st`);
                     if (d.selloutStreak) steps.push(`🔥 2× uitverkocht: ×${(1 + SETTINGS.pSelloutStreak / 100).toFixed(2)}`);
-                    if (d.feestdagFactor) steps.push(`🎉 Feestdag: ×${d.feestdagFactor.toFixed(2)}`);
+                    if (d.feestdagFactor) steps.push(d.ctx.speciaal ? `🎄 ${d.ctx.speciaal.naam || 'Speciale dag'}: ×${d.feestdagFactor.toFixed(2)} v. zaterdag` : `🎉 Feestdag: ×${d.feestdagFactor.toFixed(2)}`);
                     const cfParts = contextFactorParts(d.ctx, p.group);
                     cfParts.forEach(pt => steps.push(`${pt.icon} ${pt.label}: ×${pt.factor.toFixed(2)}`));
                     if (cfParts.length > 1) steps.push(`= Dag-multiplier totaal (${p.group}): ×${d.cf.toFixed(2)}`);
@@ -4356,13 +4476,133 @@
             return SETTINGS.perioden;
         }
 
-        // Klaar voor november: geeft de periodes terug waar een datum in valt.
-        // Nog nergens aangeroepen door de motor — bewust.
+        // ===== PERIODES MET EFFECT (jaar-audit 2026-11-14) =====
+        // Een periode = { naam, van, tot, jaarlijks?, a?: [wk, za, zo], b?: [wk, za, zo] }.
+        // a/b zijn percentages voor pistolets/stokbrood per dagsoort. Zonder a/b is het een
+        // label (zoals vóór 14-11). Mét a/b rekent contextFactor() ermee via periodeFactor().
+        // NIET als referentie uitsluiten: dat duwt het 4-dagen-venster verder terug (§8f).
+        // De standaardperiode: het zomerweekend. In 2026 gemeten pistolets za −20% / zo −15..−25%
+        // (04-07 → 16-08) en stokbrood ±−15%. De daling-rem en de mediaan vangen zelf al een deel
+        // op; getest over heel 2026 was de HELFT van de gemeten waarde het best (volle sterkte
+        // was slechter). Weekdagen in de zomer dalen niet (+10%) → 0.
+        const ZOMERWEEKEND = { naam: 'Zomervakantie — weekend', van: '2026-07-01', tot: '2026-08-16',
+                               jaarlijks: true, a: [0, -10, -10], b: [0, -10, -10] };
+
+        // KERST EN OUDEJAAR — gemeten op kerst 2025 (één jaar!), in % van de mediaan van de 4
+        // gewone zaterdagen ervoor. De zaterdag-basis is de enige schone: de weekdagen in die
+        // weken zijn elkaars referentie en vervuilen elkaar (januari 2026 plande daardoor te hoog).
+        //                      pistolets   stokbrood     (gewone weekdag ≈ 18-24% / ≈ 28%)
+        //   ma 22-12, ma 29-12   25-30%      30-34%      → "kerstweek": eigen weekdag +30% / +20%
+        //        (gemeten ≥+27% uitverkocht en +64% schoon; +30 gekozen omdat de periode in 2026 ook
+        //         op ma 21-12 en ma 28-12 valt, waarvoor geen meting bestaat — eigenaar akkoord 14-11)
+        //   di 23-12, di 30-12   39-40%      65-70%
+        //   wo 24-12             51%         237%        (niets uitverkocht = schone meting)
+        //   wo 31-12             53%         261%+       (stokbrood uitverkocht)
+        //   vr 26-12, vr 02-01   47-57%      61-68%      (eerste dag open na de sluiting)
+        // Zaterdag en zondag in die weken verkochten gewoon normaal → geen factor.
+        // Eerste week van januari: geen effect gemeten (wel 3 sneeuwdagen, dus onzeker).
+        // geenRondFeestdag: de dag vóór/ná 25-12 en 01-01 zit al in deze getallen.
+        const KERSTWEEK = { naam: 'Kerstvakantie — weekdagen', van: '2026-12-21', tot: '2027-01-02',
+                            jaarlijks: true, geenRondFeestdag: true, a: [30, 0, 0], b: [20, 0, 0] };
+        const SPECIALE_DAGEN = [
+            { naam: 'Dag vóór kerstavond',   md: '12-23', a: 40, b: 70 },
+            { naam: 'Kerstavond',            md: '12-24', a: 50, b: 240 },
+            { naam: 'Dag na Kerstmis',       md: '12-26', a: 50, b: 70 },
+            { naam: 'Dag vóór oudejaar',     md: '12-30', a: 40, b: 65 },
+            { naam: 'Oudejaarsavond',        md: '12-31', a: 55, b: 270 },
+            { naam: 'Dag na Nieuwjaar',      md: '01-02', a: 55, b: 60 }
+        ];
+
+        // Geldt periode p op deze datum? "Elk jaar" vergelijkt alleen maand-dag (ook over nieuwjaar heen).
+        function periodeGeldt(p, dateISO) {
+            if (!p || !p.van || !p.tot || !dateISO) return false;
+            if (!p.jaarlijks) return dateISO >= p.van && dateISO <= p.tot;
+            const md = dateISO.slice(5), a = p.van.slice(5), b = p.tot.slice(5);
+            return a <= b ? (md >= a && md <= b) : (md >= a || md <= b);
+        }
         function periodenVoor(dateISO) {
-            return periodenLijst().filter(p => p.van && p.tot && dateISO >= p.van && dateISO <= p.tot);
+            return periodenLijst().filter(p => periodeGeldt(p, dateISO));
+        }
+        // % van één periode voor groep A/B op deze datum (weekdag / zaterdag / zondag).
+        function periodePct(p, group, dateISO) {
+            const arr = group === 'A' ? p.a : p.b;
+            if (!Array.isArray(arr)) return 0;
+            const dw = new Date(dateISO + 'T00:00:00').getDay();
+            const v = Number(arr[dw === 6 ? 1 : dw === 0 ? 2 : 0]) || 0;
+            return Math.max(-60, Math.min(400, v));
+        }
+        function periodeRekentMee(p) {
+            return [p.a, p.b].some(arr => Array.isArray(arr) && arr.some(v => Number(v)));
+        }
+        // Alle periodes die op deze datum gelden, vermenigvuldigd.
+        function periodeFactor(dateISO, group) {
+            if (!dateISO || !Array.isArray(SETTINGS.perioden) || !SETTINGS.perioden.length) return 1;
+            let f = 1;
+            SETTINGS.perioden.forEach(p => { if (periodeGeldt(p, dateISO)) f *= 1 + periodePct(p, group, dateISO) / 100; });
+            return f;
+        }
+        const pctTekst = v => (v > 0 ? '+' : '') + v + '%';
+
+        // --- Speciale dagen: lijst in Instellingen ---
+        function speciaalLijst() {
+            if (!Array.isArray(SETTINGS.speciaal)) SETTINGS.speciaal = [];
+            return SETTINGS.speciaal;
+        }
+        function renderSpeciaal() {
+            const box = document.getElementById('speciaal-lijst');
+            if (!box) return;
+            const stijl = 'padding:4px;text-align:center;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border-color);border-radius:6px;font-family:var(--font-mono);';
+            const lijst = speciaalLijst();
+            if (!lijst.length) { box.innerHTML = '<p style="font-size:0.75rem;color:var(--text-muted);">Nog geen speciale dagen.</p>'; return; }
+            box.innerHTML = lijst.map((x, i) => {
+                const [mm, dd] = (x.md || '-').split('-');
+                return `
+                <div style="border:1px solid var(--border-light);border-radius:var(--radius-sm);padding:8px;margin-bottom:8px;">
+                    <div class="setting-row" style="gap:6px;flex-wrap:wrap;">
+                        <input type="text" value="${(x.naam || '').replace(/"/g, '&quot;')}" placeholder="bv. Kerstavond" style="flex:1;min-width:120px;" onchange="speciaalWijzig(${i},'naam',this.value)">
+                        <span style="font-size:0.72rem;color:var(--text-secondary);">dag</span>
+                        <input type="number" min="1" max="31" value="${parseInt(dd) || ''}" style="width:48px;${stijl}" onchange="speciaalWijzig(${i},'dag',this.value)">
+                        <span style="font-size:0.72rem;color:var(--text-secondary);">maand</span>
+                        <input type="number" min="1" max="12" value="${parseInt(mm) || ''}" style="width:48px;${stijl}" onchange="speciaalWijzig(${i},'maand',this.value)">
+                        <button class="btn" style="padding:4px 8px;" onclick="speciaalVerwijder(${i})" title="Verwijderen">🗑️</button>
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:0.72rem;color:var(--text-secondary);margin-top:6px;">
+                        <span>Pistolets</span><input type="number" value="${Number(x.a) || ''}" placeholder="100" style="width:58px;${stijl}" onchange="speciaalWijzig(${i},'a',this.value)"><span>%</span>
+                        <span style="margin-left:10px;">Stokbrood</span><input type="number" value="${Number(x.b) || ''}" placeholder="100" style="width:58px;${stijl}" onchange="speciaalWijzig(${i},'b',this.value)"><span>% van een zaterdag</span>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+        function speciaalToevoegen() {
+            speciaalLijst().push({ naam: '', md: '12-24', a: 100, b: 100 });
+            renderSpeciaal();
+            savePeriodes();
+        }
+        function speciaalWijzig(i, veld, waarde) {
+            const x = speciaalLijst()[i];
+            if (!x) return;
+            if (veld === 'naam') x.naam = waarde;
+            else if (veld === 'a' || veld === 'b') {
+                const v = parseFloat(waarde);
+                x[veld] = isNaN(v) ? 100 : Math.max(5, Math.min(1500, v));
+            } else {
+                let [mm, dd] = (x.md || '12-24').split('-').map(n => parseInt(n) || 1);
+                const v = parseInt(waarde);
+                if (veld === 'dag' && v >= 1 && v <= 31) dd = v;
+                if (veld === 'maand' && v >= 1 && v <= 12) mm = v;
+                x.md = String(mm).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
+            }
+            renderSpeciaal();
+            savePeriodes();
+        }
+        function speciaalVerwijder(i) {
+            speciaalLijst().splice(i, 1);
+            renderSpeciaal();
+            savePeriodes();
         }
 
         function renderPeriodes() {
+            renderSpeciaal();
             const box = document.getElementById('periodes-lijst');
             if (!box) return;
             const lijst = periodenLijst();
@@ -4370,14 +4610,50 @@
                 box.innerHTML = '<p style="font-size:0.75rem;color:var(--text-muted);">Nog geen periodes ingevuld.</p>';
                 return;
             }
-            box.innerHTML = lijst.map((p, i) => `
-                <div class="setting-row" style="gap:6px;flex-wrap:wrap;">
-                    <input type="text" value="${(p.naam || '').replace(/"/g, '&quot;')}" placeholder="bv. Concurrent dicht"
-                           style="flex:1;min-width:120px;" onchange="periodeWijzig(${i},'naam',this.value)">
-                    <input type="date" value="${p.van || ''}" onchange="periodeWijzig(${i},'van',this.value)">
-                    <input type="date" value="${p.tot || ''}" onchange="periodeWijzig(${i},'tot',this.value)">
-                    <button class="btn" style="padding:4px 8px;" onclick="periodeVerwijder(${i})" title="Verwijderen">🗑️</button>
-                </div>`).join('');
+            const veld = (i, g, k, arr) => `<input type="number" value="${Number(arr[k]) || ''}" placeholder="0" style="width:52px;padding:4px;text-align:center;background:var(--bg-input);color:var(--text-primary);border:1px solid var(--border-color);border-radius:6px;font-family:var(--font-mono);" onchange="periodeZetPct(${i},'${g}',${k},this.value)">`;
+            const rij = (i, g, titel, arr) => `
+                <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:0.72rem;color:var(--text-secondary);margin-top:6px;">
+                    <span style="min-width:78px;">${titel} %</span>
+                    <span>wk</span>${veld(i, g, 0, arr)}<span>za</span>${veld(i, g, 1, arr)}<span>zo</span>${veld(i, g, 2, arr)}
+                </div>`;
+            box.innerHTML = lijst.map((p, i) => {
+                const a = Array.isArray(p.a) ? p.a : [], b = Array.isArray(p.b) ? p.b : [];
+                return `
+                <div style="border:1px solid var(--border-light);border-radius:var(--radius-sm);padding:8px;margin-bottom:8px;">
+                    <div class="setting-row" style="gap:6px;flex-wrap:wrap;">
+                        <input type="text" value="${(p.naam || '').replace(/"/g, '&quot;')}" placeholder="bv. Concurrent dicht"
+                               style="flex:1;min-width:120px;" onchange="periodeWijzig(${i},'naam',this.value)">
+                        <input type="date" value="${p.van || ''}" onchange="periodeWijzig(${i},'van',this.value)">
+                        <input type="date" value="${p.tot || ''}" onchange="periodeWijzig(${i},'tot',this.value)">
+                        <button class="btn" style="padding:4px 8px;" onclick="periodeVerwijder(${i})" title="Verwijderen">🗑️</button>
+                    </div>
+                    ${rij(i, 'a', 'Pistolets', a)}
+                    ${rij(i, 'b', 'Stokbrood', b)}
+                    <label style="display:flex;align-items:center;gap:6px;font-size:0.72rem;color:var(--text-secondary);margin-top:6px;">
+                        <input type="checkbox" ${p.jaarlijks ? 'checked' : ''} onchange="periodeZetJaarlijks(${i},this.checked)"> Elk jaar herhalen (zelfde dag en maand)
+                    </label>
+                    <div style="font-size:0.68rem;margin-top:4px;color:${periodeRekentMee(p) ? 'var(--accent-cyan)' : 'var(--text-muted)'};">
+                        ${periodeRekentMee(p) ? '🧠 De suggesties rekenen hiermee.' : '🏷️ Alleen een label — geen effect op de suggesties.'}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        // Percentage van een periode zetten: groep 'a' (pistolets) of 'b' (stokbrood), k = 0 wk / 1 za / 2 zo.
+        function periodeZetPct(i, groep, k, waarde) {
+            const p = periodenLijst()[i];
+            if (!p) return;
+            if (!Array.isArray(p[groep])) p[groep] = [0, 0, 0];
+            const v = parseFloat(waarde);
+            p[groep][k] = isNaN(v) ? 0 : Math.max(-60, Math.min(400, v));
+            renderPeriodes();
+            savePeriodes();
+        }
+        function periodeZetJaarlijks(i, aan) {
+            const p = periodenLijst()[i];
+            if (!p) return;
+            p.jaarlijks = !!aan;
+            savePeriodes();
         }
 
         function periodeToevoegen() {
@@ -4414,6 +4690,10 @@
             localStorage.setItem('bakkerij_settings', JSON.stringify(SETTINGS));
             saveCloudSetting('app', SETTINGS);
             updatePeriodeBadge();
+            // Een periode met percentages verandert de suggesties → planning opnieuw rekenen.
+            // Niet als er onopgeslagen invoer staat: die mag hier niet door wegvallen.
+            remCache = new Map();
+            if (!hasUnsavedChanges) renderPlanning();
             showToast('📅 Periodes opgeslagen');
         }
 
@@ -4461,8 +4741,14 @@
             SETTINGS.pBbqA = num('setting-p-bbq-a', 5);
             SETTINGS.pWarmB = num('setting-p-warm-b', 20);
             SETTINGS.pSnow = Math.min(90, Math.max(0, num('setting-p-snow', 38)));
+            SETTINGS.pSnowIcoon = Math.min(90, Math.max(0, num('setting-p-snow-icoon', 19)));
             SETTINGS.pFeestdag = num('setting-p-feestdag', 80);
-            SETTINGS.pRondFeestdag = num('setting-p-rond-feestdag', 20);
+            SETTINGS.pFeestdagA = num('setting-p-feestdag-a', 70);
+            SETTINGS.pFeestdagB = num('setting-p-feestdag-b', 100);
+            SETTINGS.pVoorFeestdag = num('setting-p-voor-feestdag', 15);
+            SETTINGS.pNaFeestdag = num('setting-p-na-feestdag', 35);
+            const afrA = document.getElementById('setting-afronden-a');
+            if (afrA) SETTINGS.afrondenA = afrA.checked;
             SETTINGS.tempBbq = num('setting-temp-bbq', 23);
             SETTINGS.tempWarm = num('setting-temp-warm', 18);
             SETTINGS.pSellout = num('setting-p-sellout', 10);
@@ -4499,7 +4785,12 @@
             el('setting-p-warm-b').value = SETTINGS.pWarmB;
             el('setting-p-snow').value = SETTINGS.pSnow;
             el('setting-p-feestdag').value = SETTINGS.pFeestdag;
-            el('setting-p-rond-feestdag').value = SETTINGS.pRondFeestdag;
+            if (el('setting-p-snow-icoon')) el('setting-p-snow-icoon').value = SETTINGS.pSnowIcoon;
+            if (el('setting-p-feestdag-a')) el('setting-p-feestdag-a').value = SETTINGS.pFeestdagA;
+            if (el('setting-p-feestdag-b')) el('setting-p-feestdag-b').value = SETTINGS.pFeestdagB;
+            if (el('setting-p-voor-feestdag')) el('setting-p-voor-feestdag').value = SETTINGS.pVoorFeestdag;
+            if (el('setting-p-na-feestdag')) el('setting-p-na-feestdag').value = SETTINGS.pNaFeestdag;
+            if (el('setting-afronden-a')) el('setting-afronden-a').checked = SETTINGS.afrondenA !== false;
             el('setting-temp-bbq').value = SETTINGS.tempBbq;
             el('setting-temp-warm').value = SETTINGS.tempWarm;
             el('setting-p-sellout').value = SETTINGS.pSellout;
@@ -4535,10 +4826,33 @@
                 // Audit 2026-09-23: stokbrood-doel apart (fase 1 = 0) + daling-rem 10%
                 targetBreukB: 0, pDalingRem: 10, restDoorschuivenB: true,
                 // Weekdag 3e-batch drempels + scorebord-toggle (eigenaar 2026-07-03)
-                minL3A: 3, minL3B: 4, showScoreboard: true, extraRijskast: false };
+                minL3A: 3, minL3B: 4, showScoreboard: true, extraRijskast: false,
+                // Jaar-audit 2026-11-14
+                pSnowIcoon: 19, pFeestdagA: 70, pFeestdagB: 100, pVoorFeestdag: 15, pNaFeestdag: 35,
+                afrondenA: true };
             Object.entries(advDefaults).forEach(([k, v]) => {
                 if (SETTINGS[k] === undefined || SETTINGS[k] === null) SETTINGS[k] = v;
             });
+            // Voorgeprogrammeerde periode (jaar-audit 2026-11-14): het zomerweekend. Eén keer
+            // toevoegen; de vlag zorgt dat hij niet terugkomt als de eigenaar hem weghaalt.
+            if (!SETTINGS.kalenderV1) {
+                if (!Array.isArray(SETTINGS.perioden)) SETTINGS.perioden = [];
+                if (!SETTINGS.perioden.some(p => p.naam === ZOMERWEEKEND.naam)) {
+                    SETTINGS.perioden.push({ ...ZOMERWEEKEND, a: [...ZOMERWEEKEND.a], b: [...ZOMERWEEKEND.b] });
+                }
+                SETTINGS.kalenderV1 = true;
+            }
+            // Kerst + oudejaar (eigenaar 14-11-2026): kerstweek-periode en de 4 speciale dagen.
+            if (!SETTINGS.kerstV1) {
+                if (!Array.isArray(SETTINGS.perioden)) SETTINGS.perioden = [];
+                if (!SETTINGS.perioden.some(p => p.naam === KERSTWEEK.naam)) {
+                    SETTINGS.perioden.push({ ...KERSTWEEK, a: [...KERSTWEEK.a], b: [...KERSTWEEK.b] });
+                }
+                if (!Array.isArray(SETTINGS.speciaal) || !SETTINGS.speciaal.length) {
+                    SETTINGS.speciaal = SPECIALE_DAGEN.map(x => ({ ...x }));
+                }
+                SETTINGS.kerstV1 = true;
+            }
         }
 
         function saveSkipBSettings() {
@@ -4959,7 +5273,7 @@
         // Handmatig ophogen bij elke wijziging. Samen met de datum van het bestand
         // zelf zie je in Instellingen meteen of je telefoon de nieuwe versie al
         // binnen heeft, of dat je nog even op de cache moet wachten.
-        const APP_VERSIE = 'v2026-09-26.2';
+        const APP_VERSIE = 'v2026-11-14.2';
 
         function toonVersie() {
             const el = document.getElementById('app-versie');
