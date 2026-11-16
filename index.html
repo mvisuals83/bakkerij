@@ -63,7 +63,16 @@
             --on-orange: #1a1a1a;     /* tekst op de oranje "bovenste plaat"-cel */
             --overlay: rgba(0, 0, 0, 0.7);
             --date-icon-filter: invert(0.75);
-            --toggle-off: var(--bg-input);
+            --toggle-off: #475569;
+            /* Stijl-haken voor thema's met diepte (15-11-2026, tweede ronde). In Legacy geven ze
+               exact het oude beeld: effen achtergrond, geen schaduw, blauw-cyaan knop. */
+            --primary: #3b82f6;       /* kleur van de bediening: actieve tab, knoppen, focus */
+            --on-primary: #ffffff;    /* tekst op zo'n knop */
+            --primary-grad: linear-gradient(135deg, #3b82f6, #06b6d4);
+            --page-bg: #0f172a;       /* achtergrond van de hele pagina (mag een verloop zijn) */
+            --hero-bg: #1e293b;       /* de kop van de Planning-tab */
+            --tabs-bg: #1e293b;
+            --card-shadow: none;      /* schaduw / fijne rand rond elke kaart */
         }
 
         /* ===== THEMA'S (U4, 15-11-2026) =====
@@ -72,41 +81,284 @@
            haar eigen thema. De betekenis van de kleuren blijft in elk thema gelijk:
            rood = fout/breuk, oranje = let op, groen = goed/opgeslagen, cyaan = totaal. */
 
-        /* Donker: zelfde accenten, neutraal antraciet i.p.v. blauwgrijs, iets meer diepte. */
-        :root[data-theme="donker"] {
+        /* Tweede ronde (15-11-2026): 8 donkere en 6 lichte thema's. Elk blok hieronder zet de
+           VOLLEDIGE set variabelen (gegenereerd uit één tabel), ook Legacy. Reden: de
+           voorbeeldtegels in Instellingen dragen zelf data-theme="…" en moeten er precies
+           uitzien als het echte thema, welk thema er ook actief is. Voeg je een variabele
+           toe, zet hem dan in ELK blok.
+           Twee soorten kleur — niet door elkaar halen:
+             --primary / --primary-grad  = de bediening (actieve tab, knoppen, focus). Mag roze,
+                                           goud, paars… zijn; dat is de "smaak" van het thema.
+             --accent-*                  = betekenis (rood fout, oranje let op, groen goed,
+                                           cyaan totaal, blauw cijfers). In elk thema dezelfde rol. */
+        /* Legacy: de :root-waarden, ongewijzigd. Staat hier voluit voor de voorbeeldtegel. */
+        [data-theme="legacy"] {
+            --bg-darkest: #0f172a; --bg-dark: #1e293b; --bg-card: #334155; --bg-input: #475569; --bg-hover: #3f4d63;
+            --text-primary: #f1f5f9; --text-secondary: #94a3b8; --text-muted: #64748b;
+            --accent-blue: #3b82f6; --accent-cyan: #06b6d4; --accent-green: #10b981; --accent-orange: #f97316; --accent-red: #ef4444; --accent-green-dark: #059669;
+            --border-color: #475569; --border-light: #334155;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            --tint-a-1: rgba(249, 115, 22, 0.2); --tint-a-2: rgba(239, 68, 68, 0.1);
+            --tint-b-1: rgba(59, 130, 246, 0.2); --tint-b-2: rgba(6, 182, 212, 0.1);
+            --tint-warn: rgba(245, 158, 11, 0.12); --tint-fout: rgba(239, 68, 68, 0.12);
+            --on-btn: #ffffff; --on-accent: #0f172a; --on-orange: #1a1a1a; --overlay: rgba(0, 0, 0, 0.7); --date-icon-filter: invert(0.75); --toggle-off: #475569;
+            --primary: #3b82f6; --on-primary: #ffffff;
+            --primary-grad: linear-gradient(135deg, #3b82f6, #06b6d4);
+            --page-bg: #0f172a;
+            --hero-bg: #1e293b;
+            --tabs-bg: #1e293b;
+            --card-shadow: none;
+            --radius: 12px; --radius-sm: 8px;
+        }
+        /* Antraciet: zelfde accenten als Legacy, neutraal grijs i.p.v. blauwgrijs. Eenvoudig. */
+        [data-theme="donker"] {
             --bg-darkest: #0c0e12; --bg-dark: #171a21; --bg-card: #232832; --bg-input: #303744; --bg-hover: #3a4352;
             --text-primary: #f0f2f6; --text-secondary: #a9b1bf; --text-muted: #747e8f;
+            --accent-blue: #3b82f6; --accent-cyan: #06b6d4; --accent-green: #10b981; --accent-orange: #f97316; --accent-red: #ef4444; --accent-green-dark: #059669;
             --border-color: #3d4656; --border-light: #2a303b;
             --shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.55);
+            --tint-a-1: rgba(249, 115, 22, 0.2); --tint-a-2: rgba(239, 68, 68, 0.1);
+            --tint-b-1: rgba(59, 130, 246, 0.2); --tint-b-2: rgba(6, 182, 212, 0.1);
+            --tint-warn: rgba(245, 158, 11, 0.12); --tint-fout: rgba(239, 68, 68, 0.12);
+            --on-btn: #ffffff; --on-accent: #0f172a; --on-orange: #1a1a1a; --overlay: rgba(0, 0, 0, 0.7); --date-icon-filter: invert(0.75); --toggle-off: #303744;
+            --primary: #3b82f6; --on-primary: #ffffff;
+            --primary-grad: linear-gradient(135deg, #3b82f6, #06b6d4);
+            --page-bg: #0c0e12;
+            --hero-bg: #171a21;
+            --tabs-bg: #171a21;
+            --card-shadow: none;
+            --radius: 12px; --radius-sm: 8px;
         }
-        /* Licht: voor bij daglicht of in de winkel. Accenten donkerder zodat ze op wit leesbaar blijven. */
-        :root[data-theme="licht"] {
-            --bg-darkest: #eef1f5; --bg-dark: #ffffff; --bg-card: #e7ebf1; --bg-input: #f8fafc; --bg-hover: #dbe1ea;
-            --text-primary: #0f172a; --text-secondary: #475569; --text-muted: #64748b;
-            --accent-blue: #2563eb; --accent-cyan: #0e7490; --accent-green: #047857;
-            --accent-orange: #c2410c; --accent-red: #dc2626; --accent-green-dark: #065f46;
-            --border-color: #b4bfcd; --border-light: #d9dfe8;
-            --shadow: 0 2px 6px -1px rgba(15, 23, 42, 0.15);
-            --tint-a-1: rgba(234, 88, 12, 0.16);  --tint-a-2: rgba(220, 38, 38, 0.06);
-            --tint-b-1: rgba(37, 99, 235, 0.14);  --tint-b-2: rgba(14, 116, 144, 0.06);
-            --tint-warn: rgba(234, 88, 12, 0.10); --tint-fout: rgba(220, 38, 38, 0.08);
-            --on-accent: #ffffff; --on-orange: #ffffff;
-            --overlay: rgba(15, 23, 42, 0.45);
-            --date-icon-filter: none;
-            --toggle-off: #b4bfcd;
+        /* Nordic: koel, gedempt en rustig (naar het Nord-palet). Eenvoudig, zonder verloop. */
+        [data-theme="nordic"] {
+            --bg-darkest: #242933; --bg-dark: #2e3440; --bg-card: #3b4252; --bg-input: #434c5e; --bg-hover: #4c566a;
+            --text-primary: #eceff4; --text-secondary: #c8d0e0; --text-muted: #8f9bb3;
+            --accent-blue: #81a1c1; --accent-cyan: #88c0d0; --accent-green: #a3be8c; --accent-orange: #e8a070; --accent-red: #e8757d; --accent-green-dark: #8fae78;
+            --border-color: #566178; --border-light: #3b4252;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            --tint-a-1: rgba(232, 160, 112, 0.20); --tint-a-2: rgba(232, 117, 125, 0.08);
+            --tint-b-1: rgba(129, 161, 193, 0.24); --tint-b-2: rgba(136, 192, 208, 0.10);
+            --tint-warn: rgba(232, 160, 112, 0.14); --tint-fout: rgba(232, 117, 125, 0.14);
+            --on-btn: #1f242d; --on-accent: #1f242d; --on-orange: #1f242d; --overlay: rgba(0, 0, 0, 0.7); --date-icon-filter: invert(0.75); --toggle-off: #4c566a;
+            --primary: #88c0d0; --on-primary: #1f242d;
+            --primary-grad: linear-gradient(135deg, #88c0d0, #81a1c1);
+            --page-bg: #242933;
+            --hero-bg: #2e3440;
+            --tabs-bg: #2e3440;
+            --card-shadow: none;
+            --radius: 12px; --radius-sm: 8px;
+        }
+        /* Espresso: warm donkerbruin met room-accent, zoals de bakkerij zelf. Lichte diepte. */
+        [data-theme="espresso"] {
+            --bg-darkest: #17110d; --bg-dark: #221912; --bg-card: #30241b; --bg-input: #3f3025; --bg-hover: #4d3c2f;
+            --text-primary: #f6ece0; --text-secondary: #c9b8a4; --text-muted: #9a8671;
+            --accent-blue: #6fb1e8; --accent-cyan: #59c9c0; --accent-green: #6fcf8e; --accent-orange: #ff9a4d; --accent-red: #f0605a; --accent-green-dark: #4fb673;
+            --border-color: #5a4634; --border-light: #35281d;
+            --shadow: 0 6px 16px -4px rgba(0, 0, 0, 0.6);
+            --tint-a-1: rgba(249, 115, 22, 0.2); --tint-a-2: rgba(239, 68, 68, 0.1);
+            --tint-b-1: rgba(111, 177, 232, 0.18); --tint-b-2: rgba(89, 201, 192, 0.08);
+            --tint-warn: rgba(245, 158, 11, 0.12); --tint-fout: rgba(239, 68, 68, 0.12);
+            --on-btn: #1a120b; --on-accent: #1a120b; --on-orange: #1a120b; --overlay: rgba(0, 0, 0, 0.7); --date-icon-filter: invert(0.75); --toggle-off: #4d3c2f;
+            --primary: #e8c9a0; --on-primary: #2a1c10;
+            --primary-grad: linear-gradient(135deg, #f0d9b5, #c9a06c);
+            --page-bg: linear-gradient(180deg, #1c150f 0%, #120d09 100%);
+            --hero-bg: linear-gradient(135deg, #2a1f16, #1f1711);
+            --tabs-bg: #1c150f;
+            --card-shadow: 0 1px 0 rgba(255, 236, 210, 0.04) inset, 0 10px 22px -14px rgba(0, 0, 0, 0.8);
+            --radius: 12px; --radius-sm: 8px;
+        }
+        /* Middernacht: diep nachtblauw met een verloop naar paars en zachte schaduwen. */
+        [data-theme="middernacht"] {
+            --bg-darkest: #0d1020; --bg-dark: #171b2e; --bg-card: #222842; --bg-input: #2d3454; --bg-hover: #3a4268;
+            --text-primary: #e6e9f8; --text-secondary: #a9b1d6; --text-muted: #7480ab;
+            --accent-blue: #7aa2f7; --accent-cyan: #5fd4f4; --accent-green: #4fd6a0; --accent-orange: #ff9e64; --accent-red: #ff6b7d; --accent-green-dark: #35b884;
+            --border-color: #3b4470; --border-light: #262d4a;
+            --shadow: 0 8px 22px -6px rgba(0, 0, 0, 0.7);
+            --tint-a-1: rgba(255, 158, 100, 0.20); --tint-a-2: rgba(255, 107, 125, 0.08);
+            --tint-b-1: rgba(122, 162, 247, 0.24); --tint-b-2: rgba(187, 154, 247, 0.12);
+            --tint-warn: rgba(245, 158, 11, 0.12); --tint-fout: rgba(239, 68, 68, 0.12);
+            --on-btn: #0b0e1c; --on-accent: #0b0e1c; --on-orange: #0b0e1c; --overlay: rgba(0, 0, 0, 0.7); --date-icon-filter: invert(0.75); --toggle-off: #3a4268;
+            --primary: #7aa2f7; --on-primary: #0b0e1c;
+            --primary-grad: linear-gradient(135deg, #7aa2f7, #bb9af7);
+            --page-bg: linear-gradient(160deg, #0b0e1d 0%, #141a3a 55%, #1f1745 100%);
+            --hero-bg: linear-gradient(135deg, #1b2142, #251e4c);
+            --tabs-bg: #12162a;
+            --card-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 12px 26px -14px rgba(0, 0, 0, 0.8);
+            --radius: 14px; --radius-sm: 9px;
+        }
+        /* Roze nacht: donker pruimpaars met roze knoppen en een roze-paars verloop. */
+        [data-theme="rozenacht"] {
+            --bg-darkest: #171320; --bg-dark: #211a2d; --bg-card: #2d2441; --bg-input: #3a3053; --bg-hover: #483c64;
+            --text-primary: #f3ebf8; --text-secondary: #bcb0cd; --text-muted: #9385ae;
+            --accent-blue: #9d8cff; --accent-cyan: #7fd6e0; --accent-green: #5fd4a0; --accent-orange: #ffa257; --accent-red: #ff5f4f; --accent-green-dark: #42b985;
+            --border-color: #4d4169; --border-light: #302743;
+            --shadow: 0 8px 22px -6px rgba(0, 0, 0, 0.7);
+            --tint-a-1: rgba(255, 162, 87, 0.20); --tint-a-2: rgba(244, 114, 182, 0.10);
+            --tint-b-1: rgba(157, 140, 255, 0.24); --tint-b-2: rgba(127, 214, 224, 0.10);
+            --tint-warn: rgba(245, 158, 11, 0.12); --tint-fout: rgba(239, 68, 68, 0.12);
+            --on-btn: #1c0d14; --on-accent: #1c0d14; --on-orange: #1c0d14; --overlay: rgba(0, 0, 0, 0.7); --date-icon-filter: invert(0.75); --toggle-off: #483c64;
+            --primary: #f472b6; --on-primary: #2b0d20;
+            --primary-grad: linear-gradient(135deg, #f472b6, #c084fc);
+            --page-bg: linear-gradient(165deg, #150f1e 0%, #25152f 55%, #36183c 100%);
+            --hero-bg: linear-gradient(135deg, #2b2040, #3d2046);
+            --tabs-bg: #1b1526;
+            --card-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 12px 26px -14px rgba(0, 0, 0, 0.8);
+            --radius: 14px; --radius-sm: 9px;
+        }
+        /* Zwart & goud: bijna zwart met gouden knoppen en een fijne gouden rand om elke kaart. Luxe. */
+        [data-theme="goud"] {
+            --bg-darkest: #0a0a0b; --bg-dark: #141416; --bg-card: #1f1f23; --bg-input: #2b2b31; --bg-hover: #36363e;
+            --text-primary: #f5f1e6; --text-secondary: #b9b3a3; --text-muted: #858072;
+            --accent-blue: #6ea8fe; --accent-cyan: #5fd0e0; --accent-green: #4ccf90; --accent-orange: #ff9447; --accent-red: #f2555a; --accent-green-dark: #33b377;
+            --border-color: #3d3a31; --border-light: #272520;
+            --shadow: 0 10px 26px -8px rgba(0, 0, 0, 0.85);
+            --tint-a-1: rgba(249, 115, 22, 0.2); --tint-a-2: rgba(239, 68, 68, 0.1);
+            --tint-b-1: rgba(110, 168, 254, 0.16); --tint-b-2: rgba(95, 208, 224, 0.06);
+            --tint-warn: rgba(245, 158, 11, 0.12); --tint-fout: rgba(239, 68, 68, 0.12);
+            --on-btn: #0a0a0b; --on-accent: #0a0a0b; --on-orange: #0a0a0b; --overlay: rgba(0, 0, 0, 0.7); --date-icon-filter: invert(0.75); --toggle-off: #36363e;
+            --primary: #d9b45a; --on-primary: #1a1405;
+            --primary-grad: linear-gradient(135deg, #f0d48a, #c9982f);
+            --page-bg: radial-gradient(120% 70% at 50% 0%, #1e1b13 0%, #0a0a0b 62%);
+            --hero-bg: linear-gradient(135deg, #1c1b17, #121214);
+            --tabs-bg: #0f0f11;
+            --card-shadow: 0 0 0 1px rgba(217, 180, 90, 0.18), 0 14px 30px -16px rgba(0, 0, 0, 0.95);
+            --radius: 10px; --radius-sm: 7px;
         }
         /* Hoog contrast: voor de bakkerijvloer (meel op het scherm, fel licht, afstand). */
-        :root[data-theme="contrast"] {
+        [data-theme="contrast"] {
             --bg-darkest: #000000; --bg-dark: #0d0d0d; --bg-card: #1f1f1f; --bg-input: #2c2c2c; --bg-hover: #3b3b3b;
             --text-primary: #ffffff; --text-secondary: #e4e4e4; --text-muted: #b8b8b8;
-            --accent-blue: #6cb2ff; --accent-cyan: #3fe0f5; --accent-green: #4ade80;
-            --accent-orange: #ffa94d; --accent-red: #ff6b6b; --accent-green-dark: #22c55e;
+            --accent-blue: #6cb2ff; --accent-cyan: #3fe0f5; --accent-green: #4ade80; --accent-orange: #ffa94d; --accent-red: #ff6b6b; --accent-green-dark: #22c55e;
             --border-color: #9c9c9c; --border-light: #5e5e5e;
-            --on-btn: #000000; --on-accent: #000000; --on-orange: #000000;
-            --toggle-off: #6e6e6e;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            --tint-a-1: rgba(249, 115, 22, 0.2); --tint-a-2: rgba(239, 68, 68, 0.1);
+            --tint-b-1: rgba(59, 130, 246, 0.2); --tint-b-2: rgba(6, 182, 212, 0.1);
+            --tint-warn: rgba(245, 158, 11, 0.12); --tint-fout: rgba(239, 68, 68, 0.12);
+            --on-btn: #000000; --on-accent: #000000; --on-orange: #000000; --overlay: rgba(0, 0, 0, 0.7); --date-icon-filter: invert(0.75); --toggle-off: #6e6e6e;
+            --primary: #6cb2ff; --on-primary: #000000;
+            --primary-grad: linear-gradient(135deg, #6cb2ff, #3fe0f5);
+            --page-bg: #000000;
+            --hero-bg: #0d0d0d;
+            --tabs-bg: #0d0d0d;
+            --card-shadow: 0 0 0 1px #5e5e5e;
+            --radius: 12px; --radius-sm: 8px;
         }
-        :root[data-theme="contrast"] .planning-table input,
-        :root[data-theme="contrast"] .breuk-item input { font-weight: 700; }
+        /* Licht: helder en eenvoudig, voor bij daglicht of in de winkel. */
+        [data-theme="licht"] {
+            --bg-darkest: #eef1f5; --bg-dark: #ffffff; --bg-card: #e7ebf1; --bg-input: #f8fafc; --bg-hover: #dbe1ea;
+            --text-primary: #0f172a; --text-secondary: #475569; --text-muted: #64748b;
+            --accent-blue: #2563eb; --accent-cyan: #0e7490; --accent-green: #047857; --accent-orange: #c2410c; --accent-red: #dc2626; --accent-green-dark: #065f46;
+            --border-color: #b4bfcd; --border-light: #d9dfe8;
+            --shadow: 0 2px 6px -1px rgba(15, 23, 42, 0.15);
+            --tint-a-1: rgba(234, 88, 12, 0.16); --tint-a-2: rgba(220, 38, 38, 0.06);
+            --tint-b-1: rgba(37, 99, 235, 0.14); --tint-b-2: rgba(14, 116, 144, 0.06);
+            --tint-warn: rgba(234, 88, 12, 0.10); --tint-fout: rgba(220, 38, 38, 0.08);
+            --on-btn: #ffffff; --on-accent: #ffffff; --on-orange: #ffffff; --overlay: rgba(15, 23, 42, 0.45); --date-icon-filter: none; --toggle-off: #b4bfcd;
+            --primary: #2563eb; --on-primary: #ffffff;
+            --primary-grad: linear-gradient(135deg, #2563eb, #0891b2);
+            --page-bg: #eef1f5;
+            --hero-bg: #ffffff;
+            --tabs-bg: #ffffff;
+            --card-shadow: none;
+            --radius: 12px; --radius-sm: 8px;
+        }
+        /* Crème: warm papier met broodkorst-bruin. Eenvoudig, rustig voor de ogen. */
+        [data-theme="creme"] {
+            --bg-darkest: #f5efe4; --bg-dark: #fffdf8; --bg-card: #efe6d6; --bg-input: #fffaf0; --bg-hover: #e4d8c3;
+            --text-primary: #2b2118; --text-secondary: #6b5a48; --text-muted: #857260;
+            --accent-blue: #1d5fbf; --accent-cyan: #0e7490; --accent-green: #047857; --accent-orange: #c2410c; --accent-red: #c81e1e; --accent-green-dark: #065f46;
+            --border-color: #d2c2a8; --border-light: #e8dcc8;
+            --shadow: 0 2px 6px -1px rgba(90, 60, 20, 0.18);
+            --tint-a-1: rgba(234, 88, 12, 0.16); --tint-a-2: rgba(220, 38, 38, 0.06);
+            --tint-b-1: rgba(37, 99, 235, 0.14); --tint-b-2: rgba(14, 116, 144, 0.06);
+            --tint-warn: rgba(234, 88, 12, 0.10); --tint-fout: rgba(220, 38, 38, 0.08);
+            --on-btn: #ffffff; --on-accent: #ffffff; --on-orange: #ffffff; --overlay: rgba(43, 33, 24, 0.45); --date-icon-filter: none; --toggle-off: #d2c2a8;
+            --primary: #8a5a2b; --on-primary: #ffffff;
+            --primary-grad: linear-gradient(135deg, #a06a35, #7a4a1f);
+            --page-bg: #f5efe4;
+            --hero-bg: #fffdf8;
+            --tabs-bg: #fffdf8;
+            --card-shadow: 0 1px 2px rgba(90, 60, 20, 0.10);
+            --radius: 12px; --radius-sm: 8px;
+        }
+        /* Munt: fris muntgroen met blauwe knoppen. Eenvoudig. */
+        [data-theme="munt"] {
+            --bg-darkest: #ecf5f0; --bg-dark: #ffffff; --bg-card: #e0eee7; --bg-input: #f7fcf9; --bg-hover: #cfe4d9;
+            --text-primary: #10261d; --text-secondary: #456356; --text-muted: #5f796d;
+            --accent-blue: #2563eb; --accent-cyan: #0e7490; --accent-green: #047857; --accent-orange: #c2410c; --accent-red: #dc2626; --accent-green-dark: #065f46;
+            --border-color: #b3d1c2; --border-light: #d6e8df;
+            --shadow: 0 2px 6px -1px rgba(16, 60, 40, 0.16);
+            --tint-a-1: rgba(234, 88, 12, 0.16); --tint-a-2: rgba(220, 38, 38, 0.06);
+            --tint-b-1: rgba(37, 99, 235, 0.14); --tint-b-2: rgba(14, 116, 144, 0.06);
+            --tint-warn: rgba(234, 88, 12, 0.10); --tint-fout: rgba(220, 38, 38, 0.08);
+            --on-btn: #ffffff; --on-accent: #ffffff; --on-orange: #ffffff; --overlay: rgba(16, 38, 29, 0.45); --date-icon-filter: none; --toggle-off: #b3d1c2;
+            --primary: #2563eb; --on-primary: #ffffff;
+            --primary-grad: linear-gradient(135deg, #2563eb, #0d9488);
+            --page-bg: #ecf5f0;
+            --hero-bg: #ffffff;
+            --tabs-bg: #ffffff;
+            --card-shadow: 0 1px 2px rgba(16, 60, 40, 0.08);
+            --radius: 12px; --radius-sm: 8px;
+        }
+        /* Roze: zacht roze met roze-paarse knoppen, een licht verloop en zachte schaduwen. */
+        [data-theme="roze"] {
+            --bg-darkest: #fdf2f7; --bg-dark: #ffffff; --bg-card: #fbe4ef; --bg-input: #fff7fb; --bg-hover: #f6cfe0;
+            --text-primary: #3b1730; --text-secondary: #7a4a66; --text-muted: #94687f;
+            --accent-blue: #6d4bd8; --accent-cyan: #0e7490; --accent-green: #047857; --accent-orange: #c2410c; --accent-red: #dc2f1e; --accent-green-dark: #065f46;
+            --border-color: #e8b4cd; --border-light: #f6d6e5;
+            --shadow: 0 6px 18px -6px rgba(190, 24, 93, 0.30);
+            --tint-a-1: rgba(234, 88, 12, 0.14); --tint-a-2: rgba(224, 51, 143, 0.07);
+            --tint-b-1: rgba(109, 75, 216, 0.14); --tint-b-2: rgba(14, 116, 144, 0.06);
+            --tint-warn: rgba(234, 88, 12, 0.10); --tint-fout: rgba(220, 38, 38, 0.08);
+            --on-btn: #ffffff; --on-accent: #ffffff; --on-orange: #ffffff; --overlay: rgba(59, 23, 48, 0.45); --date-icon-filter: none; --toggle-off: #e8b4cd;
+            --primary: #e0338f; --on-primary: #ffffff;
+            --primary-grad: linear-gradient(135deg, #ec4899, #a855f7);
+            --page-bg: linear-gradient(170deg, #fff5f9 0%, #fde6f1 50%, #f4e3fb 100%);
+            --hero-bg: linear-gradient(135deg, #ffffff, #fdeaf3);
+            --tabs-bg: #ffffff;
+            --card-shadow: 0 1px 2px rgba(190, 24, 93, 0.06), 0 12px 26px -16px rgba(190, 24, 93, 0.32);
+            --radius: 16px; --radius-sm: 10px;
+        }
+        /* Lavendel: zacht paars met een verloop naar lichtblauw en zachte schaduwen. */
+        [data-theme="lavendel"] {
+            --bg-darkest: #f3f0fb; --bg-dark: #ffffff; --bg-card: #ebe6f8; --bg-input: #faf8ff; --bg-hover: #dcd4f2;
+            --text-primary: #231a3d; --text-secondary: #5a4d7a; --text-muted: #7a6d96;
+            --accent-blue: #2563eb; --accent-cyan: #0e7490; --accent-green: #047857; --accent-orange: #c2410c; --accent-red: #dc2626; --accent-green-dark: #065f46;
+            --border-color: #c6b9e8; --border-light: #e2daf5;
+            --shadow: 0 6px 18px -6px rgba(76, 29, 149, 0.28);
+            --tint-a-1: rgba(234, 88, 12, 0.16); --tint-a-2: rgba(220, 38, 38, 0.06);
+            --tint-b-1: rgba(124, 58, 237, 0.13); --tint-b-2: rgba(37, 99, 235, 0.06);
+            --tint-warn: rgba(234, 88, 12, 0.10); --tint-fout: rgba(220, 38, 38, 0.08);
+            --on-btn: #ffffff; --on-accent: #ffffff; --on-orange: #ffffff; --overlay: rgba(35, 26, 61, 0.45); --date-icon-filter: none; --toggle-off: #c6b9e8;
+            --primary: #7c3aed; --on-primary: #ffffff;
+            --primary-grad: linear-gradient(135deg, #8b5cf6, #6366f1);
+            --page-bg: linear-gradient(165deg, #f8f5ff 0%, #ece6fb 55%, #e2ecfd 100%);
+            --hero-bg: linear-gradient(135deg, #ffffff, #f1ecfd);
+            --tabs-bg: #ffffff;
+            --card-shadow: 0 1px 2px rgba(76, 29, 149, 0.06), 0 12px 26px -16px rgba(76, 29, 149, 0.30);
+            --radius: 16px; --radius-sm: 10px;
+        }
+        /* Porselein: wit met diepe zachte schaduwen en donkerblauwe knoppen. Luxe en strak. */
+        [data-theme="porselein"] {
+            --bg-darkest: #f1f3f6; --bg-dark: #ffffff; --bg-card: #eef0f4; --bg-input: #fafbfc; --bg-hover: #e2e6ec;
+            --text-primary: #111827; --text-secondary: #4b5563; --text-muted: #6b7280;
+            --accent-blue: #1e40af; --accent-cyan: #0e7490; --accent-green: #047857; --accent-orange: #c2410c; --accent-red: #dc2626; --accent-green-dark: #065f46;
+            --border-color: #c9ced8; --border-light: #e6e9ee;
+            --shadow: 0 10px 30px -10px rgba(17, 24, 39, 0.30);
+            --tint-a-1: rgba(234, 88, 12, 0.16); --tint-a-2: rgba(220, 38, 38, 0.06);
+            --tint-b-1: rgba(37, 99, 235, 0.14); --tint-b-2: rgba(14, 116, 144, 0.06);
+            --tint-warn: rgba(234, 88, 12, 0.10); --tint-fout: rgba(220, 38, 38, 0.08);
+            --on-btn: #ffffff; --on-accent: #ffffff; --on-orange: #ffffff; --overlay: rgba(17, 24, 39, 0.5); --date-icon-filter: none; --toggle-off: #c9ced8;
+            --primary: #1f2a44; --on-primary: #ffffff;
+            --primary-grad: linear-gradient(135deg, #2f4170, #141c33);
+            --page-bg: linear-gradient(180deg, #fcfcfd 0%, #eceff3 100%);
+            --hero-bg: linear-gradient(135deg, #ffffff, #f2f4f8);
+            --tabs-bg: #ffffff;
+            --card-shadow: 0 0 0 1px rgba(17, 24, 39, 0.04), 0 1px 2px rgba(17, 24, 39, 0.06), 0 20px 38px -20px rgba(17, 24, 39, 0.30);
+            --radius: 16px; --radius-sm: 10px;
+        }
+        [data-theme="contrast"] .planning-table input,
+        [data-theme="contrast"] .breuk-item input { font-weight: 700; }
 
         /* Knoppen zonder eigen opmaak ("➕ Periode toevoegen", 🗑️) kregen de witte
            browserstandaard en vielen uit elk thema. */
@@ -115,18 +367,37 @@
             border: 1px solid var(--border-color); border-radius: var(--radius-sm);
             padding: 8px 12px; font-size: 0.8rem; font-family: var(--font-sans); cursor: pointer;
         }
+        .thema-groep-kop { font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); margin: 14px 0 8px; }
+        .thema-groep-kop:first-child { margin-top: 0; }
         .thema-knoppen { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        @media (min-width: 640px) { .thema-knoppen { grid-template-columns: repeat(4, 1fr); } }
         .thema-knop {
-            display: flex; align-items: center; gap: 10px; text-align: left;
+            display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch;
+            text-align: left; width: 100%;
             background: var(--bg-card); color: var(--text-primary);
             border: 2px solid var(--border-color); border-radius: var(--radius-sm);
-            padding: 10px; min-height: 48px; cursor: pointer; font-family: var(--font-sans);
+            padding: 6px 6px 8px; cursor: pointer; font-family: var(--font-sans);
         }
-        .thema-knop.actief { border-color: var(--accent-blue); }
-        .thema-knop .staal { display: flex; flex-shrink: 0; width: 34px; height: 34px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); }
-        .thema-knop .staal i { flex: 1; }
-        .thema-knop .naam { font-weight: 600; font-size: 0.85rem; }
-        .thema-knop .uitleg { font-size: 0.68rem; color: var(--text-muted); }
+        .thema-knop.actief { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary); }
+        .thema-knop .naam { display: block; font-weight: 600; font-size: 0.82rem; margin: 6px 2px 1px; }
+        .thema-knop .uitleg { display: block; font-size: 0.66rem; color: var(--text-muted); margin: 0 2px; line-height: 1.3; }
+        /* Voorbeeldtegel: draagt zelf data-theme en toont dus de echte kleuren, het echte
+           verloop en de echte schaduw van dat thema — een mini-kaart met tekst, drie
+           betekenis-stippen en een knop. */
+        .thema-voorbeeld {
+            display: block; position: relative; height: 66px; border-radius: 6px; overflow: hidden;
+            background: var(--page-bg); padding: 8px;
+        }
+        .thema-voorbeeld .tv-kaart {
+            display: block; position: relative; height: 100%; border-radius: 6px;
+            background: var(--bg-dark); box-shadow: var(--card-shadow); padding: 7px 8px;
+        }
+        .thema-voorbeeld .tv-lijn { display: block; height: 4px; width: 58%; border-radius: 2px; background: var(--text-primary); margin-bottom: 5px; }
+        .thema-voorbeeld .tv-lijn.kort { width: 34%; background: var(--text-muted); }
+        .thema-voorbeeld .tv-stippen { position: absolute; left: 8px; bottom: 7px; display: flex; gap: 4px; }
+        .thema-voorbeeld .tv-stippen i { width: 8px; height: 8px; border-radius: 50%; }
+        .thema-voorbeeld .tv-knop { position: absolute; right: 7px; bottom: 6px; width: 34px; height: 13px; border-radius: 4px; background: var(--primary-grad); }
+
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -140,9 +411,22 @@
             color: var(--text-primary);
             min-height: 100vh;
         }
+        /* Pagina-achtergrond als vaste laag achter alles: zo kan een thema een verloop tonen
+           dat blijft staan tijdens het scrollen (background-attachment: fixed hapert op
+           telefoons). In Legacy is --page-bg gewoon de effen achtergrondkleur. */
+        body { background: transparent; }
+        body::before {
+            content: ''; position: fixed; inset: 0; z-index: -1;
+            background: var(--page-bg); pointer-events: none;
+        }
+        /* Diepte: schaduw of fijne rand rond de kaarten op het hoogste niveau. Legacy: none. */
+        .planning-header, .group-card, .lading-card, .reference-card, .settings-section,
+        .page > .collapsible-section, .stat-card, .breuk-date-selector, .breuk-item {
+            box-shadow: var(--card-shadow);
+        }
         
         .planning-header {
-            background: var(--bg-dark);
+            background: var(--hero-bg);
             border-radius: var(--radius);
             padding: 12px;
             margin-bottom: 12px;
@@ -221,13 +505,14 @@
         }
         
         .save-btn {
-            background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
-            border: none; color: var(--on-btn); padding: 8px 16px; border-radius: var(--radius-sm);
+            background: var(--primary-grad);
+            border: none; color: var(--on-primary); padding: 8px 16px; border-radius: var(--radius-sm);
             font-weight: 600; font-size: 0.9rem; cursor: pointer;
             display: flex; align-items: center; gap: 6px;
             transition: all 0.3s ease;
         }
         
+        .save-btn.unsaved, .save-btn.saved, .save-btn.viewing-saved { color: var(--on-btn); }
         .save-btn.unsaved {
             background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
             animation: pulse-unsaved 2s infinite;
@@ -247,7 +532,7 @@
         }
         
         .tabs {
-            display: flex; background: var(--bg-dark);
+            display: flex; background: var(--tabs-bg);
             border-bottom: 1px solid var(--border-light);
         }
         
@@ -258,10 +543,10 @@
             position: relative; white-space: nowrap; text-align: center;
         }
         
-        .tab.active { color: var(--accent-blue); }
+        .tab.active { color: var(--primary); }
         .tab.active::after {
             content: ''; position: absolute; bottom: 0; left: 0; right: 0;
-            height: 3px; background: var(--accent-blue);
+            height: 3px; background: var(--primary);
         }
         
         .main { padding: 12px; padding-bottom: 100px; }
@@ -373,7 +658,7 @@
             font-family: var(--font-mono); font-size: 0.85rem; text-align: center;
         }
         
-        .planning-table input:focus { outline: none; border-color: var(--accent-blue); }
+        .planning-table input:focus { outline: none; border-color: var(--primary); }
         
         .planning-table .sug-value {
             color: var(--text-secondary); font-family: var(--font-mono); font-size: 0.85rem;
@@ -462,7 +747,7 @@
             padding: 10px 20px; border: none; border-radius: var(--radius-sm);
             font-weight: 600; cursor: pointer; font-size: 0.9rem;
         }
-        .modal-btn.confirm { background: var(--accent-blue); color: var(--on-btn); }
+        .modal-btn.confirm { background: var(--primary); color: var(--on-primary); }
         .modal-btn.cancel { background: var(--bg-card); color: var(--text-primary); }
         
         .breuk-date-selector { background: var(--bg-dark); border-radius: var(--radius); padding: 10px; margin-bottom: 10px; }
@@ -589,7 +874,7 @@
         
         .range-btn { padding: 8px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; transition: all 0.2s; }
         .range-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-        .range-btn.active { background: var(--accent-blue); color: var(--on-btn); border-color: var(--accent-blue); }
+        .range-btn.active { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
         
         @media (max-width: 400px) {
             .save-btn span { display: none; }
@@ -632,11 +917,11 @@
             margin-bottom: 14px;
         }
         .login-card input:focus {
-            outline: none; border-color: var(--accent-blue);
+            outline: none; border-color: var(--primary);
         }
         .login-card button {
             width: 100%; padding: 13px;
-            background: var(--accent-blue); color: var(--on-btn);
+            background: var(--primary); color: var(--on-primary);
             border: none; border-radius: var(--radius-sm);
             font-size: 1rem; font-weight: 600; font-family: var(--font-sans);
             cursor: pointer;
@@ -785,7 +1070,7 @@
                 <div class="collapsible-content" style="display: none;">
                     <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
                         <input type="date" id="ref-date-picker" onchange="loadReferencePlanning()" style="flex: 1; padding: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary);">
-                        <button onclick="copyReferencePlanning()" style="padding: 8px 12px; background: var(--accent-blue); border: none; border-radius: var(--radius-sm); color: var(--on-btn); font-weight: 600; cursor: pointer; white-space: nowrap;">📋 Kopieer</button>
+                        <button onclick="copyReferencePlanning()" style="padding: 8px 12px; background: var(--primary); border: none; border-radius: var(--radius-sm); color: var(--on-primary); font-weight: 600; cursor: pointer; white-space: nowrap;">📋 Kopieer</button>
                     </div>
                     <div id="ref-feest-kiezer"></div>
                     <div id="ref-planning-content" style="color: var(--text-muted); font-size: 0.85rem;">Selecteer een datum...</div>
@@ -979,8 +1264,8 @@
         <div class="page" id="page-instellingen">
             <div class="settings-section">
                 <h3>🎨 Thema (alleen dit toestel)</h3>
-                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">De kleuren van de app op <b>dít toestel</b>. Je collega houdt haar eigen keuze — er gaat niets naar de cloud. Rood, oranje en groen betekenen in elk thema hetzelfde.</p>
-                <div class="thema-knoppen" id="thema-knoppen"></div>
+                <p style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 8px;">De kleuren van de app op <b>dít toestel</b>. Je collega houdt haar eigen keuze — er gaat niets naar de cloud. Elk vakje toont het echte thema in het klein. Rood, oranje en groen betekenen in elk thema hetzelfde.</p>
+                <div id="thema-knoppen"></div>
             </div>
             <div class="settings-section">
                 <h3>⚙️ Capaciteit</h3>
@@ -5292,10 +5577,23 @@
         // thema gecontroleerd leesbaar. De stijl zelf staat in de CSS ([data-theme="…"]);
         // hier alleen de keuze. Opslag: localStorage 'bakkerij_theme' — per toestel.
         const THEMAS = [
-            { id: 'legacy',   naam: 'Legacy',        uitleg: 'zoals het altijd was',    staal: ['#0f172a', '#334155', '#3b82f6'] },
-            { id: 'donker',   naam: 'Donker',        uitleg: 'rustiger, meer diepte',   staal: ['#0c0e12', '#232832', '#3b82f6'] },
-            { id: 'licht',    naam: 'Licht',         uitleg: 'voor bij daglicht',       staal: ['#eef1f5', '#ffffff', '#2563eb'] },
-            { id: 'contrast', naam: 'Hoog contrast', uitleg: 'voor in de bakkerij',     staal: ['#000000', '#ffffff', '#ffa94d'] }
+            // groep 'donker' / 'licht' = de twee blokken in de kiezer. De id is wat in
+            // localStorage staat: een bestaande id nooit hernoemen (dan valt dat toestel
+            // terug op Legacy).
+            { id: 'legacy',      groep: 'donker', naam: 'Legacy',        uitleg: 'Zoals het altijd was' },
+            { id: 'donker',      groep: 'donker', naam: 'Antraciet',     uitleg: 'Neutraal grijs, eenvoudig' },
+            { id: 'nordic',      groep: 'donker', naam: 'Nordic',        uitleg: 'Koel en gedempt, eenvoudig' },
+            { id: 'espresso',    groep: 'donker', naam: 'Espresso',      uitleg: 'Warm bruin met room' },
+            { id: 'middernacht', groep: 'donker', naam: 'Middernacht',   uitleg: 'Blauw-paars verloop, schaduwen' },
+            { id: 'rozenacht',   groep: 'donker', naam: 'Roze nacht',    uitleg: 'Donker met roze, verloop' },
+            { id: 'goud',        groep: 'donker', naam: 'Zwart & goud',  uitleg: 'Luxe, gouden randje' },
+            { id: 'contrast',    groep: 'donker', naam: 'Hoog contrast', uitleg: 'Voor in de bakkerij' },
+            { id: 'licht',       groep: 'licht',  naam: 'Licht',         uitleg: 'Helder en eenvoudig' },
+            { id: 'creme',       groep: 'licht',  naam: 'Crème',         uitleg: 'Warm papier, eenvoudig' },
+            { id: 'munt',        groep: 'licht',  naam: 'Munt',          uitleg: 'Fris groen, eenvoudig' },
+            { id: 'roze',        groep: 'licht',  naam: 'Roze',          uitleg: 'Zacht roze, verloop' },
+            { id: 'lavendel',    groep: 'licht',  naam: 'Lavendel',      uitleg: 'Zacht paars, verloop' },
+            { id: 'porselein',   groep: 'licht',  naam: 'Porselein',     uitleg: 'Luxe wit, diepe schaduw' }
         ];
         function cssVar(naam) { return getComputedStyle(document.documentElement).getPropertyValue(naam).trim(); }
         function huidigThema() {
@@ -5319,11 +5617,21 @@
             const el = document.getElementById('thema-knoppen');
             if (!el) return;
             const nu = huidigThema();
-            el.innerHTML = THEMAS.map(t => `
+            const tegel = t => `
                 <button class="thema-knop${t.id === nu ? ' actief' : ''}" onclick="zetThema('${t.id}')">
-                    <span class="staal">${t.staal.map(k => `<i style="background:${k};"></i>`).join('')}</span>
-                    <span><span class="naam">${t.id === nu ? '✓ ' : ''}${t.naam}</span><br><span class="uitleg">${t.uitleg}</span></span>
-                </button>`).join('');
+                    <span class="thema-voorbeeld" data-theme="${t.id}">
+                        <span class="tv-kaart">
+                            <span class="tv-lijn"></span><span class="tv-lijn kort"></span>
+                            <span class="tv-stippen"><i style="background: var(--accent-green);"></i><i style="background: var(--accent-orange);"></i><i style="background: var(--accent-red);"></i><i style="background: var(--accent-cyan);"></i></span>
+                            <span class="tv-knop"></span>
+                        </span>
+                    </span>
+                    <span class="naam">${t.id === nu ? '✓ ' : ''}${t.naam}</span>
+                    <span class="uitleg">${t.uitleg}</span>
+                </button>`;
+            el.innerHTML = [['donker', '🌙 Donkere thema\'s'], ['licht', '☀️ Lichte thema\'s']].map(([g, kop]) =>
+                `<div class="thema-groep-kop">${kop}</div><div class="thema-knoppen">${THEMAS.filter(t => t.groep === g).map(tegel).join('')}</div>`
+            ).join('');
         }
 
         // ===== SETTINGS =====
@@ -6255,7 +6563,7 @@
         // Handmatig ophogen bij elke wijziging. Samen met de datum van het bestand
         // zelf zie je in Instellingen meteen of je telefoon de nieuwe versie al
         // binnen heeft, of dat je nog even op de cache moet wachten.
-        const APP_VERSIE = 'v2026-11-15.1';
+        const APP_VERSIE = 'v2026-11-16.1';
 
         function toonVersie() {
             const el = document.getElementById('app-versie');
