@@ -1151,7 +1151,7 @@
                 <div id="breuk-hist-dag"></div>
             </div>
             <div class="reference-card">
-                <div class="reference-header">📈 Breuk-trend — stijgt of daalt het?</div>
+                <div class="reference-header">📈 Breuk-trend</div>
                 <div id="breuk-trend"></div>
             </div>
             <div class="reference-card">
@@ -4761,7 +4761,7 @@
 
         // ===== BREUK-TREND + GEMIDDELDE PER WEEKDAG (16-11-2026) — alleen lezen =====
         // Vervangt het weekraster, de tegels en de kostentabel van 15-11 (te veel cijfers).
-        //   • Trend: breuk-% per VOLLEDIGE kalenderweek (ma-zo), laatste 12 weken, één lijn
+        //   • Trend: breuk-% per VOLLEDIGE kalenderweek (ma-zo), laatste 4/8/12 weken, één lijn
         //     per groep + stippellijn = doel-breuk. De lopende week telt niet mee: die mist
         //     dagen, en elke weekdag heeft zijn eigen breukniveau. Oordeel = laatste 4 weken
         //     tegen de 4 ervoor; een verschil onder 1 procentpunt heet stabiel (ruis).
@@ -4770,7 +4770,9 @@
         // Breuk-% = breuk / gebakken stuks, opgeteld over de dagen (niet het gemiddelde van
         // dag-percentages). Een uitverkochte dag telt als 0 breuk; uit voorraad telt niet mee.
         const BT_GROEPEN = [['A', 'Pistolets', 'var(--accent-orange)'], ['B', 'Stokbrood', 'var(--accent-cyan)']];
-        const BT_WEKEN = 12;
+        const BT_WEKEN = 12;          // zoveel weken worden berekend (het oordeel heeft er 8 nodig)
+        let breukTrendWeken = 12;     // zoveel weken toont de grafiek: 4, 8 of 12 (knoppen)
+        function zetBreukTrendWeken(n) { breukTrendWeken = n; renderBreukTrend(); }
         let breukWeekdagWeken = 8;
         function zetBreukWeekdagWeken(n) { breukWeekdagWeken = n; renderBreukWeekdag(); }
 
@@ -4794,6 +4796,9 @@
             if (eerste < 0) eerste = weken.length;
             weken = weken.slice(eerste);
             reeksen.forEach(r => { r.pts = r.pts.slice(eerste); });
+            // Het oordeel rekent altijd op alle weken; de grafiek toont alleen de gekozen 4/8/12.
+            reeksen.forEach(r => { r.alle = r.pts; r.pts = r.pts.slice(-breukTrendWeken); });
+            weken = weken.slice(-breukTrendWeken);
             const n = weken.length;
             if (n < 2) {
                 el.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8rem;">Nog geen 2 volledige weken met ingevulde breuk.</div>';
@@ -4832,7 +4837,9 @@
                 });
             });
             svg += '</svg>';
-            let html = svg + '<div class="bt-legende">' + reeksen.map(r => `<span><b style="color: ${r.kleur};">●</b> ${r.naam}</span>`).join('') + '<span>- - doel</span></div>';
+            const knoppen = '<div style="display: flex; gap: 4px; margin-bottom: 8px; align-items: center; flex-wrap: wrap;"><span style="font-size: 0.72rem; color: var(--text-muted); margin-right: 4px;">Laatste</span>'
+                + [4, 8, 12].map(w => `<button class="range-btn${w === breukTrendWeken ? ' active' : ''}" style="padding: 6px 10px; font-size: 0.72rem;" onclick="zetBreukTrendWeken(${w})">${w} weken</button>`).join('') + '</div>';
+            let html = knoppen + svg + '<div class="bt-legende">' + reeksen.map(r => `<span><b style="color: ${r.kleur};">●</b> ${r.naam}</span>`).join('') + '<span>- - doel</span></div>';
 
             // ---- oordeel: laatste 4 weken tegen de 4 ervoor ----
             const som = lijst => {
@@ -4841,7 +4848,7 @@
                 return wk ? { pct: br / st * 100, wk } : null;
             };
             reeksen.forEach(r => {
-                const nu = som(r.pts.slice(-4)), toen = som(r.pts.slice(-8, -4));
+                const nu = som(r.alle.slice(-4)), toen = som(r.alle.slice(-8, -4));
                 let oordeel = '<span style="color: var(--text-muted);">nog te weinig weken</span>', cijfers = nu ? pct1(nu.pct) : '';
                 if (nu && toen && nu.wk >= 2 && toen.wk >= 2) {
                     const d = nu.pct - toen.pct;
@@ -6503,7 +6510,7 @@
         // Handmatig ophogen bij elke wijziging. Samen met de datum van het bestand
         // zelf zie je in Instellingen meteen of je telefoon de nieuwe versie al
         // binnen heeft, of dat je nog even op de cache moet wachten.
-        const APP_VERSIE = 'v2026-11-16.2';
+        const APP_VERSIE = 'v2026-11-16.3';
 
         function toonVersie() {
             const el = document.getElementById('app-versie');
