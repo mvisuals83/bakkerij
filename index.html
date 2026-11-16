@@ -781,15 +781,38 @@
         .bh-table th:first-child, .bh-table td:first-child { text-align: left; font-family: var(--font-sans); }
         .bh-table td { padding: 5px 4px; text-align: center; font-family: var(--font-mono); border-top: 1px solid var(--border-light); white-space: nowrap; }
         .bh-table tr.bh-som td { font-weight: 700; background: var(--bg-card); }
-        .bh-table th.bh-dag { cursor: pointer; }
-        .bh-table th.bh-gekozen, .bh-table td.bh-gekozen { background: var(--bg-card); }
-        .bh-table th.bh-gekozen { color: var(--accent-cyan); }
+        .bh-table td.bh-top { background: var(--tint-fout); }
         .bh-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        .bh-tegels { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-        .bh-tegel { background: var(--bg-card); border-radius: var(--radius-sm); padding: 8px 10px; }
-        .bh-tegel .t { font-size: 0.68rem; color: var(--text-muted); margin-bottom: 2px; }
-        .bh-tegel .v { font-family: var(--font-mono); font-size: 0.95rem; font-weight: 700; }
-        .bh-tegel .s { font-size: 0.68rem; color: var(--text-secondary); margin-top: 2px; }
+        .bh-dagtabel { font-size: 0.85rem; }
+        .bh-dagtabel td { padding: 7px 6px; }
+        .bh-dagtabel th:not(:first-child), .bh-dagtabel td:not(:first-child) { text-align: right; }
+        /* Breuk-trend (16-11-2026) */
+        .bt-svg { display: block; width: 100%; max-width: 560px; margin: 0 auto; }
+        .bt-svg text { font-family: var(--font-mono); font-size: 9px; fill: var(--text-muted); }
+        .bt-svg .raster { stroke: var(--border-light); stroke-width: 1; }
+        .bt-svg .lijn { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+        .bt-legende { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; font-size: 0.72rem; color: var(--text-secondary); margin: 4px 0 8px; }
+        .bt-regel { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 0.8rem; padding: 6px 0; border-top: 1px solid var(--border-light); }
+        .bt-regel .cijfers { font-family: var(--font-mono); color: var(--text-secondary); font-size: 0.78rem; }
+
+        /* Kalender met gemarkeerde feestdagen (Referentie, 16-11-2026) */
+        .kal-knop { flex: 1; min-width: 0; padding: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-sans); font-size: 0.85rem; text-align: left; cursor: pointer; min-height: 38px; }
+        .kal { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 8px; margin-bottom: 10px; }
+        .kal-kop { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+        .kal-titel { flex: 1; text-align: center; font-weight: 600; font-size: 0.85rem; color: var(--text-primary); text-transform: capitalize; }
+        .kal-nav { background: none; border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: var(--radius-sm); min-width: 38px; min-height: 38px; font-size: 1rem; cursor: pointer; padding: 0; }
+        .kal-raster { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+        .kal-wd { text-align: center; font-size: 0.62rem; color: var(--text-muted); font-weight: 600; padding: 2px 0; }
+        .kal-dag { background: var(--bg-dark); border: 1px solid transparent; color: var(--text-primary); border-radius: var(--radius-sm); min-height: 38px; font-family: var(--font-mono); font-size: 0.8rem; cursor: pointer; padding: 0; }
+        .kal-dag:disabled { background: none; color: var(--text-muted); opacity: 0.45; cursor: default; }
+        .kal-dag.feest { border-color: var(--accent-orange); color: var(--accent-orange); background: var(--tint-warn); font-weight: 700; }
+        .kal-dag.feest:disabled { background: none; opacity: 0.6; }
+        .kal-dag.vandaag { text-decoration: underline; }
+        .kal-dag.gekozen { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+        .kal-feest { margin-top: 8px; display: grid; gap: 4px; }
+        .kal-feest button { background: none; border: none; color: var(--accent-orange); font-family: var(--font-sans); font-size: 0.75rem; text-align: left; padding: 4px 2px; cursor: pointer; }
+        .kal-feest button:disabled { opacity: 0.6; cursor: default; }
+        .kal-voet { font-size: 0.66rem; color: var(--text-muted); margin-top: 6px; }
         .bh-link { background: none; border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: var(--radius-sm); padding: 6px 10px; font-size: 0.72rem; cursor: pointer; font-family: var(--font-sans); }
 
         .breuk-save-btn { width: 100%; padding: 12px; margin-top: 10px; background: linear-gradient(135deg, var(--accent-green), var(--accent-green-dark)); border: none; border-radius: var(--radius); color: var(--on-btn); font-size: 1rem; font-weight: 600; cursor: pointer; }
@@ -1055,13 +1078,6 @@
                 </div>
             </div>
 
-            <!-- Vorig jaar (E6, 15-11-2026): alleen informatie, rekent niet mee in de suggestie.
-                 Wat is er op dezelfde gelegenheid vorig jaar gebakken, verkocht en uitverkocht? -->
-            <div class="reference-card" id="vorigjaar-card">
-                <div class="reference-header">🗓️ Vorig jaar</div>
-                <div id="vorigjaar-content"></div>
-            </div>
-
             <div class="collapsible-section" id="referentie-sectie">
                 <div class="collapsible-header" onclick="toggleCollapsible(this)">
                     <span>📅 Referentie</span>
@@ -1069,10 +1085,13 @@
                 </div>
                 <div class="collapsible-content" style="display: none;">
                     <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
-                        <input type="date" id="ref-date-picker" onchange="loadReferencePlanning()" style="flex: 1; padding: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary);">
+                        <!-- Eigen kalender i.p.v. de datumkiezer van de browser (16-11-2026): zo
+                             kunnen feestdagen en speciale dagen in de kalender zelf gemarkeerd staan. -->
+                        <input type="hidden" id="ref-date-picker">
+                        <button id="ref-date-knop" class="kal-knop" onclick="refKalToggle()">📅 Kies een datum…</button>
                         <button onclick="copyReferencePlanning()" style="padding: 8px 12px; background: var(--primary); border: none; border-radius: var(--radius-sm); color: var(--on-primary); font-weight: 600; cursor: pointer; white-space: nowrap;">📋 Kopieer</button>
                     </div>
-                    <div id="ref-feest-kiezer"></div>
+                    <div id="ref-kalender" class="kal" style="display: none;"></div>
                     <div id="ref-planning-content" style="color: var(--text-muted); font-size: 0.85rem;">Selecteer een datum...</div>
                 </div>
             </div>
@@ -1119,18 +1138,25 @@
             <div class="breuk-grid" id="breuk-grid"></div>
             <button class="breuk-save-btn" onclick="saveBreuk()">✅ Breuk Opslaan</button>
 
-            <!-- Breuk-historiek (U3, 15-11-2026). Alleen lezen: terugkijken naar elke dag,
-                 de week in één oogopslag en een paar kerncijfers. Slaat niets op. -->
+            <!-- Breuk terugkijken (U3, 15-11-2026; vereenvoudigd 16-11-2026). Alleen lezen:
+                 één dag (naam, aantal, %), daaronder de trend per week en het gemiddelde
+                 per weekdag. Slaat niets op. -->
             <div class="reference-card" id="breuk-hist-card">
-                <div class="reference-header">📖 Breuk-historiek (terugkijken)</div>
+                <div class="reference-header">📖 Breuk per dag (terugkijken)</div>
                 <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 10px;">
                     <button class="date-btn" onclick="breukHistStap(-1)" title="Dag terug">‹</button>
                     <input type="date" id="breuk-hist-date" onchange="renderBreukHistoriek()" style="flex: 1; min-width: 0; padding: 8px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-sans);">
                     <button class="date-btn" onclick="breukHistStap(1)" title="Dag verder">›</button>
                 </div>
                 <div id="breuk-hist-dag"></div>
-                <div id="breuk-hist-week"></div>
-                <div id="breuk-hist-cijfers"></div>
+            </div>
+            <div class="reference-card">
+                <div class="reference-header">📈 Breuk-trend — stijgt of daalt het?</div>
+                <div id="breuk-trend"></div>
+            </div>
+            <div class="reference-card">
+                <div class="reference-header">📅 Gemiddelde breuk per weekdag</div>
+                <div id="breuk-weekdag"></div>
             </div>
         </div>
 
@@ -3649,7 +3675,6 @@
             }
 
             renderReference();
-            renderVorigJaar();
             renderFeestKiezers();
             renderPlanningScoreboard();
             updatePeriodeBadge();
@@ -4184,12 +4209,13 @@
                       .sort((a, b) => b.iso.localeCompare(a.iso));
         }
 
-        // Snelkiezer in 📅 Referentie (Planning) en in de Suggestie-diagnose (Instellingen).
+        // Snelkiezer in de Suggestie-diagnose (Instellingen). Stond tot 16-11-2026 ook onder
+        // 📅 Referentie; daar staan de feestdagen nu in de kalender zelf (renderRefKalender).
         // Eén tik springt naar de feestdag, de dag ervoor of de dag erna. Naast elke dag
         // staat of er producten uitverkocht waren: een uitverkochte referentie verbergt de
         // echte vraag.
         function renderFeestKiezers() {
-            const doelen = [['ref-feest-kiezer', 'ref'], ['diag-feest-kiezer', 'diag']]
+            const doelen = [['diag-feest-kiezer', 'diag']]
                 .map(([id, doel]) => [document.getElementById(id), doel]).filter(([el]) => el);
             if (!doelen.length) return;
             const lijst = feestLijst();
@@ -4228,204 +4254,83 @@
             }
         }
 
-        // ===== "VORIG JAAR"-KAART (E6, 15-11-2026) — alleen informatie =====
-        // Rekent NIET mee in de suggestie. Toont wat er op de overeenkomstige dag vorig jaar
-        // gebakken, verkocht en uitverkocht is. Grootste waarde rond kerst en nieuwjaar, waar
-        // de motor weinig houvast heeft.
-        // Welke dag is "dezelfde dag vorig jaar"?
-        //   1. Zelfde GELEGENHEID: feestdag ↔ dezelfde feestdag (Paasmaandag ↔ Paasmaandag,
-        //      ook al schuift de datum), speciale dag ↔ dezelfde datum (24/12 ↔ 24/12), en de
-        //      dagen vlak rond een feestdag ↔ dezelfde afstand tot die feestdag.
-        //   2. Zelfde ISO-WEEK + WEEKDAG: voor elke gewone dag.
-        // Valt de gelegenheid vorig jaar op een ander soort dag (weekdag ↔ zaterdag ↔ zondag),
-        // dan is de week-match de standaard: een feestdag in het weekend gedraagt zich als een
-        // gewone weekenddag. De eigenaar kan met twee knoppen wisselen.
-        function isoWeekJaar(d) { const t = isoWeekStart(d); t.setDate(t.getDate() + 3); return t.getFullYear(); }
-        function datumVanIsoWeek(jaar, week, dow) {
-            const d = isoWeekStart(new Date(jaar, 0, 4));
-            d.setDate(d.getDate() + (week - 1) * 7 + ((dow + 6) % 7));
-            return d;
-        }
-        const dagKlasse = d => (d.getDay() === 6 ? 1 : d.getDay() === 0 ? 2 : 0);
-
-        function gelegenheidVan(dateObj) {
-            const iso = formatDateISO(dateObj), y = dateObj.getFullYear();
-            const feest = belgischeFeestdagen(y).find(f => f.iso === iso);
-            if (feest) return { soort: 'feest', sleutel: feest.sleutel, jaar: y, offset: 0, naam: feest.naam };
-            const sp = speciaalLijst().find(x => x.md === iso.slice(5));
-            if (sp) return { soort: 'speciaal', md: sp.md, jaar: y, naam: sp.naam || 'Speciale dag' };
-            // Dagen rond een feestdag. Vaste feestdagen: alleen de dag ervoor/erna. Feestdagen
-            // die aan Pasen hangen: 2 dagen ervoor t/m 3 dagen erna (paaszaterdag, het lange
-            // weekend na Hemelvaart) — daar valt elke afstand elk jaar op dezelfde weekdag.
-            // De dichtstbijzijnde feestdag wint; bij gelijke afstand "erna" (zoals de motor).
-            let beste = null;
-            [y - 1, y, y + 1].forEach(j => belgischeFeestdagen(j).forEach(f => {
-                const offset = Math.round((dateObj - new Date(f.iso + 'T00:00:00')) / 86400000);
-                const mag = f.paas ? (offset >= -2 && offset <= 3) : Math.abs(offset) === 1;
-                if (!mag || offset === 0) return;
-                if (!beste || Math.abs(offset) < Math.abs(beste.offset) || (Math.abs(offset) === Math.abs(beste.offset) && offset > 0))
-                    beste = { soort: 'feest', sleutel: f.sleutel, jaar: j, offset, feestNaam: f.naam };
-            }));
-            if (!beste) return null;
-            const n = Math.abs(beste.offset);
-            beste.naam = `${n === 1 ? 'Dag' : n + ' dagen'} ${beste.offset > 0 ? 'na' : 'vóór'} ${beste.feestNaam}`;
-            return beste;
-        }
-        function gelegenheidVorigJaar(gel) {
-            if (gel.soort === 'speciaal') return new Date(`${gel.jaar - 1}-${gel.md}T00:00:00`);
-            const f = belgischeFeestdagen(gel.jaar - 1).find(x => x.sleutel === gel.sleutel);
-            return f ? new Date(isoPlus(f.iso, gel.offset) + 'T00:00:00') : null;
-        }
-        function vorigJaarKandidaten(dateObj) {
-            const uit = [];
-            const gel = gelegenheidVan(dateObj);
-            if (gel) {
-                const d = gelegenheidVorigJaar(gel);
-                if (d && !isNaN(d)) uit.push({ soort: 'gelegenheid', datum: d, iso: formatDateISO(d), label: gel.naam,
-                                               zelf: gel.soort === 'speciaal' || gel.offset === 0 });
-            }
-            const jr = isoWeekJaar(dateObj), wk = isoWeekNumber(dateObj);
-            let d2 = datumVanIsoWeek(jr - 1, wk, dateObj.getDay());
-            if (isoWeekJaar(d2) !== jr - 1) d2 = datumVanIsoWeek(jr - 1, wk - 1, dateObj.getDay());   // week 53 bestaat niet elk jaar
-            const iso2 = formatDateISO(d2);
-            if (!uit.length || uit[0].iso !== iso2)
-                uit.push({ soort: 'week', datum: d2, iso: iso2, label: `zelfde week (W${isoWeekNumber(d2)}) en weekdag` });
-            return uit;
-        }
-
-        // Het niveau is intussen veranderd (de winkel groeit), dus aantallen van vorig jaar
-        // zijn geen platen-advies. Deze regel zegt hoeveel: verkochte stuks in de 4 volledige
-        // weken vóór de plandag tegen de 4 weken vóór de dag van vorig jaar, per groep, in %.
-        function niveauRegel(planISO, toenISO) {
-            const todayISO = formatDateISO(new Date());
-            const idx = new Map(historicalData.map(r => [r.datum + '|' + r.product, r]));
-            // Maandag van de laatste van 4 volledige, afgesloten weken vóór de week van `iso`.
-            const laatsteMaandag = iso => {
-                let m = isoPlus(formatDateISO(isoWeekStart(new Date(iso + 'T00:00:00'))), -7);
-                while (isoPlus(m, 6) >= todayISO) m = isoPlus(m, -7);
-                return m;
-            };
-            const vierWeken = m => { const d = []; for (let k = 0; k < 4; k++) for (let i = 0; i < 7; i++) d.push(isoPlus(m, -7 * k + i)); return d; };
-            const wkTekst = m => `W${isoWeekNumber(new Date(isoPlus(m, -21) + 'T00:00:00'))}–W${isoWeekNumber(new Date(m + 'T00:00:00'))}`;
-            const som = (dagen, g) => {
-                let v = 0; const n = new Set();
-                dagen.forEach(d => PRODUCTS.forEach(p => {
-                    if (p.group !== g) return;
-                    const r = idx.get(d + '|' + p.name);
-                    if (!r || r.out_of_stock || !((r.totaal || 0) > 0)) return;
-                    v += stuksOnDate(p, d, r.totaal) - (r.breuk || 0); n.add(d);
-                }));
-                return { v, n: n.size };
-            };
-            const mNu = laatsteMaandag(planISO);
-            // Voorkeur: exact dezelfde weken een jaar eerder (52 weken terug = zelfde weekdagen).
-            // Bestaat die data nog niet, dan de 4 weken vóór de dag van vorig jaar.
-            const pogingen = [
-                { mToen: isoPlus(mNu, -364), uitleg: m => `dezelfde weken vorig jaar` },
-                { mToen: laatsteMaandag(toenISO), uitleg: m => `${wkTekst(m)} van vorig jaar (de weken vóór die dag)` }
-            ];
-            for (const pg of pogingen) {
-                const dNu = vierWeken(mNu), dToen = vierWeken(pg.mToen);
-                const delen = [];
-                [['A', 'pistolets'], ['B', 'stokbrood']].forEach(([g, naam]) => {
-                    const nu = som(dNu, g), toen = som(dToen, g);
-                    if (nu.n < 20 || toen.n < 20 || !(toen.v > 0)) return;   // te weinig dagen → geen uitspraak
-                    const d = Math.round((nu.v - toen.v) / toen.v * 100);
-                    delen.push(`${naam} <b style="color: ${d > 2 ? 'var(--accent-green)' : d < -2 ? 'var(--accent-red)' : 'var(--text-secondary)'};">${d > 0 ? '+' : ''}${d}%</b>`);
-                });
-                if (delen.length) return `📈 Niveau nu: ${delen.join(' · ')} — verkocht in ${wkTekst(mNu)} t.o.v. ${pg.uitleg(pg.mToen)}. Neem de aantallen hieronder dus niet één-op-één over.`;
-            }
-            return '';
-        }
-
-        let vorigJaarKeuze = null;      // 'gelegenheid' | 'week' | null (automatisch)
-        let vorigJaarVoorDatum = '';
-        function zetVorigJaarKeuze(soort) { vorigJaarKeuze = soort; renderVorigJaar(); }
-
-        function renderVorigJaar() {
-            const el = document.getElementById('vorigjaar-content');
-            if (!el) return;
-            const planISO = formatDateISO(currentDate);
-            if (planISO !== vorigJaarVoorDatum) { vorigJaarVoorDatum = planISO; vorigJaarKeuze = null; }
-            const kand = vorigJaarKandidaten(currentDate);
-            const heeftData = k => historicalData.some(r => r.datum === k.iso);
-            let gekozen = kand.find(k => k.soort === vorigJaarKeuze);
-            if (!gekozen) {
-                const gel = kand.find(k => k.soort === 'gelegenheid'), wk = kand.find(k => k.soort === 'week');
-                // Gelegenheid wint als beide dagen hetzelfde soort dag zijn (weekdag/za/zo), en
-                // ook als de plandag zelf een feestdag of speciale dag op een WEEKDAG is: die
-                // lijkt meer op dezelfde feestdag vorig jaar (ook al viel die toen in het
-                // weekend) dan op een gewone weekdag. Een feestdag in het weekend gedraagt zich
-                // als een gewone weekenddag → dan de week-match.
-                const planKlasse = dagKlasse(currentDate);
-                gekozen = (gel && (!wk || dagKlasse(gel.datum) === planKlasse || (gel.zelf && planKlasse === 0))) ? gel : wk;
-                if (!heeftData(gekozen)) gekozen = kand.find(k => heeftData(k)) || gekozen;
-            }
-
-            let html = '';
-            if (kand.length > 1) {
-                html += '<div style="display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap;">' + kand.map(k =>
-                    `<button class="range-btn${k === gekozen ? ' active' : ''}" style="padding: 6px 10px; font-size: 0.72rem;" onclick="zetVorigJaarKeuze('${k.soort}')">${k.soort === 'gelegenheid' ? '🎉 ' + escHtml(k.label) : '📅 Zelfde week + weekdag'}</button>`
-                ).join('') + '</div>';
-            }
-            const rijen = historicalData.filter(r => r.datum === gekozen.iso);
-            const kop = `<b style="color: var(--text-primary);">${getDayName(gekozen.datum)} ${formatDate(gekozen.datum)}</b> · ${escHtml(gekozen.label)}`;
-            if (!rijen.length) {
-                const eerste = historicalData.reduce((m, r) => (r.datum < m ? r.datum : m), '9999-12-31');
-                html += `<div style="font-size: 0.78rem; color: var(--text-muted);">${kop}<br>Geen planning bewaard voor die dag${eerste !== '9999-12-31' && gekozen.iso < eerste ? ` — de historiek begint op ${formatDate(new Date(eerste + 'T00:00:00'))}` : ' (gesloten?)'}.</div>`;
-                el.innerHTML = html;
-                return;
-            }
-            const ev = rijen[0].event || 'Normal';
-            const weer = rijen.find(r => r.weather && /\d/.test(r.weather))?.weather || '';
-            const note = rijen.find(r => r.note && r.note.length)?.note || '';
-            html += `<div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 6px;">${kop} · ${EVENT_ICONEN[ev] || ''} ${ev}${weer ? ' · ' + weer : ''}</div>`;
-
-            // Eerlijk zeggen wanneer de twee dagen niet goed vergelijkbaar zijn.
-            const waarsch = [];
-            if (gekozen.datum.getDay() !== currentDate.getDay())
-                waarsch.push(`viel toen op een <b>${getDayName(gekozen.datum)}</b>, nu op een ${getDayName(currentDate)}`);
-            const nuFeest = isFeestEv(document.getElementById('event-select')?.value);
-            if (gekozen.soort === 'week' && isFeestEv(ev) !== nuFeest)
-                waarsch.push(isFeestEv(ev) ? 'was toen een feestdag, deze dag niet' : 'deze dag is een feestdag, toen niet');
-            if (waarsch.length) html += `<div style="font-size: 0.72rem; color: var(--accent-orange); margin-bottom: 6px;">⚠️ Let op: ${waarsch.join(' · ')}.</div>`;
-            if (note) html += `<div style="font-size: 0.75rem; color: var(--accent-orange); margin-bottom: 6px;">📝 ${escHtml(note)}</div>`;
-            const niveau = niveauRegel(planISO, gekozen.iso);
-            if (niveau) html += `<div style="font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 6px;">${niveau}</div>`;
-
-            html += '<div class="bh-scroll"><table class="bh-table"><thead><tr><th>Product</th><th>Platen</th><th>Stuks</th><th>Verkocht</th><th>Breuk</th><th></th></tr></thead><tbody>';
-            [['A', 'Pistolets'], ['B', 'Stokbrood']].forEach(([g, naam]) => {
-                let sPl = 0, sSt = 0, sVk = 0, sBr = 0, volledig = true, iets = false;
-                PRODUCTS.filter(p => p.group === g).forEach(p => {
-                    const r = rijen.find(x => x.product === p.name);
-                    if (!r) { html += `<tr><td>${p.short}</td><td colspan="5" style="color: var(--text-muted);">—</td></tr>`; return; }
-                    if (r.out_of_stock) { html += `<tr><td>${p.short}</td><td colspan="5" style="color: var(--accent-red); font-size: 0.72rem;">UIT VOORRAAD</td></tr>`; return; }
-                    const stuks = stuksOnDate(p, gekozen.iso, r.totaal || 0);
-                    const open = r.breuk === null || r.breuk === undefined;
-                    const deels = r.partial_oos ? ' <span class="oos-badge partial">DEELS</span>' : '';
-                    const status = open ? '' : (r.breuk === 0 && stuks > 0) ? '<span title="Uitverkocht">🔥</span>' : '';
-                    sPl += r.totaal || 0; sSt += stuks; iets = true;
-                    if (open) volledig = false; else { sVk += stuks - r.breuk; sBr += r.breuk; }
-                    html += `<tr><td>${p.short}${deels}</td><td style="color: var(--accent-cyan); font-weight: 600;">${r.totaal || 0}</td><td>${stuks}</td><td>${open ? '—' : stuks - r.breuk}</td><td style="color: var(--accent-red);">${open ? '—' : r.breuk}</td><td style="font-size: 0.68rem; color: var(--accent-orange);">${status}</td></tr>`;
-                });
-                if (iets) html += `<tr class="bh-som"><td>${naam}</td><td>${sPl}</td><td>${sSt}</td><td>${volledig ? sVk : '—'}</td><td style="color: var(--accent-red);">${volledig ? sBr : '—'}</td><td></td></tr>`;
+        // ===== KALENDER MET FEESTDAGEN (16-11-2026) — datumkiezer van 📅 Referentie =====
+        // De "Vorig jaar"-kaart en de lange feestdagenlijst onder Referentie zijn op vraag van
+        // de eigenaar weg: een dag van vorig jaar zoek je gewoon op via Referentie. Daarom
+        // staan de feestdagen (🎉) en de speciale dagen uit Instellingen (🎄) nu in de
+        // kalender zelf gemarkeerd. Dagen zonder bewaarde planning zijn grijs en niet te
+        // kiezen. Alleen lezen — rekent nergens in mee.
+        let refKalMaand = null;   // ISO van de 1e dag van de getoonde maand
+        function feestOpJaar(jaar) {
+            const m = new Map();
+            belgischeFeestdagen(jaar).forEach(f => m.set(f.iso, { naam: f.naam, icoon: '🎉' }));
+            speciaalLijst().forEach(sp => {
+                if (sp.md && !m.has(`${jaar}-${sp.md}`)) m.set(`${jaar}-${sp.md}`, { naam: sp.naam || 'Speciale dag', icoon: '🎄' });
             });
-            html += '</tbody></table></div>';
-            html += `<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
-                <span style="font-size: 0.66rem; color: var(--text-muted); flex: 1; min-width: 160px;">Alleen ter info — telt niet mee in de suggestie. 🔥 = uitverkocht: de vraag was hoger dan wat er verkocht is.</span>
-                <button class="bh-link" onclick="openInReferentie('${gekozen.iso}')">📋 Open in Referentie</button></div>`;
-            el.innerHTML = html;
+            return m;
         }
-
-        // Zet de dag klaar in 📅 Referentie (met de L1-L5-verdeling en de Kopieer-knop).
-        function openInReferentie(iso) {
-            const sectie = document.getElementById('referentie-sectie');
-            if (!sectie) return;
-            const kopEl = sectie.querySelector('.collapsible-header'), inhoud = sectie.querySelector('.collapsible-content');
-            if (inhoud.style.display === 'none') { kopEl.classList.add('open'); inhoud.style.display = 'block'; }
+        function refKalToggle() {
+            const el = document.getElementById('ref-kalender');
+            if (!el) return;
+            if (el.style.display !== 'none') { el.style.display = 'none'; return; }
+            // Open op de maand van de gekozen referentiedag, anders op die van de plandag.
+            const start = document.getElementById('ref-date-picker').value || formatDateISO(currentDate);
+            refKalMaand = start.slice(0, 7) + '-01';
+            el.style.display = 'block';
+            renderRefKalender();
+        }
+        function refKalStap(maanden) {
+            const d = new Date(refKalMaand + 'T00:00:00');
+            d.setMonth(d.getMonth() + maanden);
+            refKalMaand = formatDateISO(d);
+            renderRefKalender();
+        }
+        function refKalKies(iso) {
             document.getElementById('ref-date-picker').value = iso;
+            const d = new Date(iso + 'T00:00:00');
+            const f = feestOpJaar(d.getFullYear()).get(iso);
+            document.getElementById('ref-date-knop').textContent = `📅 ${DAG_KORT[d.getDay()]} ${formatDate(d)}${f ? ' · ' + f.icoon + ' ' + f.naam : ''}`;
+            document.getElementById('ref-kalender').style.display = 'none';
             loadReferencePlanning();
-            sectie.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        function renderRefKalender() {
+            const el = document.getElementById('ref-kalender');
+            if (!el || !refKalMaand) return;
+            const eerste = new Date(refKalMaand + 'T00:00:00');
+            const jaar = eerste.getFullYear(), maand = eerste.getMonth();
+            const feest = feestOpJaar(jaar);
+            const metData = new Set(historicalData.map(r => r.datum));
+            const gekozen = document.getElementById('ref-date-picker').value;
+            const todayISO = formatDateISO(new Date());
+            const twee = n => String(n).padStart(2, '0');
+            let html = `<div class="kal-kop">
+                <button class="kal-nav" onclick="refKalStap(-12)" title="Jaar terug">«</button>
+                <button class="kal-nav" onclick="refKalStap(-1)" title="Maand terug">‹</button>
+                <span class="kal-titel">${eerste.toLocaleDateString('nl-BE', { month: 'long', year: 'numeric' })}</span>
+                <button class="kal-nav" onclick="refKalStap(1)" title="Maand verder">›</button>
+                <button class="kal-nav" onclick="refKalStap(12)" title="Jaar verder">»</button>
+            </div><div class="kal-raster">`;
+            [1, 2, 3, 4, 5, 6, 0].forEach(dw => { html += `<div class="kal-wd">${DAG_KORT[dw]}</div>`; });
+            for (let i = (eerste.getDay() + 6) % 7; i > 0; i--) html += '<div></div>';
+            const namen = [];
+            const aantal = new Date(jaar, maand + 1, 0).getDate();
+            for (let dag = 1; dag <= aantal; dag++) {
+                const iso = `${jaar}-${twee(maand + 1)}-${twee(dag)}`;
+                const f = feest.get(iso), heeft = metData.has(iso);
+                if (f) namen.push({ iso, f, heeft });
+                const kl = 'kal-dag' + (f ? ' feest' : '') + (iso === gekozen ? ' gekozen' : '') + (iso === todayISO ? ' vandaag' : '');
+                html += `<button class="${kl}"${heeft ? '' : ' disabled'}${f ? ` title="${escHtml(f.naam)}"` : ''} onclick="refKalKies('${iso}')">${dag}</button>`;
+            }
+            html += '</div>';
+            // De namen van de gemarkeerde dagen in deze maand (een kleurtje alleen zegt niet wélke feestdag).
+            if (namen.length) {
+                html += '<div class="kal-feest">' + namen.map(x => {
+                    const d = new Date(x.iso + 'T00:00:00');
+                    return `<button${x.heeft ? '' : ' disabled'} onclick="refKalKies('${x.iso}')">${x.f.icoon} ${DAG_KORT[d.getDay()]} ${twee(d.getDate())}/${twee(d.getMonth() + 1)} · ${escHtml(x.f.naam)}${x.heeft ? '' : ' — geen planning bewaard'}</button>`;
+                }).join('') + '</div>';
+            }
+            html += '<div class="kal-voet">Oranje = feestdag of speciale dag · grijs = geen planning bewaard</div>';
+            el.innerHTML = html;
         }
 
         // ===== MODAL =====
@@ -4640,6 +4545,8 @@
 
             loadBreukData();
             renderBreukHistoriek();
+            renderBreukTrend();
+            renderBreukWeekdag();
         }
         
         function loadBreukData() {
@@ -4787,10 +4694,6 @@
             inp.value = isoPlus(inp.value || formatDateISO(new Date()), delta);
             renderBreukHistoriek();
         }
-        function breukHistNaar(iso) {
-            document.getElementById('breuk-hist-date').value = iso;
-            renderBreukHistoriek();
-        }
         // Een oudere dag alsnog openen in het invulformulier bovenaan (bv. een typfout herstellen).
         function breukBewerk(iso) {
             breukExtraDatum = iso;
@@ -4801,6 +4704,8 @@
             select.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
+        // De gekozen dag: naam, aantal, % (vereenvoudigd 16-11-2026 op vraag van de eigenaar;
+        // platen, stuks, weer en kost stonden er ook maar werden niet bekeken).
         function renderBreukHistoriek() {
             const inp = document.getElementById('breuk-hist-date');
             const elDag = document.getElementById('breuk-hist-dag');
@@ -4815,140 +4720,175 @@
             const iso = inp.value;
             const dateObj = new Date(iso + 'T00:00:00');
             const idx = new Map(historicalData.map(r => [r.datum + '|' + r.product, r]));
-            const groepen = [['A', 'Pistolets'], ['B', 'Stokbrood']];
 
-            // ---------- 1. De gekozen dag ----------
             const dagRijen = historicalData.filter(r => r.datum === iso);
             let html = '';
             if (!dagRijen.length) {
                 html = `<div style="color: var(--text-muted); font-size: 0.8rem;">${getDayName(dateObj)} ${formatDate(dateObj)} — geen planning opgeslagen voor deze dag.</div>`;
             } else {
                 const ev = dagRijen[0].event || 'Normal';
-                const weer = dagRijen.find(r => r.weather && /\d/.test(r.weather))?.weather || '';
                 const note = dagRijen.find(r => r.note && r.note.length)?.note || '';
-                html = `<div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 6px;"><b style="color: var(--text-primary);">${getDayName(dateObj)} ${formatDate(dateObj)}</b> · ${EVENT_ICONEN[ev] || ''} ${ev}${weer ? ' · ' + weer : ''}</div>`;
+                html = `<div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 6px;"><b style="color: var(--text-primary);">${getDayName(dateObj)} ${formatDate(dateObj)}</b>${ev !== 'Normal' ? ` · ${EVENT_ICONEN[ev] || ''} ${ev}` : ''}</div>`;
                 if (note) html += `<div style="font-size: 0.75rem; color: var(--accent-orange); margin-bottom: 6px;">📝 ${escHtml(note)}</div>`;
-                html += '<div class="bh-scroll"><table class="bh-table"><thead><tr><th>Product</th><th>Platen</th><th>Stuks</th><th>Breuk</th><th>%</th><th></th></tr></thead><tbody>';
-                groepen.forEach(([g, naam]) => {
+                html += '<table class="bh-table bh-dagtabel"><thead><tr><th>Product</th><th>Breuk</th><th>%</th></tr></thead><tbody>';
+                const grijs = t => `<td colspan="2" style="color: var(--text-muted); font-size: 0.75rem; font-family: var(--font-sans);">${t}</td>`;
+                BT_GROEPEN.forEach(([g, naam]) => {
                     const prods = PRODUCTS.filter(p => p.group === g);
                     prods.forEach(p => {
                         const c = breukCel(idx, p, iso);
-                        if (c.soort === 'geen') { html += `<tr><td>${p.short}</td><td colspan="5" style="color: var(--text-muted);">—</td></tr>`; return; }
-                        if (c.soort === 'uit') { html += `<tr><td>${p.short}</td><td colspan="5" style="color: var(--accent-red); font-size: 0.72rem;">UIT VOORRAAD</td></tr>`; return; }
+                        if (c.soort === 'geen') { html += `<tr><td>${p.name}</td>${grijs('—')}</tr>`; return; }
+                        if (c.soort === 'uit') { html += `<tr><td>${p.name}</td><td colspan="2" style="color: var(--accent-red); font-size: 0.72rem; font-family: var(--font-sans);">UIT VOORRAAD</td></tr>`; return; }
                         const deels = c.rec.partial_oos ? ' <span class="oos-badge partial">DEELS</span>' : '';
-                        const best = c.rec.bestelling ? ` <span title="grote bestelling" style="color: var(--text-muted);">📋${c.rec.bestelling}</span>` : '';
                         if (c.soort === 'open') {
-                            html += `<tr><td>${p.short}${deels}</td><td>${c.rec.totaal}</td><td>${c.stuks}</td><td colspan="3" style="color: var(--text-muted); font-size: 0.72rem;">nog niet ingevuld</td></tr>`;
+                            html += `<tr><td>${p.name}${deels}</td>${grijs('nog niet ingevuld')}</tr>`;
                         } else if (c.soort === 'uitverkocht') {
-                            html += `<tr><td>${p.short}${deels}</td><td>${c.rec.totaal}</td><td>${c.stuks}</td><td>0</td><td style="color: var(--text-muted);">0%</td><td style="font-size: 0.7rem; color: var(--text-muted);">🔥 uitv.${best}</td></tr>`;
+                            html += `<tr><td>${p.name}${deels}</td><td>0</td><td style="color: var(--text-muted); font-size: 0.75rem; font-family: var(--font-sans);">🔥 uitverkocht</td></tr>`;
                         } else {
-                            html += `<tr><td>${p.short}${deels}</td><td>${c.rec.totaal}</td><td>${c.stuks}</td><td style="color: var(--accent-red); font-weight: 600;">${c.breuk}</td><td style="color: ${breukKleur(c.pct)}; font-weight: 600;">${c.pct.toFixed(0)}%</td><td style="font-size: 0.7rem; color: var(--text-muted);">${best}</td></tr>`;
+                            html += `<tr><td>${p.name}${deels}</td><td style="color: var(--accent-red); font-weight: 600;">${c.breuk}</td><td style="color: ${breukKleur(c.pct)}; font-weight: 600;">${c.pct.toFixed(0)}%</td></tr>`;
                         }
                     });
                     const s = breukSom(idx, prods, [iso]);
-                    if (s.stuks > 0) html += `<tr class="bh-som"><td>${naam}</td><td></td><td>${s.stuks}</td><td style="color: var(--accent-red);">${s.breuk}</td><td style="color: ${breukKleur(s.pct)};">${s.pct.toFixed(0)}%</td><td style="font-size: 0.7rem; font-weight: 400; color: var(--text-muted);">${euro(s.kost)}</td></tr>`;
+                    // Hele groep uitverkocht: 0% in het groen zou "perfect" suggereren, terwijl de vraag onbekend is.
+                    if (s.stuks > 0) html += `<tr class="bh-som"><td>${naam}</td><td style="color: var(--accent-red);">${s.breuk}</td>${s.breuk === 0
+                        ? '<td style="color: var(--text-muted); font-size: 0.75rem; font-weight: 400; font-family: var(--font-sans);">🔥 uitverkocht</td>'
+                        : `<td style="color: ${breukKleur(s.pct)};">${s.pct.toFixed(0)}%</td>`}</tr>`;
                 });
-                html += '</tbody></table></div>';
+                html += '</tbody></table>';
                 if (iso < todayISO) html += `<div style="margin-top: 8px; text-align: right;"><button class="bh-link" onclick="breukBewerk('${iso}')">✏️ Breuk van deze dag verbeteren</button></div>`;
             }
             elDag.innerHTML = html;
-
-            // ---------- 2. De week (ma → zo) ----------
-            const maandag = formatDateISO(isoWeekStart(dateObj));
-            const weekDagen = Array.from({ length: 7 }, (_, i) => isoPlus(maandag, i));
-            let wk = `<div class="bh-kop">Week ${isoWeekNumber(dateObj)} — breuk % per dag <span style="font-weight: 400; color: var(--text-muted);">(tik op een dag)</span></div>`;
-            wk += '<div class="bh-scroll"><table class="bh-table"><thead><tr><th></th>';
-            weekDagen.forEach(d => {
-                const dd = new Date(d + 'T00:00:00');
-                wk += `<th class="bh-dag${d === iso ? ' bh-gekozen' : ''}" onclick="breukHistNaar('${d}')">${DAG_KORT[dd.getDay()]}<br>${String(dd.getDate()).padStart(2, '0')}/${String(dd.getMonth() + 1).padStart(2, '0')}</th>`;
-            });
-            wk += '</tr></thead><tbody>';
-            const weekCel = (c, gekozen) => {
-                const k = gekozen ? ' class="bh-gekozen"' : '';
-                if (c.soort === 'geen') return `<td${k} style="color: var(--text-muted);">·</td>`;
-                if (c.soort === 'uit') return `<td${k} style="color: var(--accent-red); font-size: 0.62rem;" title="Uit voorraad">UIT</td>`;
-                if (c.soort === 'open') return `<td${k} style="color: var(--text-muted);" title="Breuk nog niet ingevuld">…</td>`;
-                if (c.soort === 'uitverkocht') return `<td${k} style="color: var(--text-muted); font-size: 0.66rem;" title="Uitverkocht">uitv.</td>`;
-                return `<td${k} style="color: ${breukKleur(c.pct)}; font-weight: 600;" title="${c.breuk} van ${c.stuks} st">${c.pct.toFixed(0)}%</td>`;
-            };
-            groepen.forEach(([g, naam]) => {
-                const prods = PRODUCTS.filter(p => p.group === g);
-                prods.forEach(p => {
-                    wk += `<tr><td>${p.short}</td>${weekDagen.map(d => weekCel(breukCel(idx, p, d), d === iso)).join('')}</tr>`;
-                });
-                wk += `<tr class="bh-som"><td>${naam}</td>${weekDagen.map(d => {
-                    const s = breukSom(idx, prods, [d]);
-                    if (s.pct === null) return '<td style="color: var(--text-muted);">·</td>';
-                    // Hele groep uitverkocht: 0% in het groen zou "perfect" suggereren, terwijl de vraag onbekend is.
-                    if (s.breuk === 0) return '<td style="color: var(--text-muted); font-size: 0.66rem; font-weight: 400;" title="Alles uitverkocht">uitv.</td>';
-                    return `<td style="color: ${breukKleur(s.pct)};">${s.pct.toFixed(0)}%</td>`;
-                }).join('')}</tr>`;
-            });
-            wk += '</tbody></table></div>';
-            wk += '<div style="font-size: 0.66rem; color: var(--text-muted); margin-top: 4px;"><span style="color: var(--accent-green);">■</span> tot 5% · <span style="color: var(--accent-orange);">■</span> tot 15% · <span style="color: var(--accent-red);">■</span> meer · uitv. = uitverkocht · … = nog niet ingevuld</div>';
-            document.getElementById('breuk-hist-week').innerHTML = wk;
-
-            // ---------- 3. Kerncijfers ----------
-            // Deze week tegen de 4 weken ervoor — op DEZELFDE weekdagen, zodat een week die
-            // nog loopt (ma-do ingevuld) eerlijk vergeleken wordt met ma-do van de weken ervoor.
-            let cf = '<div class="bh-kop">Deze week t.o.v. de 4 weken ervoor</div><div class="bh-tegels">';
-            groepen.forEach(([g, naam]) => {
-                const prods = PRODUCTS.filter(p => p.group === g);
-                const nu = breukSom(idx, prods, weekDagen);
-                const dagenNu = weekDagen.filter(d => nu.dagen.has(d));
-                let vStuks = 0, vBreuk = 0, vKost = 0, vWeken = 0;
-                for (let w = 1; w <= 4; w++) {
-                    const s = breukSom(idx, prods, dagenNu.map(d => isoPlus(d, -7 * w)));
-                    if (s.stuks > 0) { vStuks += s.stuks; vBreuk += s.breuk; vKost += s.kost; vWeken++; }
-                }
-                const vPct = vStuks > 0 ? vBreuk / vStuks * 100 : null;
-                let oordeel = '';
-                if (nu.pct !== null && vPct !== null) {
-                    const d = nu.pct - vPct;
-                    oordeel = Math.abs(d) < 1 ? '≈ gelijk'
-                        : d < 0 ? `<span style="color: var(--accent-green);">▼ ${Math.abs(d).toFixed(1).replace('.', ',')} punt minder breuk</span>`
-                                : `<span style="color: var(--accent-red);">▲ ${d.toFixed(1).replace('.', ',')} punt meer breuk</span>`;
-                }
-                cf += `<div class="bh-tegel"><div class="t">${naam}${dagenNu.length && dagenNu.length < 7 ? ` · ${dagenNu.length} dag${dagenNu.length > 1 ? 'en' : ''}` : ''}</div>
-                    <div class="v" style="color: ${nu.pct === null ? 'var(--text-muted)' : breukKleur(nu.pct)};">${pct1(nu.pct)} <span style="font-size: 0.75rem; color: var(--text-secondary);">${nu.pct === null ? '' : euro(nu.kost)}</span></div>
-                    <div class="s">ervoor: ${pct1(vPct)}${vWeken ? ' · ' + euro(vKost / vWeken) + '/week' : ''}</div>
-                    <div class="s">${oordeel}</div></div>`;
-            });
-            cf += '</div>';
-
-            // Breuk % per weekdag over 8 weken (deze week + de 7 ervoor).
-            const acht = [];
-            for (let w = 0; w < 8; w++) weekDagen.forEach(d => acht.push(isoPlus(d, -7 * w)));
-            cf += '<div class="bh-kop">Breuk % per weekdag — laatste 8 weken</div><div class="bh-scroll"><table class="bh-table"><thead><tr><th></th>';
-            [1, 2, 3, 4, 5, 6, 0].forEach(dw => { cf += `<th>${DAG_KORT[dw]}</th>`; });
-            cf += '<th>alle</th></tr></thead><tbody>';
-            groepen.forEach(([g, naam]) => {
-                const prods = PRODUCTS.filter(p => p.group === g);
-                cf += `<tr><td>${naam}</td>`;
-                [1, 2, 3, 4, 5, 6, 0].forEach(dw => {
-                    const s = breukSom(idx, prods, acht.filter(d => new Date(d + 'T00:00:00').getDay() === dw));
-                    cf += s.pct === null ? '<td style="color: var(--text-muted);">·</td>' : `<td style="color: ${breukKleur(s.pct)}; font-weight: 600;">${s.pct.toFixed(0)}%</td>`;
-                });
-                const alle = breukSom(idx, prods, acht);
-                cf += alle.pct === null ? '<td>·</td>' : `<td style="color: ${breukKleur(alle.pct)}; font-weight: 700;">${alle.pct.toFixed(0)}%</td>`;
-                cf += '</tr>';
-            });
-            cf += '</tbody></table></div>';
-
-            // Waar gaat het geld naartoe? Kost van breuk per product over dezelfde 8 weken.
-            const rang = PRODUCTS.map(p => ({ p, s: breukSom(idx, [p], acht) })).filter(x => x.s.stuks > 0)
-                                 .sort((a, b) => b.s.kost - a.s.kost);
-            if (rang.length) {
-                const totKost = rang.reduce((t, x) => t + x.s.kost, 0);
-                cf += '<div class="bh-kop">Kost van breuk per product — laatste 8 weken</div><div class="bh-scroll"><table class="bh-table"><thead><tr><th>Product</th><th>Breuk</th><th>%</th><th>Kost</th><th>Aandeel</th></tr></thead><tbody>';
-                rang.forEach((x, i) => {
-                    cf += `<tr><td>${i === 0 ? '💸 ' : ''}${x.p.short}</td><td>${x.s.breuk}</td><td style="color: ${breukKleur(x.s.pct)}; font-weight: 600;">${x.s.pct.toFixed(0)}%</td><td>${hasCostPrice(x.p) ? euro(x.s.kost) : '—'}</td><td style="color: var(--text-muted);">${totKost > 0 ? Math.round(x.s.kost / totKost * 100) + '%' : '—'}</td></tr>`;
-                });
-                cf += `<tr class="bh-som"><td>Totaal</td><td>${rang.reduce((t, x) => t + x.s.breuk, 0)}</td><td></td><td>${euro(totKost)}</td><td></td></tr></tbody></table></div>`;
-            }
-            document.getElementById('breuk-hist-cijfers').innerHTML = cf;
         }
-        
+
+        // ===== BREUK-TREND + GEMIDDELDE PER WEEKDAG (16-11-2026) — alleen lezen =====
+        // Vervangt het weekraster, de tegels en de kostentabel van 15-11 (te veel cijfers).
+        //   • Trend: breuk-% per VOLLEDIGE kalenderweek (ma-zo), laatste 12 weken, één lijn
+        //     per groep + stippellijn = doel-breuk. De lopende week telt niet mee: die mist
+        //     dagen, en elke weekdag heeft zijn eigen breukniveau. Oordeel = laatste 4 weken
+        //     tegen de 4 ervoor; een verschil onder 1 procentpunt heet stabiel (ruis).
+        //   • Weekdag: breuk-% per weekdag over de laatste 4/8/12 weken t/m gisteren, de
+        //     hoogste weekdag per groep gemarkeerd.
+        // Breuk-% = breuk / gebakken stuks, opgeteld over de dagen (niet het gemiddelde van
+        // dag-percentages). Een uitverkochte dag telt als 0 breuk; uit voorraad telt niet mee.
+        const BT_GROEPEN = [['A', 'Pistolets', 'var(--accent-orange)'], ['B', 'Stokbrood', 'var(--accent-cyan)']];
+        const BT_WEKEN = 12;
+        let breukWeekdagWeken = 8;
+        function zetBreukWeekdagWeken(n) { breukWeekdagWeken = n; renderBreukWeekdag(); }
+
+        function renderBreukTrend() {
+            const el = document.getElementById('breuk-trend');
+            if (!el) return;
+            const idx = new Map(historicalData.map(r => [r.datum + '|' + r.product, r]));
+            // Maandag van de laatste volledig afgesloten week (de week van vandaag loopt nog).
+            const laatste = isoPlus(formatDateISO(isoWeekStart(new Date())), -7);
+            let weken = [];
+            for (let k = BT_WEKEN - 1; k >= 0; k--) {
+                const ma = isoPlus(laatste, -7 * k);
+                weken.push({ nr: isoWeekNumber(new Date(ma + 'T00:00:00')), dagen: Array.from({ length: 7 }, (_, i) => isoPlus(ma, i)) });
+            }
+            let reeksen = BT_GROEPEN.map(([g, naam, kleur]) => {
+                const prods = PRODUCTS.filter(p => p.group === g);
+                return { naam, kleur, doel: doelBreuk(prods[0]), pts: weken.map(w => breukSom(idx, prods, w.dagen)) };
+            });
+            // Lege weken vooraan (historiek nog niet zo oud) laten vallen.
+            let eerste = weken.findIndex((w, i) => reeksen.some(r => r.pts[i].pct !== null));
+            if (eerste < 0) eerste = weken.length;
+            weken = weken.slice(eerste);
+            reeksen.forEach(r => { r.pts = r.pts.slice(eerste); });
+            const n = weken.length;
+            if (n < 2) {
+                el.innerHTML = '<div style="color: var(--text-muted); font-size: 0.8rem;">Nog geen 2 volledige weken met ingevulde breuk.</div>';
+                return;
+            }
+
+            // ---- grafiek (SVG, kleuren uit het thema) ----
+            const W = 320, H = 150, L = 30, R = 10, T = 8, B = 20;
+            const hoogste = Math.max(...reeksen.flatMap(r => r.pts.map(s => s.pct || 0)), ...reeksen.map(r => r.doel || 0), 1);
+            const stap = mooieStap(hoogste / 4);
+            const yMax = Math.ceil(hoogste / stap) * stap;
+            const x = i => L + i / (n - 1) * (W - L - R);
+            const y = v => T + (1 - v / yMax) * (H - T - B);
+            const f1 = v => v.toFixed(1);
+            let svg = `<svg class="bt-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Breuk-procent per week">`;
+            for (let v = 0; v <= yMax + 1e-9; v += stap) {
+                svg += `<line class="raster" x1="${L}" x2="${W - R}" y1="${f1(y(v))}" y2="${f1(y(v))}"/><text x="${L - 4}" y="${f1(y(v) + 3)}" text-anchor="end">${Math.round(v * 10) / 10}%</text>`;
+            }
+            const labelStap = n > 8 ? 2 : 1;
+            weken.forEach((w, i) => {
+                if ((n - 1 - i) % labelStap === 0) svg += `<text x="${f1(x(i))}" y="${H - 6}" text-anchor="middle">W${w.nr}</text>`;
+            });
+            reeksen.forEach(r => {
+                if (r.doel > 0 && r.doel <= yMax) svg += `<line x1="${L}" x2="${W - R}" y1="${f1(y(r.doel))}" y2="${f1(y(r.doel))}" style="stroke: ${r.kleur}; stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.55;"/>`;
+            });
+            reeksen.forEach(r => {
+                let d = '', pen = false;
+                r.pts.forEach((s, i) => {
+                    if (s.pct === null) { pen = false; return; }
+                    d += `${pen ? 'L' : 'M'}${f1(x(i))} ${f1(y(s.pct))} `;
+                    pen = true;
+                });
+                svg += `<path class="lijn" d="${d.trim()}" style="stroke: ${r.kleur};"/>`;
+                r.pts.forEach((s, i) => {
+                    if (s.pct !== null) svg += `<circle cx="${f1(x(i))}" cy="${f1(y(s.pct))}" r="2.6" style="fill: ${r.kleur};"><title>W${weken[i].nr} · ${r.naam}: ${pct1(s.pct)} (${s.breuk} van ${s.stuks} st)</title></circle>`;
+                });
+            });
+            svg += '</svg>';
+            let html = svg + '<div class="bt-legende">' + reeksen.map(r => `<span><b style="color: ${r.kleur};">●</b> ${r.naam}</span>`).join('') + '<span>- - doel</span></div>';
+
+            // ---- oordeel: laatste 4 weken tegen de 4 ervoor ----
+            const som = lijst => {
+                let st = 0, br = 0, wk = 0;
+                lijst.forEach(s => { if (s.stuks > 0) { st += s.stuks; br += s.breuk; wk++; } });
+                return wk ? { pct: br / st * 100, wk } : null;
+            };
+            reeksen.forEach(r => {
+                const nu = som(r.pts.slice(-4)), toen = som(r.pts.slice(-8, -4));
+                let oordeel = '<span style="color: var(--text-muted);">nog te weinig weken</span>', cijfers = nu ? pct1(nu.pct) : '';
+                if (nu && toen && nu.wk >= 2 && toen.wk >= 2) {
+                    const d = nu.pct - toen.pct;
+                    oordeel = Math.abs(d) < 1 ? '<b style="color: var(--text-secondary);">≈ stabiel</b>'
+                        : d > 0 ? '<b style="color: var(--accent-red);">▲ stijgt</b>'
+                                : '<b style="color: var(--accent-green);">▼ daalt</b>';
+                    cijfers = `${pct1(toen.pct)} → ${pct1(nu.pct)}`;
+                }
+                html += `<div class="bt-regel"><span><b style="color: ${r.kleur};">●</b> ${r.naam} ${oordeel}</span><span class="cijfers">${cijfers}</span></div>`;
+            });
+            html += `<div style="font-size: 0.66rem; color: var(--text-muted); margin-top: 6px;">Breuk-% per volledige week (W${weken[0].nr}–W${weken[n - 1].nr}). Stijgt/daalt = de laatste 4 weken tegen de 4 ervoor; minder dan 1 punt verschil = stabiel.</div>`;
+            el.innerHTML = html;
+        }
+
+        function renderBreukWeekdag() {
+            const el = document.getElementById('breuk-weekdag');
+            if (!el) return;
+            const idx = new Map(historicalData.map(r => [r.datum + '|' + r.product, r]));
+            const gisteren = isoPlus(formatDateISO(new Date()), -1);
+            const dagen = Array.from({ length: breukWeekdagWeken * 7 }, (_, i) => isoPlus(gisteren, -i));
+            const volg = [1, 2, 3, 4, 5, 6, 0];
+            const DAG_LANG = ['zondag', 'maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag'];
+            let html = '<div style="display: flex; gap: 4px; margin-bottom: 8px; align-items: center; flex-wrap: wrap;"><span style="font-size: 0.72rem; color: var(--text-muted); margin-right: 4px;">Laatste</span>'
+                + [4, 8, 12].map(w => `<button class="range-btn${w === breukWeekdagWeken ? ' active' : ''}" style="padding: 6px 10px; font-size: 0.72rem;" onclick="zetBreukWeekdagWeken(${w})">${w} weken</button>`).join('') + '</div>';
+            html += '<div class="bh-scroll"><table class="bh-table"><thead><tr><th></th>' + volg.map(dw => `<th>${DAG_KORT[dw]}</th>`).join('') + '<th>alle</th></tr></thead><tbody>';
+            const zinnen = [];
+            BT_GROEPEN.forEach(([g, naam]) => {
+                const prods = PRODUCTS.filter(p => p.group === g);
+                const per = volg.map(dw => breukSom(idx, prods, dagen.filter(d => new Date(d + 'T00:00:00').getDay() === dw)));
+                const geldig = per.filter(s => s.pct !== null);
+                const top = geldig.length > 1 ? Math.max(...geldig.map(s => s.pct)) : 0;
+                html += `<tr><td>${naam}</td>`;
+                per.forEach(s => {
+                    html += s.pct === null ? '<td style="color: var(--text-muted);">·</td>'
+                        : `<td${top > 0 && s.pct === top ? ' class="bh-top"' : ''} style="color: ${breukKleur(s.pct)}; font-weight: 600;">${s.pct.toFixed(0)}%</td>`;
+                });
+                const alle = breukSom(idx, prods, dagen);
+                html += alle.pct === null ? '<td>·</td>' : `<td style="color: ${breukKleur(alle.pct)}; font-weight: 700;">${alle.pct.toFixed(0)}%</td>`;
+                html += '</tr>';
+                if (top > 0) zinnen.push(`${naam} op <b style="color: var(--text-primary);">${DAG_LANG[volg[per.findIndex(s => s.pct === top)]]}</b> (${top.toFixed(0)}%)`);
+            });
+            html += '</tbody></table></div>';
+            if (zinnen.length) html += `<div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 8px;">Meeste breuk: ${zinnen.join(' · ')}</div>`;
+            html += '<div style="font-size: 0.66rem; color: var(--text-muted); margin-top: 4px;"><span style="color: var(--accent-green);">■</span> tot 5% · <span style="color: var(--accent-orange);">■</span> tot 15% · <span style="color: var(--accent-red);">■</span> meer · gekleurd vakje = de weekdag met de meeste breuk</div>';
+            el.innerHTML = html;
+        }
+
         // ===== HISTORIEK =====
         let histDateMode = 'single'; // 'single' or 'range'
         
@@ -6563,7 +6503,7 @@
         // Handmatig ophogen bij elke wijziging. Samen met de datum van het bestand
         // zelf zie je in Instellingen meteen of je telefoon de nieuwe versie al
         // binnen heeft, of dat je nog even op de cache moet wachten.
-        const APP_VERSIE = 'v2026-11-16.1';
+        const APP_VERSIE = 'v2026-11-16.2';
 
         function toonVersie() {
             const el = document.getElementById('app-versie');
